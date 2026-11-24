@@ -1,0 +1,50 @@
+/* darkroom: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Darkroom: a photo lab under the safelight. Everything in reds, a film strip down the sidebar's edge with frame
+   numbers by the workspaces, sprocket holes along the tab bar, Futura caps, and the safelight's glow over the terminals */
+[data-look='darkroom'] { --radius: 2px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 1px); --r-m: var(--rs, 2px); --r-l: var(--rs, 3px); --r-xl: var(--rs, 5px); --ui-font: Futura, 'Avenir Next', 'Century Gothic', sans-serif; --glow: 0 0 12px rgba(255, 68, 51, 0.4); }
+[data-look='darkroom'] :is(.settings-main h2, .tunnel-head b) { color: var(--accent-ink); font-size: var(--fs-4); font-weight: 500; letter-spacing: 3px; text-transform: uppercase; }
+[data-look='darkroom'] .settings-main h2::after { content: '  \25B8 400'; font-size: var(--fs-1); letter-spacing: 1px; color: var(--muted); }
+[data-look='darkroom'] .project-head { letter-spacing: 2px; }
+[data-look='darkroom'] .sidebar { padding-right: 12px; counter-reset: frame; }
+[data-look='darkroom'] .app:not(.narrow) .sidebar { position: relative; } /* a phone's drawer is fixed already */
+[data-look='darkroom'] .sidebar::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 12px; pointer-events: none;
+  background: linear-gradient(rgba(255, 120, 100, 0.22) 0 8px, transparent 8px) 3px 4px / 6px 14px repeat-y, #050101; }
+[data-look='darkroom'] .ws { counter-increment: frame; }
+[data-look='darkroom'] .ws::after { content: counter(frame) 'A'; flex: none; font: 9px var(--mono); color: var(--muted); opacity: 0.7; }
+[data-look='darkroom'] .tabbar { background: linear-gradient(90deg, rgba(255, 120, 100, 0.2) 0 8px, transparent 8px) 6px 2px / 16px 5px repeat-x, var(--side); }
+[data-look='darkroom'] .tab { border-radius: var(--rs, 2px) var(--rs, 2px) 0 0; text-transform: uppercase; letter-spacing: 1px; font-size: var(--fs-1); }
+[data-look='darkroom'] .tab.sel { background: var(--bg); }
+[data-look='darkroom'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #5a1a14; border-radius: var(--rs, 2px); background: var(--panel); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='darkroom'] :is(.buttons button, .seg button, .scripts-tabs button):hover { border-color: var(--accent); box-shadow: var(--glow); }
+[data-look='darkroom'] .seg button.on { background: var(--sel); border-color: var(--accent); color: #fff0ea; }
+[data-look='darkroom'] button.primary { border: none; border-radius: var(--rs, 2px); background: var(--accent); color: var(--accent-fg); text-transform: uppercase; letter-spacing: 2px; box-shadow: var(--glow); }
+[data-look='darkroom'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a1612; border-radius: var(--rs, 2px); background: #0d0404; }
+[data-look='darkroom'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #4a1612; border-radius: var(--rs, 3px); box-shadow: 0 0 0 1px #000, 0 0 40px rgba(255, 40, 20, 0.14), 0 20px 50px rgba(0, 0, 0, 0.7); }
+[data-look='darkroom'] .menu-item:hover { background: var(--sel); color: #fff0ea; }
+[data-look='darkroom'] .ws.sel { background: linear-gradient(90deg, var(--sel), transparent); border-left-color: var(--accent); color: #fff0ea; }
+[data-look='darkroom'] .settings-nav > button.on { background: var(--sel); color: #fff0ea; }
+[data-look='darkroom'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(ellipse at 88% -8%, rgba(255, 40, 20, 0.16), transparent 55%), radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.35)); }
+[data-look='darkroom'] .toggle.on .toggle-track { background: var(--accent); box-shadow: var(--glow); }
+[data-look='darkroom'] .theme { border-radius: var(--rs, 2px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

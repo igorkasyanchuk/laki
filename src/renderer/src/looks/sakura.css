@@ -1,0 +1,51 @@
+/* sakura: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Sakura: cherry blossom season. Blush paper, petals drifting down the terminals and a sprig in their corner,
+   Hiragino Mincho headings with a ❀, round buttons, a petal-pink main one */
+[data-look='sakura'] { --radius: 14px; --r-xs: var(--rs, 5px); --r-s: var(--rs, 9px); --r-m: var(--rs, 14px); --r-l: var(--rs, 23px); --r-xl: var(--rs, 33px); --ui-font: 'Hiragino Sans', 'Avenir Next', sans-serif; --head: 'Hiragino Mincho ProN', 'Songti SC', serif;
+  --petal: radial-gradient(ellipse 6px 3.5px at 50% 50%, rgba(240, 130, 165, 0.7) 55%, transparent 70%);
+  --bloom: radial-gradient(circle, #fff 0 1.5px, #f7a8c0 2px 5px, transparent 5.5px); }
+[data-look='sakura'] :is(.sidebar, .settings-nav) { background: radial-gradient(ellipse at 100% 0, rgba(240, 138, 168, 0.2), transparent 55%), var(--side); }
+[data-look='sakura'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); font-weight: 600; font-size: var(--fs-5); letter-spacing: 2px; color: #b8405f; }
+[data-look='sakura'] .settings-main h2::after { content: '\2740'; margin-left: 10px; color: #f08aa8; font-size: var(--fs-4); }
+[data-look='sakura'] .project-head { color: #b44b68; letter-spacing: 1.5px; }
+[data-look='sakura'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); border-radius: 999px; background: #fff; }
+[data-look='sakura'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='sakura'] .seg button.on { background: #fde3eb; border-color: var(--accent); }
+[data-look='sakura'] button.primary { border: none; border-radius: 999px; background: linear-gradient(135deg, #d3507a, #bb3a60); color: #fff; box-shadow: 0 3px 10px rgba(224, 87, 127, 0.3); }
+[data-look='sakura'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: var(--rs, 10px); border-color: var(--line); background: #fff; }
+[data-look='sakura'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--line); border-radius: var(--rs, 16px); box-shadow: 0 14px 40px rgba(200, 80, 120, 0.18); }
+[data-look='sakura'] .menu-item:hover { background: #fde3eb; border-radius: var(--rs, 10px); }
+[data-look='sakura'] .ws.sel { background: linear-gradient(90deg, rgba(240, 138, 168, 0.3), transparent); border-left-color: var(--accent); }
+[data-look='sakura'] .settings-nav > button.on { background: var(--sel); border-radius: 999px; }
+[data-look='sakura'] .tab.sel { border-radius: var(--rs, 14px) var(--rs, 14px) 0 0; box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)); }
+[data-look='sakura'] .term-wrap { overflow: hidden; }
+[data-look='sakura'] .term-wrap::before { content: ''; position: absolute; left: -40px; right: 0; top: -300px; bottom: 0; z-index: 2; pointer-events: none; opacity: 0.65; animation: sk-fall 18s linear infinite;
+  background: var(--petal) 5% 20px / 14px 150px repeat-y, var(--petal) 18% 110px / 14px 300px repeat-y, var(--petal) 31% 40px / 14px 100px repeat-y, var(--petal) 46% 160px / 14px 300px repeat-y,
+    var(--petal) 59% 70px / 14px 150px repeat-y, var(--petal) 73% 0 / 14px 300px repeat-y, var(--petal) 86% 90px / 14px 100px repeat-y, var(--petal) 97% 200px / 14px 300px repeat-y; }
+[data-look='sakura'] .term-wrap::after { content: ''; position: absolute; top: 0; right: 0; width: 44px; height: 40px; z-index: 2; pointer-events: none; opacity: 0.45;
+  background: var(--bloom) 28px 2px / 12px 12px no-repeat, var(--bloom) 14px 6px / 12px 12px no-repeat, var(--bloom) 30px 18px / 12px 12px no-repeat; } /* a sprig in the corner */
+[data-look='sakura'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='sakura'] .theme { border-radius: var(--rs, 14px); }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='sakura'] .term-wrap::before, [data-look='magma'] .term-wrap::before, [data-look='shibuya'] .term-wrap::before, [data-look='tiki'] .term-wrap::after { animation: none; }
+}
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

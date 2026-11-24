@@ -1,0 +1,26 @@
+/* retro: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* The creative themes' looks (themes.ts `look`): more than colors, shapes, borders, shadows and type, then the Frosted
+   design. Loads last (main.tsx): at equal specificity a look wins. */
+
+/* ---------- looks: more than colors ---------- */
+
+/* Phosphor: a CRT. Mono everywhere, square and dashed, glowing text, scanlines over the terminals */
+[data-look='retro'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: var(--mono); }
+[data-look='retro'] body { text-shadow: 0 0 5px color-mix(in srgb, var(--fg) 40%, transparent); }
+[data-look='retro'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea, .menu, .modal, .tunnel-pop, .toast, .theme, .run-btn, kbd) {
+  border-style: dashed; border-radius: 0; }
+[data-look='retro'] .ib { border-radius: 0; }
+[data-look='retro'] :is(.menu, .modal, .tunnel-pop) { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 0 28px color-mix(in srgb, var(--accent) 22%, transparent); }
+[data-look='retro'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1px; font-size: var(--fs-1); }
+[data-look='retro'] :is(.project-head, .settings-main h2) { letter-spacing: 2px; }
+[data-look='retro'] .ws.sel { box-shadow: inset 3px 0 0 var(--accent); }
+[data-look='retro'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

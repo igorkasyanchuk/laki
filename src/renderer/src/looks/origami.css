@@ -1,0 +1,37 @@
+/* origami: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Origami: folded paper. Panels and buttons creased along the diagonal, corners folded down on popups, a two-tone
+   folded main button, a paper square before the headings, faint crease lines across the terminals */
+[data-look='origami'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: 'Manrope', 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --crease: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0 50%, rgba(0, 0, 0, 0.035) 50% 100%);
+  --cut: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
+[data-look='origami'] :is(.sidebar, .settings-nav) { background: linear-gradient(160deg, rgba(255, 255, 255, 0.5) 0 38%, transparent 38% 100%), var(--side); }
+[data-look='origami'] :is(.settings-main h2, .tunnel-head b) { font-weight: 600; font-size: var(--fs-5); letter-spacing: 1px; }
+[data-look='origami'] .settings-main h2::before { content: ''; display: inline-block; width: 16px; height: 16px; margin-right: 10px; vertical-align: -2px;
+  background: linear-gradient(135deg, #f06a4a 0 50%, #c8432a 50% 100%); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+[data-look='origami'] .project-head { color: var(--accent-ink); letter-spacing: 2px; }
+[data-look='origami'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: none; border-radius: 0; background: var(--crease), var(--raised); clip-path: var(--cut); }
+[data-look='origami'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='origami'] .seg button.on { background: var(--crease), #f3dccf; }
+[data-look='origami'] button.primary { border: none; border-radius: 0; background: linear-gradient(135deg, #c4523a 0 50%, #a83c27 50% 100%); color: #fff; font-weight: 600; clip-path: var(--cut); }
+[data-look='origami'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-color: var(--line); background: #fff; }
+[data-look='origami'] :is(.menu, .modal, .tunnel-pop) { border: 1px solid var(--line); border-radius: 0; background: linear-gradient(225deg, #e2dccd 0 14px, transparent 14px), var(--crease), var(--panel);
+  box-shadow: 2px 3px 0 rgba(43, 43, 51, 0.08), 0 14px 34px rgba(43, 43, 51, 0.14); }
+[data-look='origami'] .menu-item { border-radius: 0; }
+[data-look='origami'] .menu-item:hover { background: #f3dccf; }
+[data-look='origami'] .ws.sel { background: linear-gradient(135deg, #f3dccf 0 60%, #ecd0c0 60% 100%); border-left-color: var(--accent); }
+[data-look='origami'] .settings-nav > button.on { background: linear-gradient(135deg, #f3dccf 0 60%, #ecd0c0 60% 100%); }
+[data-look='origami'] .tab { border-radius: 0; }
+[data-look='origami'] .tab.sel { background: var(--crease), var(--term-bg); box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)); }
+[data-look='origami'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.5;
+  background: linear-gradient(135deg, transparent calc(50% - 0.5px), rgba(43, 43, 51, 0.06) 50%, transparent calc(50% + 0.5px)), linear-gradient(45deg, transparent calc(50% - 0.5px), rgba(43, 43, 51, 0.05) 50%, transparent calc(50% + 0.5px)); }
+[data-look='origami'] :is(.toggle-track, .toggle-knob) { border-radius: 0; }
+[data-look='origami'] .theme { border-radius: 0; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

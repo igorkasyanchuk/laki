@@ -2451,7 +2451,7 @@ ${bridge && /Mac/.test(navigator.userAgent) && !narrow ? 'electron' : ''} ${sett
       {railBar}
       {(sideOpen || video) && <Sidebar app={app} /> /* hidden, not gone, while a video plays */}
       {strip === 'left' && stripBar}
-      {sideOpen && !listOff && !strip && (narrow ? <div role="presentation" className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={(rail ? railW : 0) + (settings.design === 'frosted' ? 8 : 0) /* its frame's padding (looks.css --f-gap) */} />)}
+      {sideOpen && !listOff && !strip && (narrow ? <div role="presentation" className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={(rail ? railW : 0) + (settings.design === 'frosted' ? 8 : 0) /* its frame's padding (looks/ --f-gap) */} />)}
 
       {narrow && !sideOpen && <div className="drawer-edge" aria-hidden="true" /> /* a swipe from the left edge opens the drawer (Phone.tsx) */}
       <main inert={narrow && sideOpen /* a phone's drawer over it */} className={`main ${wsTint ? 'ws-tint' : ''}`} style={wsTint ? ({ '--ws': `var(--tc-${wsTint})` } as CSSProperties) : undefined /* Extras › Tint with the workspace's color: styles.css' --ws */}>

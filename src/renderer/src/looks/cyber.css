@@ -1,0 +1,28 @@
+/* cyber: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Cyberpunk: clipped corners, hazard stripes, yellow on black, a glitch in the headings */
+[data-look='cyber'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --cut: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px)); }
+[data-look='cyber'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, .run-btn, .theme) { clip-path: var(--cut); text-transform: uppercase; letter-spacing: 1px; font-size: var(--fs-1); }
+[data-look='cyber'] button.primary { font-weight: 800; box-shadow: none; }
+[data-look='cyber'] :is(.menu, .modal, .tunnel-pop, .toast) { border-radius: 0; border-left: 3px solid var(--accent);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
+[data-look='cyber'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-width: 0 0 2px; border-bottom-color: var(--accent); }
+[data-look='cyber'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { border-bottom-color: var(--running); }
+[data-look='cyber'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1px; font-size: var(--fs-1); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 100%, 0 100%); padding-right: 16px; }
+[data-look='cyber'] .tab.sel { background: var(--accent); color: var(--accent-fg); box-shadow: inset 0 -3px 0 var(--tab-c, transparent); }
+[data-look='cyber'] .ws.sel { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 24%, transparent), transparent); border-left: 3px solid var(--accent); }
+[data-look='cyber'] :is(.project-head, .settings-main h2) { color: var(--accent-ink); letter-spacing: 2px;
+  text-shadow: 1.5px 0 color-mix(in srgb, var(--tc-pink) 70%, transparent), -1.5px 0 color-mix(in srgb, var(--running) 70%, transparent); }
+[data-look='cyber'] .sidebar { border-right: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='cyber'] .status { border-top: 3px solid transparent; border-image: repeating-linear-gradient(-45deg, var(--accent) 0 7px, var(--bg) 7px 14px) 3; }
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+[data-look='cyber'] :is(.side-panel, .info) { border-left: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+/* a selected tab filled with a color: its status mark in the tab's own text color (green on orange doesn't read) */
+:is([data-look='cyber'], [data-look='pocket'], [data-look='starship'], [data-look='groovy'], [data-look='bricks'], [data-look='cassette'], [data-look='brass']) .tab.sel .glyph { color: inherit; --running: currentColor; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

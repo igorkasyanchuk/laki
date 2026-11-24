@@ -1,0 +1,53 @@
+/* denim: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Denim: jeans. A twill weave on the panels, orange stitching inset along every seam, a leather patch for the main
+   button, popups cut like a back pocket */
+[data-look='denim'] { --radius: 6px; --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px); --stitch: color-mix(in srgb, #e8a33d 85%, transparent);
+  --twill: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 5px); }
+[data-look='denim'] :is(.sidebar, .tabbar, .settings-head, .settings-nav, .status, .info, .side-panel) { background-image: var(--twill); }
+[data-look='denim'] :is(.project-head, .settings-main h2, .tunnel-head b) { color: var(--accent-ink); letter-spacing: 1px; }
+[data-look='denim'] .settings-main h2 { padding-bottom: 6px; border-bottom: 2px dashed var(--stitch); }
+[data-look='denim'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #0d1626; border-radius: var(--rs, 6px); background: var(--raised);
+  outline: 1px dashed var(--stitch); outline-offset: -4px; }
+[data-look='denim'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):hover { background: var(--sel); }
+[data-look='denim'] .seg button.on { background: #35548a; }
+[data-look='denim'] button.primary { border: 1px solid #4a2c12; border-radius: var(--rs, 6px); background: linear-gradient(180deg, #a8703a, #7a4c22); color: #fbe8cc; font-weight: 700;
+  outline: 1px dashed #f3d3a0; outline-offset: -4px; text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4); }
+[data-look='denim'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 1px solid #0d1626; background: #101b2e; }
+[data-look='denim'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { border-color: var(--accent); }
+[data-look='denim'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #0d1626; border-radius: var(--rs, 8px) var(--rs, 8px) var(--rs, 22px) var(--rs, 22px); background: var(--twill), var(--panel);
+  outline: 1.5px dashed var(--stitch); outline-offset: -6px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); }
+[data-look='denim'] .menu-item:hover { background: var(--sel); }
+[data-look='denim'] .sidebar { border-right: 1px solid #0d1626; box-shadow: inset -5px 0 0 -3px var(--stitch); }
+[data-look='denim'] :is(.tabbar, .settings-head) { --tab-line: 2px dashed var(--stitch); border-bottom: 2px dashed var(--stitch); }
+[data-look='denim'] .status { border-top: 2px dashed var(--stitch); background-color: #0f1a2c; }
+[data-look='denim'] .tab { border-radius: var(--rs, 6px) var(--rs, 6px) 0 0; }
+[data-look='denim'] .tab.sel { box-shadow: inset 0 3px 0 var(--tab-c, var(--accent)); }
+[data-look='denim'] .ws.sel { margin: 1px 6px; border-left-color: transparent; border-radius: var(--rs, 6px); background: var(--sel); outline: 1px dashed var(--stitch); outline-offset: -3px; }
+[data-look='denim'] .settings-nav > button.on { background: var(--sel); outline: 1px dashed var(--stitch); outline-offset: -3px; }
+[data-look='denim'] .toggle-track { background: #101b2e; box-shadow: inset 0 0 0 1px var(--stitch); }
+[data-look='denim'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='denim'] .toggle-knob { background: #c48a4a; }
+[data-look='denim'] .theme { border-style: dashed; border-color: var(--stitch); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+[data-look='denim'] { --ws-guide: 2px dashed var(--stitch); --proj-divider: 1px dashed var(--stitch); }
+[data-look='denim'] :is(.side-panel, .info) { border-left: 1px solid #0d1626; box-shadow: inset 5px 0 0 -3px var(--stitch); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

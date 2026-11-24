@@ -1,0 +1,43 @@
+/* fieldops: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Field Ops: a command post. Olive drab and khaki, faint camouflage on the sidebar, DIN Condensed in capitals,
+   square stenciled buttons, hazard stripes on the main one and the status bar, HUD brackets and a grid on the terminals */
+[data-look='fieldops'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: 'DIN Alternate', 'Avenir Next Condensed', sans-serif;
+  --camo: radial-gradient(ellipse 40px 24px at 20% 30%, rgba(90, 100, 60, 0.18), transparent 70%) 0 0 / 120px 90px, radial-gradient(ellipse 30px 40px at 70% 60%, rgba(60, 70, 40, 0.22), transparent 70%) 0 0 / 120px 90px,
+    radial-gradient(ellipse 50px 20px at 40% 85%, rgba(110, 100, 60, 0.14), transparent 70%) 0 0 / 120px 90px;
+  --hazard: repeating-linear-gradient(-45deg, #c8b45a 0 6px, #141611 6px 12px); }
+[data-look='fieldops'] :is(.sidebar, .settings-nav) { background: var(--camo), var(--side); }
+[data-look='fieldops'] :is(.settings-main h2, .tunnel-head b) { font-family: 'DIN Condensed', var(--ui-font); font-size: var(--fs-5); font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--accent-ink); }
+[data-look='fieldops'] .settings-main h2::before { content: '// '; color: var(--muted); }
+[data-look='fieldops'] .project-head { font-family: 'DIN Condensed', var(--ui-font); font-size: var(--fs-3); letter-spacing: 2.5px; color: var(--accent-ink); }
+[data-look='fieldops'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a5240; border-radius: 0; background: #1f231a; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='fieldops'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='fieldops'] .seg button.on { border-color: var(--accent); color: var(--accent-ink); }
+[data-look='fieldops'] button.primary { border: none; border-radius: 0; background: var(--accent); color: #141611; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; box-shadow: inset 4px 0 0 #141611, inset 10px 0 0 #c8b45a, inset 14px 0 0 #141611; }
+[data-look='fieldops'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a5240; border-radius: 0; background: #10120d; }
+[data-look='fieldops'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #5a6448; border-radius: 0; box-shadow: 0 0 0 1px #10120d, 0 18px 40px rgba(0, 0, 0, 0.6); }
+[data-look='fieldops'] .modal-title { text-transform: uppercase; letter-spacing: 2px; padding-bottom: 6px; border-bottom: 4px solid transparent; border-image: var(--hazard) 4; }
+[data-look='fieldops'] .menu-item { border-radius: 0; }
+[data-look='fieldops'] .menu-item:hover { background: rgba(200, 180, 90, 0.16); }
+[data-look='fieldops'] .ws.sel { background: rgba(200, 180, 90, 0.14); border-left-color: var(--accent); }
+[data-look='fieldops'] .settings-nav > button.on { background: rgba(200, 180, 90, 0.16); color: var(--accent-ink); }
+[data-look='fieldops'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1px; font-size: var(--fs-1); }
+[data-look='fieldops'] .status { border-top: 3px solid transparent; border-image: var(--hazard) 3; }
+[data-look='fieldops'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(var(--accent), var(--accent)) 8px 8px / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) 8px 8px / 1.5px 14px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right 8px top 8px / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) right 8px top 8px / 1.5px 14px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) left 8px bottom 8px / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) left 8px bottom 8px / 1.5px 14px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right 8px bottom 8px / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) right 8px bottom 8px / 1.5px 14px no-repeat;
+  opacity: 0.45; }
+[data-look='fieldops'] .term-wrap::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.05;
+  background: linear-gradient(var(--fg) 1px, transparent 1px) 0 0 / 40px 40px, linear-gradient(90deg, var(--fg) 1px, transparent 1px) 0 0 / 40px 40px; }
+[data-look='fieldops'] :is(.toggle-track, .toggle-knob) { border-radius: 0; }
+[data-look='fieldops'] .theme { border-radius: 0; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

@@ -1,0 +1,45 @@
+/* aquarelle: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Aquarelle: watercolour on cold-press paper. Soft washes of blue, rose and ochre, Snell Roundhand headings,
+   wobbly deckled shapes for buttons and popups, a brush stroke under the selected tab */
+[data-look='aquarelle'] { --radius: 12px; --r-xs: var(--rs, 4px); --r-s: var(--rs, 8px); --r-m: var(--rs, 12px); --r-l: var(--rs, 20px); --r-xl: var(--rs, 28px); --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --script: 'Snell Roundhand', 'Apple Chancery', cursive;
+  --wash: radial-gradient(ellipse 60% 40% at 15% 20%, rgba(79, 127, 196, 0.14), transparent 70%), radial-gradient(ellipse 50% 45% at 85% 70%, rgba(210, 112, 154, 0.12), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 60% 10%, rgba(217, 154, 58, 0.1), transparent 70%);
+  --deckle: 14px 9px 16px 7px / 9px 15px 8px 14px; }
+[data-look='aquarelle'] :is(.sidebar, .settings-nav) { background: var(--wash), var(--side); }
+[data-look='aquarelle'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--script); font-size: 26px; font-weight: 700; color: #4f6fa8; }
+[data-look='aquarelle'] .project-head { color: var(--purple); letter-spacing: 1.5px; }
+[data-look='aquarelle'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: none; border-radius: var(--deckle); background: radial-gradient(ellipse at 30% 40%, rgba(79, 127, 196, 0.22), rgba(79, 127, 196, 0.1) 70%); }
+[data-look='aquarelle'] :is(.buttons button, .seg button, .scripts-tabs button):hover { background: radial-gradient(ellipse at 30% 40%, rgba(79, 127, 196, 0.32), rgba(79, 127, 196, 0.16) 70%); }
+[data-look='aquarelle'] .seg button.on { background: radial-gradient(ellipse at 30% 40%, rgba(210, 112, 154, 0.3), rgba(210, 112, 154, 0.12) 70%); }
+[data-look='aquarelle'] button.primary { border: none; border-radius: var(--deckle); background: radial-gradient(ellipse at 35% 35%, #4f7cc0, #3f6aab 70%, #365f9c); color: #fff; box-shadow: 0 2px 6px rgba(79, 127, 196, 0.35); }
+[data-look='aquarelle'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 10px 6px 12px 5px / 6px 11px 5px 10px; background: var(--panel); }
+[data-look='aquarelle'] :is(.menu, .modal, .tunnel-pop) { border: none; border-radius: 18px 12px 20px 10px / 12px 20px 10px 18px; background: var(--wash), var(--panel); box-shadow: 0 10px 30px rgba(80, 60, 100, 0.18), 0 0 0 1px rgba(80, 60, 100, 0.06); }
+[data-look='aquarelle'] .menu-item:hover { background: rgba(79, 127, 196, 0.14); border-radius: var(--deckle); }
+[data-look='aquarelle'] .ws.sel { background: radial-gradient(ellipse 80% 120% at 30% 50%, rgba(79, 127, 196, 0.25), transparent 75%); border-left-color: transparent; }
+[data-look='aquarelle'] .settings-nav > button.on { background: radial-gradient(ellipse 80% 120% at 30% 50%, rgba(79, 127, 196, 0.25), transparent 75%); }
+[data-look='aquarelle'] .tab.sel { box-shadow: none; background: linear-gradient(90deg, transparent, var(--tab-c, rgba(79, 127, 196, 0.55)) 15% 85%, transparent) bottom / 100% 3px no-repeat, var(--tab-sel, var(--term-bg)); }
+[data-look='aquarelle'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--wash); opacity: 0.7; }
+[data-look='aquarelle'] .toggle-track { border-radius: 8px 5px 9px 4px / 5px 8px 4px 9px; }
+[data-look='aquarelle'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='aquarelle'] .theme { border-radius: var(--deckle); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

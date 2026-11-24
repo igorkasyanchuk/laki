@@ -1,0 +1,34 @@
+/* macrodata: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Macrodata: a severed office's terminal. Deep sea-blue and pale cyan, softly glowing type, rounded boxes, the
+   terminals curved like an old monitor's glass with a dark edge */
+[data-look='macrodata'] { --radius: 6px; --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px); --ui-font: 'Helvetica Neue', 'Avenir Next', sans-serif; --bloom: 0 0 10px rgba(127, 224, 255, 0.45); }
+[data-look='macrodata'] :is(.sidebar, .settings-nav) { border-right: 1px solid var(--line); background: linear-gradient(180deg, #0a2232, #05121b); }
+[data-look='macrodata'] :is(.settings-main h2, .tunnel-head b) { font-weight: 500; letter-spacing: 1px; color: #c8f1ff; text-shadow: var(--bloom); }
+[data-look='macrodata'] .settings-main h2::after { content: ''; display: inline-block; width: 22px; height: 12px; margin-left: 12px; vertical-align: 1px; border: 2px solid #7fe0ff; border-top-width: 5px; border-radius: var(--rs, 3px); opacity: 0.7; }
+[data-look='macrodata'] .project-head { color: #7fe0ff; letter-spacing: 2px; text-shadow: var(--bloom); }
+[data-look='macrodata'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2a5068; background: #0a1e2b; }
+[data-look='macrodata'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='macrodata'] .seg button.on { border-color: #7fe0ff; color: #e6faff; text-shadow: var(--bloom); }
+[data-look='macrodata'] button.primary { border: none; background: #c8f1ff; color: #04121a; font-weight: 600; box-shadow: var(--bloom); }
+[data-look='macrodata'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #2a5068; background: #05121b; }
+[data-look='macrodata'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #2a5068; border-radius: var(--rs, 10px); box-shadow: 0 0 24px rgba(127, 224, 255, 0.12), 0 20px 50px rgba(0, 0, 0, 0.6); }
+[data-look='macrodata'] .menu-item:hover { background: #10324a; }
+[data-look='macrodata'] .ws.sel { background: #10324a; border-left-color: #7fe0ff; border-radius: 0 var(--rs, 6px) var(--rs, 6px) 0; }
+[data-look='macrodata'] .settings-nav > button.on { background: #10324a; color: #e6faff; }
+[data-look='macrodata'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #7fe0ff); }
+[data-look='macrodata'] .status { background: #05121b; }
+[data-look='macrodata'] .term-wrap { border-radius: var(--rs, 16px); overflow: hidden; }
+[data-look='macrodata'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: var(--rs, 16px);
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, transparent 62%, rgba(0, 0, 0, 0.45) 100%); box-shadow: inset 0 0 30px rgba(127, 224, 255, 0.08); }
+[data-look='macrodata'] :is(.board-col, .board-card) { border-color: #2a5068; border-radius: var(--rs, 8px); }
+[data-look='macrodata'] .toggle.on .toggle-track { background: #7fe0ff; }
+[data-look='macrodata'] .theme { border-color: #2a5068; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

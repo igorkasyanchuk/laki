@@ -1,0 +1,52 @@
+/* abyss: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Abyss: the deep sea. Bioluminescent cyan and magenta glows, thin letterspaced Gill Sans, soft round shapes, light
+   coming down from the surface and bubbles rising through the terminals */
+[data-look='abyss'] { --radius: 14px; --r-xs: var(--rs, 5px); --r-s: var(--rs, 9px); --r-m: var(--rs, 14px); --r-l: var(--rs, 23px); --r-xl: var(--rs, 33px); --ui-font: 'Gill Sans', 'Avenir Next', sans-serif; --glow: 0 0 10px rgba(63, 240, 255, 0.55);
+  --bubble: radial-gradient(circle, transparent 0 3px, rgba(160, 240, 255, 0.35) 3.5px 4.5px, transparent 5px); --fizz: radial-gradient(circle, rgba(160, 240, 255, 0.4) 0 1.5px, transparent 2px); }
+[data-look='abyss'] :is(.sidebar, .settings-nav) { background: linear-gradient(180deg, #031024, #010610); }
+[data-look='abyss'] :is(.settings-main h2, .tunnel-head b) { font-weight: 300; font-size: var(--fs-5); letter-spacing: 4px; text-transform: uppercase; color: var(--accent-ink); text-shadow: var(--glow); }
+[data-look='abyss'] .project-head { color: var(--pink); letter-spacing: 2px; text-shadow: 0 0 8px rgba(255, 79, 216, 0.5); }
+[data-look='abyss'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(63, 240, 255, 0.35); border-radius: var(--rs, 14px); background: rgba(63, 240, 255, 0.06); }
+[data-look='abyss'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='abyss'] .seg button.on { border-color: var(--accent); box-shadow: var(--glow); }
+[data-look='abyss'] button.primary { border: none; border-radius: var(--rs, 16px); background: radial-gradient(circle at 50% 30%, #8af8ff, #1fb8d0); color: #020b18; box-shadow: 0 0 16px rgba(63, 240, 255, 0.5); }
+[data-look='abyss'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: rgba(63, 240, 255, 0.3); border-radius: var(--rs, 12px); background: #010812; }
+[data-look='abyss'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(63, 240, 255, 0.3); border-radius: var(--rs, 18px); box-shadow: 0 0 30px rgba(63, 240, 255, 0.12), 0 20px 50px rgba(0, 0, 0, 0.7); }
+[data-look='abyss'] .menu-item:hover { background: rgba(63, 240, 255, 0.12); border-radius: var(--rs, 10px); }
+[data-look='abyss'] .ws.sel { background: radial-gradient(ellipse at 20% 50%, rgba(255, 79, 216, 0.28), transparent 70%); border-left-color: var(--pink); color: #fff; }
+[data-look='abyss'] .settings-nav > button.on { background: rgba(63, 240, 255, 0.12); color: var(--accent-ink); }
+[data-look='abyss'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)), 0 -4px 12px -6px rgba(63, 240, 255, 0.6); }
+[data-look='abyss'] .term-wrap { overflow: hidden; }
+[data-look='abyss'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, rgba(63, 240, 255, 0.05) 25%, transparent 32%), linear-gradient(80deg, transparent 55%, rgba(63, 240, 255, 0.04) 60%, transparent 68%),
+    radial-gradient(ellipse at 50% -20%, rgba(63, 240, 255, 0.1), transparent 60%); }
+/* bubbles: each column repeats every 120-480px, so a 480px rise loops without a jump */
+[data-look='abyss'] .term-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: -480px; z-index: 2; pointer-events: none; animation: abyss-rise 18s linear infinite;
+  background: var(--bubble) 8% 40px / 10px 240px repeat-y, var(--fizz) 21% 0 / 6px 160px repeat-y, var(--bubble) 37% 120px / 10px 480px repeat-y, var(--fizz) 52% 60px / 6px 120px repeat-y,
+    var(--bubble) 66% 10px / 10px 160px repeat-y, var(--fizz) 79% 90px / 6px 240px repeat-y, var(--bubble) 91% 200px / 10px 480px repeat-y; }
+[data-look='abyss'] .toggle.on .toggle-track { background: var(--accent); box-shadow: var(--glow); }
+[data-look='abyss'] .theme { border-radius: var(--rs, 14px); }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='modular'] .term-wrap::after, [data-look='abyss'] .term-wrap::before, [data-look='cosmos'] .term-wrap::before { animation: none; }
+}
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

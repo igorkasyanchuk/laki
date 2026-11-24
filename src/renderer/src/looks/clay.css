@@ -1,0 +1,48 @@
+/* clay: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Clay: soft UI. One color everywhere, shapes raised out of it or pressed into it by light from the top left */
+[data-look='clay'] { --radius: 12px; --r-xs: var(--rs, 4px); --r-s: var(--rs, 8px); --r-m: var(--rs, 12px); --r-l: var(--rs, 20px); --r-xl: var(--rs, 28px);
+  --up: 5px 5px 11px #c2c8d3, -5px -5px 11px #ffffff; --up-sm: 3px 3px 6px #c2c8d3, -3px -3px 6px #ffffff;
+  --down: inset 3px 3px 7px #c2c8d3, inset -3px -3px 7px #ffffff; }
+[data-look='clay'] :is(.sidebar, .tabbar, .settings-head, .settings-nav, .info, .side-panel) { border-color: transparent; }
+[data-look='clay'] .status { border-top-color: transparent; box-shadow: 0 -4px 10px -6px #c2c8d3; }
+[data-look='clay'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn, button.primary) { border: none; border-radius: var(--rs, 12px); box-shadow: var(--up-sm); }
+[data-look='clay'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):is(:active, .on) { box-shadow: var(--down); }
+[data-look='clay'] button.primary { background: linear-gradient(145deg, #7d75ff, #5a51e6); box-shadow: 4px 4px 10px #b6bcd0, -4px -4px 10px #ffffff; }
+[data-look='clay'] button.primary:active { box-shadow: inset 3px 3px 7px #4a42c4, inset -3px -3px 7px #8a83ff; }
+[data-look='clay'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: none; border-radius: var(--rs, 12px); background: var(--bg); box-shadow: var(--down); }
+[data-look='clay'] :is(.menu, .modal, .tunnel-pop, .toast) { border: none; border-radius: var(--rs, 20px); background: var(--bg); box-shadow: 10px 10px 30px #b9c0cc, -10px -10px 30px #ffffff; }
+[data-look='clay'] .menu-item:hover { background: var(--bg); box-shadow: var(--down); border-radius: var(--rs, 10px); }
+[data-look='clay'] .tab { margin: 0 3px 4px; height: 26px; border-radius: var(--rs, 10px); }
+[data-look='clay'] .tab.sel { background: var(--bg); box-shadow: var(--down), inset 0 -2px 0 var(--tab-c, transparent); }
+[data-look='clay'] .ws { margin: 2px 8px; border-left-width: 0; border-radius: var(--rs, 10px); }
+[data-look='clay'] .ws.sel { background: var(--bg); box-shadow: var(--down); color: var(--accent-ink); }
+[data-look='clay'] .settings-nav > button.on { background: var(--bg); box-shadow: var(--down); border-radius: var(--rs, 10px); color: var(--accent-ink); }
+[data-look='clay'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: var(--down); }
+[data-look='clay'] .toggle-track { background: var(--bg); box-shadow: var(--down); }
+[data-look='clay'] .toggle.on .toggle-track { background: var(--accent); box-shadow: inset 2px 2px 4px #4a42c4, inset -2px -2px 4px #8a83ff; }
+[data-look='clay'] .toggle-knob { background: var(--bg); box-shadow: 1px 1px 3px #a9b0bd; }
+[data-look='clay'] .theme { border: none; border-radius: var(--rs, 16px); box-shadow: var(--up); }
+[data-look='clay'] .theme.on { box-shadow: var(--down); }
+[data-look='clay'] :is(.setting-box, .preset) { border: none; box-shadow: var(--down); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='bubble'], [data-look='clay'], [data-look='groovy']) { --ws-guide: none; --ws-indent: 4px; --proj-divider: none; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

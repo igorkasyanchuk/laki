@@ -112,7 +112,7 @@ are tested in `test/units-more.test.ts`.
   noise). The board's own chunk is 11 KB, but its import of the AI page's `Thumbs` kept that one in the first load.
   Their CSS too (`npm run size`): a styles.css rule that only one lazy page draws is in that page's own file
   (`ai.css`, `extension.css`, `uikit.css`, `schedules.css`, `board.css`, `review.css`), imported by it, so it loads
-  with its chunk, after styles.css, components.css and looks.css. A rule moves only when no rule of the same
+  with its chunk, after styles.css, components.css and looks-base.css (a look's file may come after). A rule moves only when no rule of the same
   specificity after it styles the same element (Glass's `:is(input, select, textarea)` beat `.kit-edit textarea` only
   by coming later; `.ai-shimmer`'s reduced-motion override follows it): those stay in styles.css. `test/css.test.ts`
   (`PAGES`) holds the page files to styles.css' checks.
@@ -766,13 +766,22 @@ are tested in `test/units-more.test.ts`.
   labels on those fills (`onAccent`). `test/contrast.test.ts` holds every theme to WCAG ratios (text 4.5; hints, status
   marks and terminal colors 3, a mark on the selection 2.5 (its shape tells it too), the dim grey 2.5; on the main area,
   the sidebar, the rail, panels and the selection; a gradient theme's on both ends): a new theme or color must pass it. A look that fills a selected tab or row gives its marks the text's
-  color (looks.css' last rules).
-- **`fonts.css`, `components.css`, `looks.css`** (V2: once one `looks.css`, in that order after `styles.css`, main.tsx): the bundled fonts (Inter, JetBrains Mono, the other terminal fonts and the interface ones, `themes.ts` `UI_FONTS`; `fonts/NOTICE.md`), syntax colors (`.hl-*`), a look's tab bar
+  color (looks-base.css' last rules).
+- **E9: a look's file** (`themes.ts` `lookCss`, `lookStart`): `looks/<look>.css` holds every rule for that look, in
+  looks.css' old order: its own, each rule several looks share (an `:is()` of them, a list), and looks-base.css' rules
+  that came after its first one, again in their places, so whatever applies under a look keeps its order. looks-base.css
+  (first load) has the rest: rules no look's alone (the interface font's, ones under `:not()`), `@keyframes`. A file
+  loads by `import.meta.glob` as `applyTheme` sets `data-look` (Settings' theme cards preview on hover, so they load
+  it then), one at a time, each file's new `document.styleSheets` kept as its own; every look file loaded but the
+  current look's is `disabled`, so one left from a preview, later in the page, never reorders the cascade.
+  `laki.look` (localStorage, every window's and the phone page's own) is the look set last: main.tsx loads its file
+  (`lookStart`) with the fonts, before the first render. ask.html and floater.html draw no look.
+- **`fonts.css`, `components.css`, `looks-base.css`, `looks/<look>.css`** (V2: in that order after `styles.css`, main.tsx; E9: each look's own rules a file of its own, loaded as it's set: below): the bundled fonts (Inter, JetBrains Mono, the other terminal fonts and the interface ones, `themes.ts` `UI_FONTS`; `fonts/NOTICE.md`), syntax colors (`.hl-*`), a look's tab bar
   line as `--tab-line` (a gradient across it as `--tab-line-bg` and `--tab-line-w`, one down it as `--tab-line-img`):
   styles.css' real tab draws it beside the selected tab (the bar's `::before`/`::after`, CSS anchor positioning on the
   tab's `--laki-tab`) and as the tab's border, never under it; not on a phone or the pill looks), glass
-  (`html.glass`; Design's Frosted: `paintOf` forces glass, `applyTheme` sets `data-look` to it over the theme's, main's `glass` IPC moves the traffic lights into the sidebar's panel and `window.json` keeps that for the next start, looks.css' last block) and the creative themes' looks (`[data-look=…]`, from a theme's `look`; their own fonts only with `uiFont` `theme`, `html.theme-font`:
-  else looks.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
+  (`html.glass`; Design's Frosted: `paintOf` forces glass, `applyTheme` sets `data-look` to it over the theme's, main's `glass` IPC moves the traffic lights into the sidebar's panel and `window.json` keeps that for the next start, looks/frosted.css) and the creative themes' looks (`[data-look=…]`, from a theme's `look`; their own fonts only with `uiFont` `theme`, `html.theme-font`:
+  else looks-base.css' last rules give them `--ui-default`, SF Pro, Inter off a Mac), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
   `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Motion, styles.css'
   last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `vertText`:
@@ -918,13 +927,13 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   look's `--r-xl` when smaller (Llama Amp's Winamp look: square cards, tabs and dialogs alike),
   `--lift-1…3`, `--h-s/m/l` (22, 28, 34), `--z-dialog` 10 < toast < page < ask < pop < drag < tip < `--z-top` (a raw
   z-index only within a part, under 10). Chrome: heads and the tab bar 40px, rows and bars 28. A toast is neutral;
-  `err` (App's `fail`, `toast(…, err)`) gives it the red edge. `test/css.test.ts` checks styles.css; looks.css next.
+  `err` (App's `fail`, `toast(…, err)`) gives it the red edge. `test/css.test.ts` checks styles.css; looks-base.css and every look's file next.
 - **Concentric corners and inset selection** (V6): `--r-window` (dialogs, menus, popovers, the peek card), `--r-panel`
   (cards: Needs you's, a settings group), `--r-control` (buttons, fields, rows, tabs), `--r-chip` (counts, status chips); a
   nested one is its parent's minus the gap (`.menu`'s `--mp`). Sidebar rows, palette and menu items sit inset (a margin
   each side) on `--r-control`: hover a neutral fill, selected the accent at 20% (a row's own color bar stays). Classic's
   tabs (no Design traits: `.app:not([data-dz], .narrow)`, not the pill looks) are segments, the open one a soft fill and its
-  color a line under it, out of the joined-tab rules' `:not()` lists. css.test: no raw px corner in any sheet but looks.css.
+  color a line under it, out of the joined-tab rules' `:not()` lists. css.test: no raw px corner in any sheet but a look's.
 - **Keyboard and screen readers** (U11): the sidebar's `.side-scroll` is a `role="tree"` (Sidebar.tsx `treeKey`, `rove`):
   project heads, Pinned and Needs you's head are treeitems at level 1 (`aria-expanded`), groups and rows at 2
   (`aria-selected`), each `.project-ws` a `group`; every treeitem is `tabIndex={-1}` in JSX and a layout effect keeps one
@@ -958,7 +967,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`), `termPad` (*Padding*: `.app[data-pad]`, the `.term`'s inset and the preview's padding; tiny on a phone too, roomy not) with a live preview
   (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section: a duplicate button, a *Show* filter by target), Appearance (themes, the current one outlined and checked, a name filter that stays in sight, a ☆ on each (`favThemes`: Favorites, a group first, each one still in All themes too);
   accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's (`radius`
-  also as `--rs`, which every fixed px radius in looks.css and styles.css takes first, `var(--rs, 10px)`: keep new ones so;
+  also as `--rs`, which every fixed px radius in looks/ and styles.css takes first, `var(--rs, 10px)`: keep new ones so;
   pills (999px, or half their height: `.pr`, `.tag`, the switch's track) and circles (50%) stay),
   `--accent-fg` by `onAccent`; `tabsAt`;
   `PROJECT_LOOK`: the sidebar's project names over the theme, `settings.projectLook`, App's `phAttrs`/`phVars` put them
@@ -966,7 +975,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   unset `auto`): `--accent-ink` in every theme but the looks whose head is a band of their own (starship, luna, mission,
   islander), `own` the project's color, `theme` none; `SIDE_LOOK`,
   `settings.sideLook`: the sidebar's lines and rows as CSS values, App's `sideVars` sets `--ws-guide`, `--proj-divider`,
-  `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of looks.css;
+  `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` in looks-base.css' last rules;
   `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
   them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's; the global sections, it and Actions, open with a `Scope` note, `.set-scope`: Global, everywhere, and where a project's own go; a project's two say *This project*: only there, with the global ones, counted (`mergeActions`, `templatesFor`), and a link to the global list), Keys (`KeysSection`: a `KeyField` per `KEYS` action, Reset all, `keyClash` against the global hotkeys and the picker as `others`; `settings.keys` only the changed ones), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…72h or Forever, then the QR code and link), and `ScriptsField` (a project's
@@ -1145,7 +1154,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 
 Laki was built twice while the stack was picked; the Go + Wails build is now its own repository
 and nothing here keeps it in step. Many renderer files were
-shared with it: some class and variable names in `looks.css` and `themes.ts` are its, and harmless here.
+shared with it: some class and variable names in `looks/` and `themes.ts` are its, and harmless here.
 
 Labs (U1): `settings.labs` and types.ts' `LABS` (desk, specs, workflows, calendar, notes, todoList, railShells,
 railBrowsers, videoButton, fun, timerButton). core.ts `load`: no state.json yet, each of them is saved `false` with
@@ -1568,13 +1577,13 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
   `.ob-themes`, whose rings are box-shadows) settles in by `focus-in` (from `outline-offset: var(--sp-3)` and a clear
   color: each control's own rule is the end), `--t-fast`; all in `:where()` and first in the reduced-motion block, so any
   animation of the control's own wins (none replaced, none replayed on blur); off with Motion: None and Reduce motion.
-- **Frosted's floating sidebar** (V16, looks.css, on the window's glass): the main area's background moves to `.app`, so it
+- **Frosted's floating sidebar** (V16, looks/frosted.css, on the window's glass): the main area's background moves to `.app`, so it
   spans the window; the rail, the list and Terminals' strip are one glass panel on it (`--lift-2`, a lit top, the window's
   corners less `--sp-2`, squircle where `corner-shape` is, `clip-path` cutting each shadow where two meet). `.main` keeps
   its box (its border transparent, not gone), so xterm's columns and the side handle's `at` are as before. A
   `backdrop-filter` only without `html.vibrant` (over the native blur it flickers); Reduce transparency or no glass: the
   cards as before.
-- **Frosted's status bar** (looks.css): no outline or fill of its own, its two groups the capsules (one level), an empty
+- **Frosted's status bar** (looks/frosted.css): no outline or fill of its own, its two groups the capsules (one level), an empty
   `.sb-foot` (the rail has the buttons) not drawn; the context meter's track `--fg` 18%, its fill green, amber past 70%,
   red past 90%.
 

@@ -1,0 +1,28 @@
+/* What every look needs, in the window's first load (main.tsx, after components.css): rules no look's alone
+   (the interface font's, ones under :not()), @keyframes and @font-face. A look's own rules are in looks/<look>.css,
+   loaded as it's set (themes.ts lookCss). */
+
+@keyframes holo-shift { to { background-position: 0 0, 300% 0; } }
+@keyframes holo-text { to { background-position: 300% 0; } }
+@keyframes sonar-sweep { to { rotate: 360deg; } }
+@keyframes sonar-blip { 50% { box-shadow: 0 0 0 5px rgba(56, 242, 182, 0); } }
+@keyframes zd-blink { 50% { opacity: 0; } }
+@keyframes zd-rain { to { translate: 0 360px; } }
+@keyframes gl-tear {
+  93% { text-shadow: -4px 0 0 rgba(255, 42, 109, 0.9), 3px 0 0 rgba(0, 240, 255, 0.9); translate: 2px 0; }
+  95% { text-shadow: 3px 0 0 rgba(255, 42, 109, 0.9), -3px 0 0 rgba(0, 240, 255, 0.9); translate: -2px 0; clip-path: inset(15% 0 35% 0); }
+  97% { text-shadow: var(--split); translate: 0; clip-path: none; } }
+@keyframes gl-jump { 0% { translate: -2px 1px; clip-path: inset(0 0 50% 0); } 33% { translate: 2px -1px; clip-path: inset(45% 0 0 0); } 66% { translate: -1px 0; clip-path: none; } 100% { translate: 0; } }
+@keyframes gl-roll { 0%, 75% { translate: 0 -30px; } 100% { translate: 0 100vh; } }
+@keyframes mod-scope { to { translate: 240px 0; } }
+@keyframes abyss-rise { to { translate: 0 -480px; } }
+@keyframes cosmos-twinkle { from { opacity: 0.15; } to { opacity: 0.7; } }
+@keyframes sk-fall { to { translate: 40px 300px; } }
+@keyframes mg-rise { to { translate: 0 -360px; } }
+@keyframes sb-rain { to { translate: 60px 240px; } }
+@keyframes tk-flicker { 0% { opacity: 0.75; } 40% { opacity: 1; } 55% { opacity: 0.85; } 100% { opacity: 1; } }
+@keyframes mono-eye { to { box-shadow: 0 0 18px 2px rgba(255, 42, 26, 0.9); } }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

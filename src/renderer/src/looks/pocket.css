@@ -1,0 +1,49 @@
+/* pocket: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Pocket: a handheld's LCD. Four greens, pixel-stepped corners, capitals, a ▶ cursor on the selection, the screen's
+   dot grid over the terminals, a round crimson A button */
+[data-look='pocket'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: var(--mono); --ink: #0f2a12;
+  --pixel: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink); }
+[data-look='pocket'] body { font-weight: 600; }
+[data-look='pocket'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn, input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea, .theme) {
+  border: none; border-radius: 0; box-shadow: var(--pixel); }
+[data-look='pocket'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn, .tab, .project-head, .settings-main h2) { text-transform: uppercase; letter-spacing: 1px; }
+[data-look='pocket'] :is(.buttons button, .seg button, .scripts-tabs button):active { transform: translateY(2px); }
+[data-look='pocket'] button.primary { border: none; border-radius: 999px; background: #8b2252; color: #f4e3ea; text-transform: uppercase; letter-spacing: 1px;
+  box-shadow: 0 3px 0 #4f1230, inset 0 2px 0 rgba(255, 255, 255, 0.25); }
+[data-look='pocket'] button.primary:active { transform: translateY(2px); box-shadow: 0 1px 0 #4f1230; }
+[data-look='pocket'] :is(.menu, .modal, .tunnel-pop, .toast) { border: none; border-radius: 0; box-shadow: var(--pixel), 6px 6px 0 3px rgba(15, 42, 18, 0.35); }
+[data-look='pocket'] .menu-item:hover { background: var(--ink); color: var(--panel); }
+[data-look='pocket'] .tab { border-radius: 0; font-size: var(--fs-1); }
+[data-look='pocket'] .tab.sel { background: var(--ink); color: var(--panel); box-shadow: inset 0 -3px 0 var(--tab-c, var(--ink)); }
+[data-look='pocket'] .ws.sel { background: transparent; border-left-color: transparent; color: var(--ink); font-weight: 800; }
+[data-look='pocket'] .ws.sel::before { content: '\25B6'; font-size: 9px; margin-left: -10px; }
+[data-look='pocket'] .settings-nav > button.on { background: var(--ink); color: var(--panel); }
+[data-look='pocket'] .sidebar { border-right: 3px solid var(--ink); }
+[data-look='pocket'] :is(.tabbar, .settings-head) { --tab-line: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
+[data-look='pocket'] .status { border-top: 3px solid var(--ink); background: var(--ink); color: var(--panel); }
+[data-look='pocket'] .status :is(button, a, .muted):not(.menu-backdrop *) { color: var(--panel); } /* not its popups */
+[data-look='pocket'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(90deg, rgba(15, 42, 18, 0.06) 1px, transparent 1px) 0 0 / 3px 3px, linear-gradient(rgba(15, 42, 18, 0.06) 1px, transparent 1px) 0 0 / 3px 3px; }
+[data-look='pocket'] .toggle-track, [data-look='pocket'] .toggle-knob { border-radius: 0; }
+[data-look='pocket'] .toggle-track { box-shadow: var(--pixel); background: var(--panel); }
+[data-look='pocket'] .toggle.on .toggle-track { background: var(--ink); }
+[data-look='pocket'] .toggle-knob { background: var(--ink); box-shadow: none; }
+[data-look='pocket'] .toggle.on .toggle-knob { background: var(--panel); }
+[data-look='pocket'] :not(.xterm-viewport)::-webkit-scrollbar { width: 9px; height: 9px; background: transparent; }
+[data-look='pocket'] :not(.xterm-viewport)::-webkit-scrollbar-thumb { background: var(--ink); border: 3px solid transparent; background-clip: padding-box; }
+/* an icon on a bar a look colors its own way (starship's black on its light heads, a status bar of another color):
+   hovered, a tint of its own color, not the theme's hover (dark on dark, white on light) */
+[data-look='starship'] :is(.tab.sel, .project-head, .ws.sel) .ib:hover, [data-look='luna'] :is(.tabbar, .settings-head, .side-head, .project-head) .ib:hover,
+  [data-look='classic'] .tunnel-head .ib:hover, :is([data-look='pocket'], [data-look='transit'], [data-look='workshop']) .status .ib:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
+[data-look='pocket'] { --ws-guide: 2px solid var(--ink); --proj-divider: none; }
+[data-look='pocket'] :is(.side-panel, .info) { border-left: 3px solid var(--ink); }
+/* a selected tab filled with a color: its status mark in the tab's own text color (green on orange doesn't read) */
+:is([data-look='cyber'], [data-look='pocket'], [data-look='starship'], [data-look='groovy'], [data-look='bricks'], [data-look='cassette'], [data-look='brass']) .tab.sel .glyph { color: inherit; --running: currentColor; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

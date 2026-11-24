@@ -1,0 +1,47 @@
+/* overworld: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Overworld: a block world's menus. Dirt in pixel squares behind the sidebar, grey stone buttons with a pixel bevel
+   and a shadowed label, a grass block for the main button, the hotbar's white frame on the selection, the experience
+   bar along the status bar */
+[data-look='overworld'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --pixel: Silom, 'Krungthep', Menlo, monospace;
+  --dirt: repeating-conic-gradient(#2e2218 0 25%, #35281c 0 50%) 0 0 / 8px 8px; }
+[data-look='overworld'] :is(.sidebar, .settings-nav) { border-right: 2px solid #000; background: var(--dirt); }
+[data-look='overworld'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--pixel); font-weight: 400; color: #fff; text-shadow: 2px 2px 0 #3f3f3f; }
+[data-look='overworld'] .settings-main h2::before { content: ''; display: inline-block; width: 14px; height: 14px; margin-right: 10px; vertical-align: -1px;
+  background: linear-gradient(#62b83d 0 35%, #7a5536 35%); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+[data-look='overworld'] .project-head { font-family: var(--pixel); font-weight: 400; color: #ffff55; text-shadow: 1px 1px 0 #3f3f15; letter-spacing: 1px; }
+[data-look='overworld'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid #000; background: #6f6f6f; color: #fff; text-shadow: 1px 1px 0 #3f3f3f;
+  box-shadow: inset 2px 2px 0 #a8a8a8, inset -2px -2px 0 #4a4a4a; }
+[data-look='overworld'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='overworld'] .seg button.on { background: #5a6296; color: #ffffa0; box-shadow: inset 2px 2px 0 #8a92c8, inset -2px -2px 0 #3a4270; }
+[data-look='overworld'] button.primary { border: 2px solid #000; background: #7a5536; color: #fff; font-weight: 700; text-shadow: 1px 1px 0 #2a1a0a; box-shadow: inset 0 5px 0 #62b83d, inset 2px 0 0 #8e6a48, inset -2px -2px 0 #4a3020; }
+[data-look='overworld'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid #a0a0a0; background: #000; }
+[data-look='overworld'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #000; background: #2a2118; box-shadow: inset 2px 2px 0 #5a4a38, inset -2px -2px 0 #15100b, 0 16px 36px rgba(0, 0, 0, 0.7); }
+[data-look='overworld'] .menu-item:hover { background: #4a3a28; color: #ffffa0; }
+[data-look='overworld'] .ws.sel { background: rgba(255, 255, 255, 0.08); border-left-color: transparent; box-shadow: inset 0 0 0 2px #e8e8e8; }
+[data-look='overworld'] .settings-nav > button.on { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 2px #e8e8e8; }
+[data-look='overworld'] .tab.sel { box-shadow: inset 0 -3px 0 var(--tab-c, #62b83d); }
+[data-look='overworld'] .status { border-top: 4px solid; border-image: repeating-linear-gradient(90deg, #80ff20 0 18px, #2a5a08 18px 20px) 1; }
+[data-look='overworld'] :is(.board-col, .board-card) { border: 2px solid #000; }
+[data-look='overworld'] .board-col { background: var(--dirt); }
+[data-look='overworld'] .toggle.on .toggle-track { background: #62b83d; }
+[data-look='overworld'] .theme { border: 2px solid #000; }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

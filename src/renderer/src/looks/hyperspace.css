@@ -1,0 +1,33 @@
+/* hyperspace: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Hyperspace: a space opera. Stars on black, the opening crawl's yellow capitals for headings, a
+   saber's white core and colored glow on the selected tab and row, the empire's black and yellow for the main button */
+[data-look='hyperspace'] { --radius: 4px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 3px); --r-m: var(--rs, 4px); --r-l: var(--rs, 7px); --r-xl: var(--rs, 9px); --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --crawl: #ffe81f; --saber: #4ab4ff;
+  --stars: radial-gradient(1px 1px at 22px 34px, #fff, transparent), radial-gradient(1px 1px at 96px 128px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 150px 62px, #fff, transparent), radial-gradient(1px 1px at 60px 180px, rgba(255, 255, 255, 0.6), transparent); }
+[data-look='hyperspace'] :is(.sidebar, .settings-nav) { border-right: 1px solid #1a1f2a; background: var(--stars), var(--side); background-size: 190px 210px, 190px 210px, 190px 210px, 190px 210px, auto; }
+[data-look='hyperspace'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Avenir Next Condensed', 'Avenir Next', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: var(--crawl); }
+[data-look='hyperspace'] .project-head { color: var(--crawl); letter-spacing: 2px; }
+[data-look='hyperspace'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2c3444; background: #0b0d12; }
+[data-look='hyperspace'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='hyperspace'] .seg button.on { border-color: var(--saber); box-shadow: 0 0 8px rgba(74, 180, 255, 0.5); color: #fff; }
+[data-look='hyperspace'] button.primary { border: none; background: var(--crawl); color: #000; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='hyperspace'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #262c38; background: #000; }
+[data-look='hyperspace'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #2c3444; background: #07080c; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9); }
+[data-look='hyperspace'] .menu-item:hover { background: #1a2236; }
+[data-look='hyperspace'] .ws.sel { background: linear-gradient(90deg, rgba(74, 180, 255, 0.16), transparent); border-left-color: #fff; box-shadow: -3px 0 8px var(--saber); }
+[data-look='hyperspace'] .settings-nav > button.on { background: #1a2236; box-shadow: inset 2px 0 0 #fff, -2px 0 8px var(--saber); }
+[data-look='hyperspace'] .tab.sel { box-shadow: inset 0 -2px 0 #fff, 0 3px 8px -2px var(--tab-c, var(--saber)); }
+[data-look='hyperspace'] .status { border-top: 1px solid rgba(255, 232, 31, 0.35); background: #000; }
+[data-look='hyperspace'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, rgba(74, 180, 255, 0.05), transparent 65%); }
+[data-look='hyperspace'] :is(.board-col, .board-card) { border-color: #262c38; }
+[data-look='hyperspace'] .toggle.on .toggle-track { background: var(--saber); box-shadow: 0 0 8px var(--saber); }
+[data-look='hyperspace'] .theme { border-color: #262c38; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

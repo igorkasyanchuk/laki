@@ -1,0 +1,38 @@
+/* greenbar: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Greenbar: line-printer paper. Pale green bands across the terminals and menus, tractor-feed holes down the sidebar,
+   perforations, a typewriter mono, and *** banner *** headings */
+[data-look='greenbar'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: 'PT Mono', 'Courier New', monospace; --band: rgba(120, 180, 90, 0.13); --perf: 1px dashed #9db487; }
+[data-look='greenbar'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Courier New', Courier, monospace; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+[data-look='greenbar'] .settings-main h2::before { content: '*** '; color: var(--accent-ink); }
+[data-look='greenbar'] .settings-main h2::after { content: ' ***'; color: var(--accent-ink); }
+[data-look='greenbar'] .project-head { color: var(--accent-ink); }
+[data-look='greenbar'] .sidebar { border-right: 2px dashed #b9cba3;
+  background: radial-gradient(circle, #d5ddca 0 3.5px, rgba(0, 0, 0, 0.1) 4px, transparent 4.5px) 0 4px / 12px 18px repeat-y, var(--side); }
+[data-look='greenbar'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: var(--perf); border-radius: 0; background: #fff; }
+[data-look='greenbar'] .seg button.on { border-style: solid; border-color: var(--accent); background: var(--sel); }
+[data-look='greenbar'] button.primary { border: 2px solid var(--fg); border-radius: 0; background: var(--fg); color: var(--bg); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='greenbar'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border: var(--perf); background: #fff; }
+[data-look='greenbar'] :is(.menu, .modal, .tunnel-pop) { border-radius: 0; border: 1px solid #b9cba3; border-block: 2px dashed #9db487; box-shadow: 0 8px 24px rgba(40, 60, 30, 0.18); }
+[data-look='greenbar'] .menu-item { border-radius: 0; }
+[data-look='greenbar'] .menu-item:nth-child(even) { background-color: var(--band); }
+[data-look='greenbar'] .menu-item:hover { background-color: var(--sel); }
+[data-look='greenbar'] .tab { border-radius: 0; }
+[data-look='greenbar'] .tab.sel { background: #fff; }
+[data-look='greenbar'] .ws.sel { font-weight: 700; }
+[data-look='greenbar'] :is(.tabbar, .settings-head) { --tab-line: var(--perf); border-bottom: var(--perf); }
+[data-look='greenbar'] .status { border-top: var(--perf); }
+[data-look='greenbar'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: repeating-linear-gradient(180deg, var(--band) 0 48px, transparent 48px 96px); }
+[data-look='greenbar'] .toggle-track, [data-look='greenbar'] .toggle-knob { border-radius: 0; }
+[data-look='greenbar'] .theme { border-radius: 0; border-style: dashed; }
+:is([data-look='greenbar'], [data-look='zeroday']) { --ws-h: 22px; }
+[data-look='greenbar'] :is(.side-panel, .info) { border-left: 2px dashed #b9cba3; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

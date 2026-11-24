@@ -1,0 +1,50 @@
+/* sonar: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Sonar: a submarine's screen. Range rings and a slow sweep over the terminals, mono capitals glowing green, a pulsing
+   blip on the selection */
+[data-look='sonar'] { --radius: 12px; --r-xs: var(--rs, 4px); --r-s: var(--rs, 8px); --r-m: var(--rs, 12px); --r-l: var(--rs, 20px); --r-xl: var(--rs, 28px); --phosphor: #38f2b6; --glow: 0 0 8px rgba(56, 242, 182, 0.55); }
+[data-look='sonar'] :is(.settings-main h2, .tunnel-head b, .project-head, .tab, .buttons button, .seg button, button.primary) { font-family: var(--mono); text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='sonar'] :is(.settings-main h2, .tunnel-head b, .project-head) { color: var(--phosphor); text-shadow: var(--glow); }
+[data-look='sonar'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(56, 242, 182, 0.45); border-radius: 999px; background: rgba(56, 242, 182, 0.05); }
+[data-look='sonar'] .seg button.on { background: rgba(56, 242, 182, 0.22); }
+[data-look='sonar'] button.primary { border: none; border-radius: 999px; background: var(--phosphor); color: #03141a; font-weight: 700; box-shadow: 0 0 16px -2px var(--phosphor); }
+[data-look='sonar'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(56, 242, 182, 0.5); border-radius: var(--rs, 16px);
+  background: repeating-radial-gradient(circle at 100% 100%, transparent 0 46px, rgba(56, 242, 182, 0.05) 46px 47px), var(--panel); box-shadow: 0 0 30px -8px var(--phosphor), 0 24px 60px rgba(0, 0, 0, 0.7); }
+[data-look='sonar'] .menu-item:hover { background: rgba(56, 242, 182, 0.14); }
+[data-look='sonar'] .sidebar { border-right: 1px solid rgba(56, 242, 182, 0.35); }
+[data-look='sonar'] :is(.tabbar, .settings-head) { --tab-line: 1px solid rgba(56, 242, 182, 0.35); border-bottom: 1px solid rgba(56, 242, 182, 0.35); }
+[data-look='sonar'] .status { border-top: 1px solid rgba(56, 242, 182, 0.35); }
+[data-look='sonar'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, var(--phosphor)); text-shadow: var(--glow); }
+[data-look='sonar'] .ws.sel { border-left-color: var(--phosphor); background: linear-gradient(90deg, rgba(56, 242, 182, 0.18), transparent); }
+[data-look='sonar'] .ws.sel::after { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--phosphor); box-shadow: 0 0 0 0 rgba(56, 242, 182, 0.7); animation: sonar-blip 2.4s ease-out infinite; }
+[data-look='sonar'] .term-wrap { overflow: hidden; }
+[data-look='sonar'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-radial-gradient(circle at 50% 55%, transparent 0 110px, rgba(56, 242, 182, 0.06) 110px 111.5px),
+    linear-gradient(rgba(56, 242, 182, 0.05), rgba(56, 242, 182, 0.05)) 50% 0 / 1px 100% no-repeat, linear-gradient(rgba(56, 242, 182, 0.05), rgba(56, 242, 182, 0.05)) 0 55% / 100% 1px no-repeat; }
+[data-look='sonar'] .term-wrap::before { content: ''; position: absolute; left: 50%; top: 55%; width: 160vmax; height: 160vmax; translate: -50% -50%; z-index: 2; pointer-events: none;
+  background: conic-gradient(from 0deg, rgba(56, 242, 182, 0.1), transparent 50deg); animation: sonar-sweep 9s linear infinite; }
+[data-look='sonar'] .toggle.on .toggle-track { background: var(--phosphor); }
+[data-look='sonar'] .theme { border-color: rgba(56, 242, 182, 0.35); }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='sonar'] .term-wrap::before, [data-look='sonar'] .ws.sel::after { animation: none; }
+}
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+[data-look='sonar'] :is(.side-panel, .info) { border-left: 1px solid rgba(56, 242, 182, 0.35); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

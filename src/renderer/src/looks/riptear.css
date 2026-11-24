@@ -1,0 +1,34 @@
+/* riptear: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Rip & Tear: a demon-slaying shooter. Hell's red on scorched iron, Impact capitals after three claw marks, riveted
+   iron plates for buttons, the old status bar's grey stone, a fire's glow rising from the bottom of the sidebar and the
+   terminals */
+[data-look='riptear'] { --radius: 2px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 1px); --r-m: var(--rs, 2px); --r-l: var(--rs, 3px); --r-xl: var(--rs, 5px); --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --hell: #f23a1e; }
+[data-look='riptear'] :is(.sidebar, .settings-nav) { border-right: 1px solid #4a2a1e; background: linear-gradient(180deg, transparent 65%, rgba(242, 58, 30, 0.14)), var(--side); }
+[data-look='riptear'] :is(.settings-main h2, .tunnel-head b) { font-family: Impact, 'Arial Black', sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: 1.5px; color: #f0e2d6; text-shadow: 0 0 10px rgba(242, 58, 30, 0.55); }
+[data-look='riptear'] .settings-main h2::before { content: ''; display: inline-block; width: 16px; height: 16px; margin-right: 10px; vertical-align: -1px;
+  background: repeating-linear-gradient(115deg, transparent 0 2px, var(--hell) 2px 4px, transparent 4px 6px); }
+[data-look='riptear'] .project-head { color: #ff7a5a; letter-spacing: 2px; }
+[data-look='riptear'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a2a1e; background: radial-gradient(circle at 5px 5px, #6a4a3a 1.5px, transparent 2px), linear-gradient(#34241c, #20150f); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+[data-look='riptear'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='riptear'] .seg button.on { border-color: var(--hell); color: #fff; }
+[data-look='riptear'] button.primary { border: 1px solid #7a1408; background: linear-gradient(#ff6a4a, #f23a1e); color: #0f0806; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 12px rgba(242, 58, 30, 0.45); }
+[data-look='riptear'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a2a1e; background: #0a0605; }
+[data-look='riptear'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #5a3424; background: #160e0b; box-shadow: 0 0 20px rgba(242, 58, 30, 0.15), 0 20px 50px rgba(0, 0, 0, 0.85); }
+[data-look='riptear'] .menu-item:hover { background: rgba(242, 58, 30, 0.18); }
+[data-look='riptear'] .ws.sel { background: linear-gradient(90deg, rgba(242, 58, 30, 0.24), transparent); border-left-color: var(--hell); }
+[data-look='riptear'] .settings-nav > button.on { background: rgba(242, 58, 30, 0.16); box-shadow: inset 2px 0 0 var(--hell); }
+[data-look='riptear'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--hell)), 0 8px 12px -10px var(--hell); }
+[data-look='riptear'] .status { border-top: 2px solid #6a625c; background: linear-gradient(#3a3532, #24201e); --error: #ff756a; }
+[data-look='riptear'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 130%, rgba(242, 58, 30, 0.12), transparent 60%); }
+[data-look='riptear'] :is(.board-col, .board-card) { border-color: #4a2a1e; }
+[data-look='riptear'] .toggle.on .toggle-track { background: var(--hell); }
+[data-look='riptear'] .theme { border-color: #4a2a1e; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

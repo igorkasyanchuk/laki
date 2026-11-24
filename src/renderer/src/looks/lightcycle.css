@@ -1,0 +1,35 @@
+/* lightcycle: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Lightcycle: a light-cycle arena. Everything drawn in glowing cyan lines on black, the arena's grid on the floor of
+   the sidebar and faintly across the terminals, an orange line for the main button */
+[data-look='lightcycle'] { --radius: 3px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 2px); --r-m: var(--rs, 3px); --r-l: var(--rs, 5px); --r-xl: var(--rs, 7px); --ui-font: 'Geist', 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --glow: 0 0 6px rgba(54, 243, 255, 0.6);
+  --grid: linear-gradient(rgba(54, 243, 255, 0.1) 1px, transparent 1px) 0 0 / 100% 28px, linear-gradient(90deg, rgba(54, 243, 255, 0.1) 1px, transparent 1px) 0 0 / 28px 100%; }
+[data-look='lightcycle'] :is(.sidebar, .settings-nav) { border-right: 1px solid #36f3ff; box-shadow: var(--glow); background: linear-gradient(var(--side), var(--side)) top / 100% 72% no-repeat, linear-gradient(180deg, transparent 72%, rgba(54, 243, 255, 0.08)), var(--grid), var(--side); }
+[data-look='lightcycle'] :is(.settings-main h2, .tunnel-head b) { text-transform: uppercase; letter-spacing: 5px; font-weight: 500; color: #d8fbff; text-shadow: 0 0 8px rgba(54, 243, 255, 0.8); }
+[data-look='lightcycle'] .project-head { color: #36f3ff; letter-spacing: 2.5px; text-shadow: var(--glow); }
+[data-look='lightcycle'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(54, 243, 255, 0.55); background: transparent; color: #bff9ff; }
+[data-look='lightcycle'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='lightcycle'] .seg button.on { border-color: #36f3ff; box-shadow: var(--glow), inset var(--glow); }
+[data-look='lightcycle'] button.primary { border: 1px solid #ff9d2e; background: rgba(255, 157, 46, 0.12); color: #ffd9a8; letter-spacing: 1px; box-shadow: 0 0 8px rgba(255, 157, 46, 0.6), inset 0 0 6px rgba(255, 157, 46, 0.3); }
+[data-look='lightcycle'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #0f3a4a; background: #010407; }
+[data-look='lightcycle'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #36f3ff; background: #03080c; box-shadow: 0 0 14px rgba(54, 243, 255, 0.35), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='lightcycle'] .menu-item:hover { background: rgba(54, 243, 255, 0.12); }
+[data-look='lightcycle'] .ws.sel { background: linear-gradient(90deg, rgba(54, 243, 255, 0.2), transparent); border-left-color: #36f3ff; }
+[data-look='lightcycle'] .settings-nav > button.on { background: rgba(54, 243, 255, 0.14); color: #d8fbff; box-shadow: inset 2px 0 0 #36f3ff; }
+[data-look='lightcycle'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #36f3ff), 0 6px 10px -8px #36f3ff; }
+[data-look='lightcycle'] .status { border-top-color: #36f3ff; box-shadow: var(--glow); }
+[data-look='lightcycle'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.35; background: var(--grid); }
+[data-look='lightcycle'] :is(.board-col, .board-card) { border-color: #0f3a4a; }
+[data-look='lightcycle'] .board-card.opens:hover { border-color: #36f3ff; box-shadow: var(--glow); }
+[data-look='lightcycle'] .toggle.on .toggle-track { background: #36f3ff; box-shadow: var(--glow); }
+[data-look='lightcycle'] .theme { border-color: #0f3a4a; }
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

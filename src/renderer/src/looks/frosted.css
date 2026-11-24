@@ -1,0 +1,152 @@
+/* frosted: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Frosted (Settings › Appearance › Design; applyTheme's data-look over any theme's): macOS's own look. The window is glass (the desktop through main's vibrancy; a
+   wallpaper where there's none: a browser, Linux; solid under Reduce transparency and in the windows without blur); on it float a sidebar panel and a main card, with
+   a hairline edge and a lit top. No backdrop-filter (html.glass' note): the blur is the window's, floats near solid.
+   [data-dz]: the frame, not on a phone or in full screen; its traits (Settings.tsx DESIGNS) bring pill tabs and a floating side panel */
+[data-look='frosted'] { --radius: 8px; --r-xs: var(--rs, 3px); --r-s: var(--rs, 5px); --r-m: var(--rs, 8px); --r-l: var(--rs, 13px); --r-xl: var(--rs, 19px); --f-gap: 8px; --f-r: var(--rs, 18px); --f-fill: color-mix(in srgb, var(--fg) 9%, transparent); --f-fill-up: color-mix(in srgb, var(--fg) 15%, transparent);
+  --f-edge: var(--line); --f-hi: light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.09));
+  --f-drop: light-dark(rgb(30 30 50 / 0.16), rgb(0 0 0 / 0.38)); --f-ring: color-mix(in srgb, var(--accent) 38%, transparent);
+  --proj-divider: none; }
+[data-look='frosted'].glass body { background: transparent; }
+[data-look='frosted'].glass body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(70% 60% at 12% 8%, color-mix(in oklch, var(--tc-blue) 62%, var(--bg)), transparent 72%), radial-gradient(60% 55% at 92% 14%, color-mix(in oklch, var(--tc-purple) 58%, var(--bg)), transparent 72%), radial-gradient(75% 70% at 68% 104%, color-mix(in oklch, var(--tc-pink) 42%, var(--bg)), transparent 72%), var(--bg); }
+[data-look='frosted'].vibrant body::before { display: none; }
+[data-look='frosted'] .main { background: var(--app-bg, var(--bg)); }
+[data-look='frosted'] .narrow .sidebar { background: var(--panel); } /* a phone's drawer over the main area: solid */
+/* the frame: one rounded panel for the rail and the list (a hairline between them), a card for the rest */
+[data-look='frosted'] .app[data-dz] { box-sizing: border-box; padding: var(--f-gap); background: none; }
+[data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .main) { border: 1px solid var(--f-edge); }
+[data-look='frosted'] .app[data-dz] .sidebar { position: relative; z-index: 1; border-radius: var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), 14px 10px 44px -14px var(--f-drop); }
+[data-look='frosted'] .app[data-dz] .rail { border-right: none; border-radius: var(--f-r) 0 0 var(--f-r); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi), -14px 10px 44px -14px var(--f-drop); }
+[data-look='frosted'] .app[data-dz].rail-on .sidebar { border-radius: 0 var(--f-r) var(--f-r) 0; } /* its left edge kept: a hairline between the rail and the list, one panel still */
+/* that hairline from under the title bar down (styles.css' .electron .rail): the traffic lights on one panel, no line through them */
+[data-look='frosted'] .app[data-dz].electron .rail::before { display: none; }
+/* a rail alone (a page over the list, the list hidden, Terminals' strip on the right): its own panel, under the title
+   row (the page's head, 40px), so the traffic lights sit above it with the page's title, none over its edge */
+[data-look='frosted'] .app[data-dz].electron:is(.list-off, .strip-right) .rail { margin-top: 41px; padding-top: var(--sp-3); }
+/* every page's first row on that line too (the Board's columns, the Calendar's bar, My Desk's tabs), as the AI page's
+   and Notes' (no padding of their own): 3px of room for a focus ring there (the page scrolls, so it clips), the body
+   that much higher */
+[data-look='frosted'] .app[data-dz].electron.list-off .page-body { margin-top: -3px; padding-top: 3px; }
+[data-look='frosted'] .app[data-dz].electron.rail-on:not(.list-off, .strip-right) .sidebar { border-left-color: transparent; }
+/* Terminals' and Browsers' strip beside the rail: the same, its left edge a line from 46px down (a background: the strip
+   scrolls, a pseudo-element would go with it) */
+[data-look='frosted'] .app[data-dz].electron.rail-on.strip-left .side-strip { border-left-color: transparent; background: linear-gradient(var(--f-edge), var(--f-edge)) 0 46px / 1px calc(100% - 46px) no-repeat border-box, var(--side); }
+[data-look='frosted'] .app[data-dz].electron.rail-on:not(.list-off, .strip-right) .sidebar::before { content: ''; position: absolute; top: 46px; left: -1px; bottom: 0; width: 1px; background: var(--f-edge); pointer-events: none; }
+[data-look='frosted'] .app[data-dz]:is(.list-off, .strip-right) .rail { border-right: 1px solid var(--f-edge); border-radius: var(--f-r); }
+[data-look='frosted'] .app[data-dz] .side-strip { border: 1px solid var(--f-edge); background: var(--side); box-shadow: inset 0 1px 0 var(--f-hi); } /* Terminals' and Browsers' strip: the rail's panel goes on (left), or a panel of its own (right) */
+[data-look='frosted'] .app[data-dz].strip-left .side-strip { border-radius: 0 var(--f-r) var(--f-r) 0; } /* its left edge kept, as the sidebar's */
+[data-look='frosted'] .app[data-dz].strip-right .side-strip { margin-left: var(--f-gap); border-radius: var(--f-r); }
+[data-look='frosted'] .app[data-dz] .main { margin-left: var(--f-gap); overflow: hidden; border-radius: var(--f-r); box-shadow: inset 0 1px 0 var(--f-hi), 0 14px 44px -12px var(--f-drop); }
+[data-look='frosted'] .app[data-dz].side-closed .main { margin-left: 0; }
+[data-look='frosted'] :is(.tabbar, .status, .settings-head, .settings-nav, .side-foot, .tabstrip) { background: none; border-color: transparent; }
+[data-look='frosted'] .settings-page { background: none; }
+[data-look='frosted'] .main[data-pages] > :not(.settings-page, .ai-fab-wrap, .ai-float), [data-look='frosted'] .main[data-pages] > .tabbar * { visibility: hidden; } /* nothing under a see-through page (styles.css' chrome) */
+[data-look='frosted'] .settings-nav { padding: 6px 10px; border-right: 1px solid var(--f-edge); }
+[data-look='frosted'] .status { border-top: 1px solid var(--f-edge); }
+[data-look='frosted'] .bar::after { background: var(--f-edge); }
+/* the status bar across the window (Settings): a floating strip of its own under the panels */
+[data-look='frosted'] .app[data-dz].wide-status { padding-bottom: calc(var(--f-gap) * 2 + 26px); }
+/* the wide status bar: no outline or fill of its own, its groups the capsules (one level), the first at the panels'
+   inset; the sidebar's foot buttons (none with the rail) leave no stub */
+[data-look='frosted'] .app[data-dz] .status.wide { left: var(--f-gap); right: var(--f-gap); bottom: var(--f-gap); height: 26px; padding: 0; border: none; border-radius: 0; background: none; box-shadow: none; }
+[data-look='frosted'] .status.wide > .sb-foot:first-child { border-right-color: var(--f-edge); }
+[data-look='frosted'] .status.wide > .sb-foot:empty { display: none; }
+[data-look='frosted'] .status .sb-group { height: 26px; }
+[data-look='frosted'] .app[data-dz] .side-handle { transform: translateX(calc(-50% + 4px)); } /* in the gap (its left: App's at, the frame's padding too) */
+[data-look='frosted'] .app[data-dz] .side-scroll > .project { background: none; }
+@media (prefers-reduced-transparency: no-preference) {
+  [data-look='frosted'].glass .app[data-dz] { background: var(--app-bg, var(--bg)); }
+  [data-look='frosted'].glass .app[data-dz] .main { border-color: transparent; border-radius: 0; background: none; box-shadow: none; }
+    /* what's under the tab bar (the terminals, the side panel) a card with the panels' corners, not a square box: clipped
+       (menus and tips are fixed, out of it) */
+  [data-look='frosted'].glass .app[data-dz] .main > .body { border-radius: var(--rs, calc(var(--r-window) - var(--sp-2))); overflow: clip; }
+  [data-look='frosted'].glass .app[data-dz][data-pad='tiny'] .main > .body { border-radius: var(--r-s); } /* Terminal padding Tiny (2px): a corner's letters clear of it */
+  [data-look='frosted'].glass .app[data-dz] :is(.rail, .sidebar, .side-strip) { --f-r: var(--rs, calc(var(--r-window) - var(--sp-2))); box-shadow: inset 0 1px 0 var(--f-hi), var(--lift-2); }
+  [data-look='frosted'].glass .app[data-dz].rail-on:not(.list-off, .strip-right) .rail { clip-path: inset(-48px 0 -48px -48px); }
+  [data-look='frosted'].glass .app[data-dz].rail-on :is(.sidebar, .side-strip.left) { clip-path: inset(-48px -48px -48px 0); }
+  [data-look='frosted'].glass:not(.vibrant) .app[data-dz] :is(.rail, .sidebar, .side-strip) { backdrop-filter: blur(var(--sp-6)) saturate(1.6); }
+    /* a page's head (Scheduled tasks, Settings…) on that see-through main area: no band of its own (glass' edge-blur is a
+       solid panel, styles.css), only its words: nothing scrolls under it */
+  [data-look='frosted'].glass .app[data-dz] .settings-head.edge-blur { background: none; border-bottom-color: transparent; }
+}
+@supports (corner-shape: squircle) {
+  [data-look='frosted'] .app[data-dz] :is(.rail, .sidebar, .side-strip, .main, .main > .body, .side-panel) { corner-shape: squircle; }
+}
+/* the rail: bare icons, a bar of the accent by the one you're on */
+[data-look='frosted'] .rail-kind { position: relative; }
+[data-look='frosted'] .rail-icon { border-radius: var(--rs, 10px); transition: background 0.14s, color 0.14s; }
+[data-look='frosted'] .rail-kind.on .rail-icon { background: var(--f-fill-up); color: var(--fg); }
+[data-look='frosted'] .rail-kind.on:not(.rail-pin)::before { content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--accent); transform: translateY(-50%); }
+[data-look='frosted'] .rail-sep { background: var(--f-edge); }
+[data-look='frosted'] .rail-count { border-color: transparent; }
+/* the list */
+[data-look='frosted'] .project-head { font-weight: 600; letter-spacing: 0.7px; color: var(--muted); }
+[data-look='frosted'] .ws { margin-inline: 8px; border-radius: var(--rs, 8px); transition: background-color 0.12s; }
+[data-look='frosted'] .ws.sel:not(.ws-picked) { background-color: var(--f-fill-up); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] .ws:not(.sel, .ws-picked):hover { background-color: var(--f-fill); }
+/* tabs: capsules */
+[data-look='frosted'] .tabbar { align-items: center; padding-right: 8px; }
+[data-look='frosted'] :is(.tabbar > .tab-list > .tab, .tabstrip .tab) { box-shadow: none; transition: background-color 0.12s, color 0.12s; }
+[data-look='frosted'] :is(.tabbar > .tab-list > .tab, .tabstrip .tab).sel { border-color: transparent; background: var(--f-fill-up); box-shadow: inset 0 1px 0 var(--f-hi), inset 0 0 0 1px color-mix(in srgb, var(--tab-c, transparent) 22%, transparent); }
+[data-look='frosted'] :is(.tabbar > .tab-list > .tab, .tabstrip .tab):not(.sel):hover { background: var(--f-fill); }
+[data-look='frosted'] .tabstrip .tab { border: 1px solid transparent; }
+[data-look='frosted'] .tabstrip.bottom { height: 38px; align-items: center; }
+[data-look='frosted'] .tabstrip.bottom .tab { height: 26px; margin: 0 1px; border-radius: 999px; }
+[data-look='frosted'] .tabstrip:is(.left, .right) .tab { margin: 1px 8px; border-radius: var(--rs, 8px); }
+/* controls: filled, borderless, a lit top; the accent's blue where it's on */
+:where([data-look='frosted']) button { border-color: transparent; background: linear-gradient(var(--f-hi) 0 1px, transparent 1px) var(--f-fill); /* the lit top in the background: a button drawn without one has none */ transition: background-color 0.12s, filter 0.12s; }
+:where([data-look='frosted']) button:where(:not(.link)):hover { background: linear-gradient(var(--f-hi) 0 1px, transparent 1px) var(--f-fill-up); }
+[data-look='frosted'] button.primary { border-color: transparent; background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent)); color: var(--accent-fg); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 1px 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='frosted'] button.primary:hover { filter: brightness(1.08); }
+[data-look='frosted'] button.primary:active { filter: brightness(0.92); }
+[data-look='frosted'] .run-btn { border-color: transparent; border-radius: var(--rs, 8px); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] .run-btn button { background: var(--f-fill); }
+[data-look='frosted'] .run-btn button:hover { background: var(--f-fill-up); }
+[data-look='frosted'] .run-btn .run-more { border-left-color: var(--f-edge); }
+[data-look='frosted'] .ib { border-radius: var(--rs, 7px); }
+[data-look='frosted'] :is(.toggle-track, .switch-row .toggle-track) { border-radius: 999px; background: var(--f-fill-up); box-shadow: inset 0 0 0 0.5px var(--f-edge); }
+[data-look='frosted'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='frosted'] .toggle-knob, [data-look='frosted'] .toggle.on .toggle-knob { background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); }
+/* a segmented control: one recessed track, the choice a blue thumb */
+[data-look='frosted'] .seg { --seg-overlap: 0px; gap: 2px; padding: 2px; border-radius: var(--rs, 9px); background: var(--f-fill); }
+[data-look='frosted'] .seg button, [data-look='frosted'] .seg button:first-child, [data-look='frosted'] .seg button:last-child { border-color: transparent; border-radius: var(--rs, 7px); background: none; box-shadow: none; color: var(--muted); }
+[data-look='frosted'] .seg button:hover { background: var(--f-fill); color: var(--fg); }
+[data-look='frosted'] .seg button.on { background: var(--accent); color: var(--accent-fg); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px rgb(0 0 0 / 0.25); }
+/* fields, by element only: a class that draws one bare (the palette's, a filter's) keeps it */
+:where([data-look='frosted']) :is(input:not([type='radio'], [type='checkbox'], [type='range']), textarea) { background-color: light-dark(rgb(255 255 255 / 0.55), rgb(0 0 0 / 0.2)); } /* as strong as html.glass' tint, which it replaces */
+:where([data-look='frosted']) input:where(:not([type='radio'], [type='checkbox'], [type='range'])), :where([data-look='frosted']) select, :where([data-look='frosted']) textarea { border: 1px solid var(--f-edge); border-radius: var(--rs, 8px); transition: border-color 0.12s, box-shadow 0.12s; }
+:where([data-look='frosted']) input:where(:not([type='radio'], [type='checkbox'], [type='range'])):focus, :where([data-look='frosted']) select:focus, :where([data-look='frosted']) textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--f-ring); }
+[data-look='frosted'] .menu-filter { box-shadow: none; }
+[data-look='frosted'] :is(.chip-field input, .chips-input input, .finder > input, .sp-tools input, .fr-filter input, .notes-find input, .tunnel-host input, .nw-chip-input, .nw-composer textarea, .pin-boxes input, .csv-input) { box-shadow: none; background-color: transparent; } /* over html.glass' tint */
+/* a select is a Mac pop-up button, as the font picker (.pick-btn) beside it: filled and raised; only what you type in is recessed */
+[data-look='frosted'] select:not([multiple], [size]) { border-color: transparent; background-color: var(--f-fill); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] select:not([multiple], [size]):hover { background-color: var(--f-fill-up); }
+[data-look='frosted'] kbd { border-radius: var(--rs, 5px); border-color: var(--f-edge); background: var(--f-fill); }
+/* what floats: near solid, big soft corners, a menu's choice in the accent as on a Mac */
+[data-look='frosted'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--f-edge); background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: inset 0 1px 0 var(--f-hi), 0 0 0 0.5px rgb(0 0 0 / 0.25), 0 24px 70px var(--f-drop); }
+[data-look='frosted'] .menu { border-radius: var(--rs, 13px); }
+[data-look='frosted'] :is(.modal, .tunnel-pop) { border-radius: var(--rs, 16px); }
+[data-look='frosted'] .toast { border-radius: var(--rs, 13px); }
+[data-look='frosted'] .tip { border-color: var(--f-edge); border-radius: var(--rs, 7px); background: color-mix(in srgb, var(--panel) 96%, transparent); box-shadow: 0 6px 20px var(--f-drop); }
+[data-look='frosted'] .overlay { background: light-dark(rgb(40 40 60 / 0.18), rgb(0 0 0 / 0.32)); }
+[data-look='frosted'] .menu-item { border-radius: var(--rs, 7px); }
+[data-look='frosted'] .menu-item:hover, [data-look='frosted'] .menu-item.sel { background: var(--accent); color: var(--accent-fg); }
+[data-look='frosted'] .menu-item:is(:hover, .sel) :is(.menu-icon, .menu-hint, .menu-sub, .menu-label, .menu-key) { color: inherit; }
+[data-look='frosted'] .menu-item.danger:is(:hover, .sel) { background: var(--error); color: var(--on-error); }
+[data-look='frosted'] .menu-foot { border-top-color: var(--f-edge); background: none; }
+[data-look='frosted'] .menu-filter { border-color: var(--f-edge); border-radius: var(--rs, 8px); }
+/* Settings: a Mac's grouped rows */
+[data-look='frosted'] .set-group { border-color: var(--f-edge); border-radius: var(--rs, 14px); background: var(--f-fill); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] :is(.set-group > .setting-box, .set-subgroup > .setting-box) > :is(.switch-row, .sliders) + :is(.switch-row, .sliders) { border-top-color: var(--f-edge); }
+[data-look='frosted'] .settings-main .pick-btn { min-height: 31px; padding: 0 10px; } /* as tall as the selects beside it */
+[data-look='frosted'] .settings-nav > button { border-radius: var(--rs, 8px); background: none; }
+[data-look='frosted'] .settings-nav > button:hover { background: var(--f-fill); }
+[data-look='frosted'] .settings-nav > button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='frosted'] .settings-nav > button.on svg { color: inherit; }
+[data-look='frosted'] .setting-box:not(.set-group > *, .set-subgroup > *) { border-color: var(--f-edge); border-radius: var(--rs, 12px); background: var(--f-fill); box-shadow: inset 0 1px 0 var(--f-hi); }
+[data-look='frosted'] .theme { border-radius: var(--rs, 12px); }

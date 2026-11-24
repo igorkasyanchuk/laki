@@ -1,0 +1,50 @@
+/* holo: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Holo: iridescent foil. Popups edged in a moving rainbow, headings printed in it, a foil button, prism lines along
+   the sidebar, the tab bar and the status bar (still, as the system asks, without motion) */
+[data-look='holo'] { --radius: 12px; --r-xs: var(--rs, 4px); --r-s: var(--rs, 8px); --r-m: var(--rs, 12px); --r-l: var(--rs, 20px); --r-xl: var(--rs, 28px); --holo: linear-gradient(115deg, #5ee7ff, #a98bff, #ff7bd5, #ffd36b, #7cf2b0, #5ee7ff);
+  --prism: linear-gradient(90deg, #5ee7ff, #a98bff, #ff7bd5, #ffd36b, #7cf2b0); }
+[data-look='holo'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid transparent; border-radius: var(--rs, 16px);
+  background: linear-gradient(var(--panel), var(--panel)) padding-box, var(--holo) border-box; background-size: 100% 100%, 300% 100%;
+  animation: holo-shift 9s linear infinite; box-shadow: 0 0 40px -12px #a98bff, 0 24px 60px rgba(0, 0, 0, 0.6); }
+[data-look='holo'] :is(.settings-main h2, .tunnel-head b) { background: var(--holo); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: holo-text 9s linear infinite; }
+[data-look='holo'] .project-head { color: #c8c0ff; letter-spacing: 1.5px; }
+[data-look='holo'] button.primary { border: none; border-radius: 999px; background: var(--holo); background-size: 300% 100%; color: #0b0d17; font-weight: 700; }
+[data-look='holo'] button.primary:hover { animation: holo-text 3s linear infinite; } /* idle: still, no repaint every frame */
+[data-look='holo'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border-radius: 999px; border-color: color-mix(in srgb, #a98bff 45%, transparent); }
+[data-look='holo'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: var(--rs, 10px); }
+[data-look='holo'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { border-color: transparent;
+  background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--prism) border-box; }
+[data-look='holo'] .sidebar { border-right: 1px solid transparent; border-image: linear-gradient(180deg, #5ee7ff, #a98bff, #ff7bd5, #ffd36b) 1; }
+[data-look='holo'] .tabbar { --tab-line: 1px solid transparent; --tab-line-bg: var(--prism); --tab-line-w: 1px; border-bottom: 1px solid transparent; border-image: var(--prism) 1; }
+[data-look='holo'] .status { border-top: 1px solid transparent; border-image: var(--prism) 1; }
+[data-look='holo'] .tab.sel { box-shadow: none; background: var(--tab-sel, var(--term-bg)); } /* the prism: its edge (styles.css' real tab) */
+[data-look='holo'] .ws.sel { background: linear-gradient(180deg, #5ee7ff, #ff7bd5) 0 50% / 3px 60% no-repeat,
+  linear-gradient(90deg, color-mix(in srgb, #a98bff 30%, transparent), color-mix(in srgb, #5ee7ff 8%, transparent)); } /* the bar: a rounded row's (styles.css) */
+[data-look='holo'] .menu-item:hover { background: linear-gradient(90deg, color-mix(in srgb, #5ee7ff 22%, transparent), color-mix(in srgb, #ff7bd5 22%, transparent)); }
+[data-look='holo'] .toggle.on .toggle-track { background: var(--prism); }
+[data-look='holo'] .theme.on { border-color: #a98bff; box-shadow: 0 0 16px -2px #ff7bd5; } /* the swatch's own background is inline */
+@media (prefers-reduced-motion: reduce) {
+  [data-look='holo'] :is(.menu, .modal, .tunnel-pop, .toast, .settings-main h2, .tunnel-head b, button.primary) { animation: none !important; }
+}
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+[data-look='holo'] :is(.side-panel, .info) { border-left: 1px solid transparent; border-image: linear-gradient(180deg, #5ee7ff, #a98bff, #ff7bd5, #ffd36b) 1; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

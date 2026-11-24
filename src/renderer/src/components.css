@@ -1,6 +1,6 @@
 /* The shared components' own styles: syntax colors for the file preview, Settings' rows and sliders, the remote page's
    PIN, the glass (translucent) window. Loads after styles.css and fonts.css: at equal specificity it wins, and glass
-   (:where) loses to a look (looks.css, after it). */
+   (:where) loses to a look (looks-base.css and a look's own file, after it). */
 
 /* syntax colors (highlight.ts), from the theme's tab colors */
 .hl-c { color: var(--muted); font-style: italic; }

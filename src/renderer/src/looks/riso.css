@@ -1,0 +1,47 @@
+/* riso: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Riso: a risograph print. Two inks, pink and blue, a little out of register: offset shadows and headings that don't
+   quite line up, overprinted selections, paper grain over the terminals */
+[data-look='riso'] { --radius: 4px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 3px); --r-m: var(--rs, 4px); --r-l: var(--rs, 7px); --r-xl: var(--rs, 9px); --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --pink: #ff48b0; --blue: #0078bf; --yellow: #ffe800; }
+[data-look='riso'] :is(.settings-main h2, .tunnel-head b, .modal h3) { color: var(--blue); font-weight: 800; text-shadow: 2px 1px 0 color-mix(in srgb, var(--pink) 70%, transparent); }
+[data-look='riso'] .settings-main h2 { font-size: var(--fs-5); letter-spacing: -0.3px; }
+[data-look='riso'] .project-head { color: #006aa8; text-shadow: 1px 1px 0 color-mix(in srgb, var(--pink) 60%, transparent); }
+[data-look='riso'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1.5px solid var(--blue); border-radius: var(--rs, 4px); background: transparent;
+  box-shadow: 2px 2px 0 color-mix(in srgb, var(--pink) 55%, transparent); }
+[data-look='riso'] :is(.buttons button, .seg button, .scripts-tabs button):active { transform: translate(2px, 2px); box-shadow: none; }
+[data-look='riso'] .seg button.on { background: color-mix(in srgb, var(--yellow) 70%, transparent); }
+[data-look='riso'] button.primary { border: none; border-radius: var(--rs, 4px); background: var(--pink); color: #fff; font-weight: 700; box-shadow: 3px 2px 0 color-mix(in srgb, var(--blue) 65%, transparent); }
+[data-look='riso'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 1.5px solid color-mix(in srgb, var(--blue) 60%, transparent); background: var(--panel); }
+[data-look='riso'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid var(--blue); border-radius: var(--rs, 4px); box-shadow: 6px 5px 0 color-mix(in srgb, var(--pink) 55%, transparent); }
+[data-look='riso'] .menu-item:hover { background: color-mix(in srgb, var(--pink) 30%, color-mix(in srgb, var(--yellow) 30%, transparent)); }
+[data-look='riso'] .sidebar { border-right: 2px solid var(--blue); box-shadow: 3px 0 0 color-mix(in srgb, var(--pink) 45%, transparent); }
+[data-look='riso'] :is(.tabbar, .settings-head) { --tab-line: 2px solid var(--blue); border-bottom: 2px solid var(--blue); }
+[data-look='riso'] .status { border-top: 2px solid var(--pink); }
+[data-look='riso'] .tab.sel { box-shadow: inset 0 3px 0 var(--tab-c, var(--pink)), inset 2px 5px 0 -2px color-mix(in srgb, var(--blue) 50%, transparent); }
+[data-look='riso'] .ws.sel { border-left-color: var(--pink); background: linear-gradient(90deg, color-mix(in srgb, var(--pink) 32%, transparent), color-mix(in srgb, var(--yellow) 40%, transparent)); }
+[data-look='riso'] .settings-nav > button.on { background: color-mix(in srgb, var(--yellow) 65%, transparent); box-shadow: 2px 2px 0 color-mix(in srgb, var(--pink) 50%, transparent); }
+[data-look='riso'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at 30% 40%, rgba(35, 48, 94, 0.05) 0.6px, transparent 1px) 0 0 / 5px 5px, radial-gradient(circle at 70% 80%, rgba(255, 72, 176, 0.05) 0.6px, transparent 1px) 0 0 / 7px 7px; }
+[data-look='riso'] .toggle-track { background: transparent; box-shadow: inset 0 0 0 1.5px var(--blue); }
+[data-look='riso'] .toggle.on .toggle-track { background: var(--blue); }
+[data-look='riso'] .toggle-knob { background: var(--pink); }
+[data-look='riso'] .theme { border-color: var(--blue); box-shadow: 3px 3px 0 color-mix(in srgb, var(--pink) 45%, transparent); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+[data-look='riso'] :is(.side-panel, .info) { border-left: 2px solid var(--blue); box-shadow: -3px 0 0 color-mix(in srgb, var(--pink) 45%, transparent); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

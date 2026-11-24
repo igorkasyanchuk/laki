@@ -1,0 +1,52 @@
+/* workshop: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Workshop: a woodshop. Wood grain on the sidebar and popups, a pegboard tab bar, a tape measure for the status bar,
+   riveted steel buttons, a safety-orange main one, Phosphate headings */
+[data-look='workshop'] { --radius: 3px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 2px); --r-m: var(--rs, 3px); --r-l: var(--rs, 5px); --r-xl: var(--rs, 7px); --ui-font: 'DIN Alternate', 'Avenir Next Condensed', sans-serif; --head: Phosphate, Impact, sans-serif;
+  --grain: repeating-linear-gradient(92deg, transparent 0 7px, rgba(0, 0, 0, 0.12) 7px 8px, transparent 8px 19px, rgba(255, 220, 170, 0.05) 19px 21px), linear-gradient(90deg, #3a2716, #2c1d11 40%, #3a2716 70%, #2a1b10);
+  --rivet: radial-gradient(circle, #6a6e74 0 1.5px, transparent 2px); --steel: linear-gradient(180deg, #c8ccd2, #8e939a); }
+[data-look='workshop'] :is(.sidebar, .settings-nav) { background: var(--grain); }
+[data-look='workshop'] .tabbar { background: radial-gradient(circle, #1a1008 0 2.5px, transparent 3px) 0 0 / 16px 16px, #6a4f32; }
+[data-look='workshop'] .tabbar .ib { color: #d2c6ba; } /* on the wood */
+[data-look='workshop'] .tab { background: #2a1d14; }
+[data-look='workshop'] .tab.sel { background: var(--bg); }
+[data-look='workshop'] .status { --fg: #1a1008; --muted: #4a3520; --waiting: #7a4f00; --done: #2f6a1a; --error: #a8200a; --running: #1a4f8a; --accent: #a8200a; --accent-ink: #a8200a; border-top: none; color: var(--fg);
+  background: repeating-linear-gradient(90deg, #1a1008 0 1px, transparent 1px 8px) top / 100% 3px no-repeat, repeating-linear-gradient(90deg, #1a1008 0 1px, transparent 1px 40px) top / 100% 6px no-repeat, linear-gradient(#e8c66a, #d8b04a); }
+[data-look='workshop'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); font-size: var(--fs-5); font-weight: 400; letter-spacing: 1px; text-transform: uppercase; color: var(--accent-ink); }
+[data-look='workshop'] .project-head { font-family: var(--head); font-size: var(--fs-2); font-weight: 400; letter-spacing: 1.5px; color: #e8c66a; }
+[data-look='workshop'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a4e54; border-radius: var(--rs, 3px); padding-inline: 14px; color: #1a1410; font-weight: 700;
+  background: var(--rivet) left 4px center / 4px 4px no-repeat, var(--rivet) right 4px center / 4px 4px no-repeat, var(--steel); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+[data-look='workshop'] .seg button.on { background: var(--rivet) left 4px center / 4px 4px no-repeat, var(--rivet) right 4px center / 4px 4px no-repeat, linear-gradient(#ffb36a, #ff7a1a); }
+[data-look='workshop'] button.primary { border: none; border-radius: var(--rs, 3px); background: var(--accent); color: #1a1410; font-family: var(--head); font-weight: 400; letter-spacing: 1px; text-transform: uppercase; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
+[data-look='workshop'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #5a4430; background: #120d09; }
+[data-look='workshop'] :is(.menu, .modal, .tunnel-pop) { border: 2px solid #1a1008; border-radius: var(--rs, 3px); background: var(--grain); box-shadow: inset 0 0 0 1px rgba(255, 220, 170, 0.15), 0 16px 40px rgba(0, 0, 0, 0.6); }
+[data-look='workshop'] .menu-item:hover { background: rgba(255, 122, 26, 0.25); }
+[data-look='workshop'] .ws.sel { background: rgba(255, 122, 26, 0.2); border-left-color: var(--accent); color: #fff; }
+[data-look='workshop'] .settings-nav > button.on { background: rgba(255, 122, 26, 0.2); }
+[data-look='workshop'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% -15%, rgba(255, 200, 120, 0.08), transparent 55%); }
+[data-look='workshop'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='workshop'] .theme { border-radius: var(--rs, 3px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* an icon on a bar a look colors its own way (starship's black on its light heads, a status bar of another color):
+   hovered, a tint of its own color, not the theme's hover (dark on dark, white on light) */
+[data-look='starship'] :is(.tab.sel, .project-head, .ws.sel) .ib:hover, [data-look='luna'] :is(.tabbar, .settings-head, .side-head, .project-head) .ib:hover,
+  [data-look='classic'] .tunnel-head .ib:hover, :is([data-look='pocket'], [data-look='transit'], [data-look='workshop']) .status .ib:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

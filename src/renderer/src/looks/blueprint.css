@@ -1,0 +1,18 @@
+/* blueprint: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Blueprint: a drafting grid, mono capitals, hairlines */
+[data-look='blueprint'] { --radius: 2px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 1px); --r-m: var(--rs, 2px); --r-l: var(--rs, 3px); --r-xl: var(--rs, 5px); --ui-font: 'Iosevka', var(--mono); /* narrow, a draftsman's */
+  --grid: linear-gradient(color-mix(in srgb, var(--fg) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 7%, transparent) 1px, transparent 1px); }
+[data-look='blueprint'] :is(.sidebar, .settings-page, .splash) { background-image: var(--grid); background-size: 22px 22px; }
+[data-look='blueprint'] :is(.project-head, .settings-main h2, .tab) { text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='blueprint'] .tab { font-size: var(--fs-1); }
+[data-look='blueprint'] :is(button, input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea, .menu, .modal, .tunnel-pop) { border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+[data-look='blueprint'] .ws.sel { outline: 1px dashed color-mix(in srgb, var(--fg) 65%, transparent); outline-offset: -3px; }
+:is([data-look='blueprint'], [data-look='kraft']) { --ws-guide: 1px dashed color-mix(in srgb, var(--fg) 35%, transparent); --proj-divider: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

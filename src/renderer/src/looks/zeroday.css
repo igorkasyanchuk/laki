@@ -1,0 +1,56 @@
+/* zeroday: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Zero Day: a hacker's terminal. Green on black in a monospace, a root prompt and a blinking block on the headings,
+   [ bracketed ] buttons, a > on the selection, and digital rain falling faintly behind the terminals */
+[data-look='zeroday'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: 'Hack', 'Andale Mono', Menlo, monospace; --matrix: 0 0 6px rgba(0, 255, 102, 0.55);
+  --drop: transparent 55%, rgba(0, 255, 102, 0.1) 90%, rgba(190, 255, 210, 0.28); }
+[data-look='zeroday'] :is(.settings-main h2, .tunnel-head b) { color: var(--accent-ink); font-size: var(--fs-4); text-shadow: var(--matrix); }
+[data-look='zeroday'] .settings-main h2::before { content: 'root@laki:~# '; color: var(--muted); text-shadow: none; }
+[data-look='zeroday'] .settings-main h2::after { content: '\2588'; margin-left: 4px; animation: zd-blink 1s steps(1) infinite; }
+[data-look='zeroday'] .project-head { color: var(--accent-ink); letter-spacing: 1px; }
+[data-look='zeroday'] .project-head::before { content: '//'; margin-right: 5px; color: var(--muted); }
+[data-look='zeroday'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--accent-ink); }
+[data-look='zeroday'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='zeroday'] .seg button.on { background: var(--accent); color: #000; }
+[data-look='zeroday'] :is(.buttons button, button.primary)::before { content: '['; margin-right: 6px; opacity: 0.6; }
+[data-look='zeroday'] :is(.buttons button, button.primary)::after { content: ']'; margin-left: 6px; opacity: 0.6; }
+[data-look='zeroday'] button.primary { border: 1px solid var(--accent); border-radius: 0; background: rgba(0, 255, 102, 0.12); color: var(--accent-ink); text-shadow: var(--matrix); }
+[data-look='zeroday'] button.primary:hover { background: var(--accent); color: #000; text-shadow: none; }
+[data-look='zeroday'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-color: var(--line); background: #000; }
+[data-look='zeroday'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--accent); border-radius: 0; background: #000; box-shadow: 0 0 18px rgba(0, 255, 102, 0.18), 0 16px 40px rgba(0, 0, 0, 0.7); }
+[data-look='zeroday'] .menu-item { border-radius: 0; }
+[data-look='zeroday'] .menu-item:hover { background: var(--accent); color: #000; }
+[data-look='zeroday'] .tab { border-radius: 0; }
+[data-look='zeroday'] .tab.sel { background: #000; color: var(--accent-ink); }
+[data-look='zeroday'] .ws.sel { background: transparent; border-left-color: transparent; color: var(--accent-ink); text-shadow: var(--matrix); }
+[data-look='zeroday'] .ws.sel::before { content: '>'; margin-left: -10px; color: var(--accent-ink); }
+[data-look='zeroday'] .settings-nav > button.on { background: transparent; color: var(--accent-ink); }
+[data-look='zeroday'] .settings-nav > button.on::before { content: '>'; margin-left: -8px; margin-right: 2px; }
+[data-look='zeroday'] .term-wrap { overflow: hidden; }
+[data-look='zeroday'] .term-wrap::before, [data-look='zeroday'] .term-wrap::after { content: ''; position: absolute; left: 0; right: 0; top: -360px; bottom: 0; z-index: 2; pointer-events: none; }
+/* columns of rain: each a falling streak with a bright head, repeating down; 360px (the loop) is a multiple of each
+   one's height, so the loop is seamless */
+[data-look='zeroday'] .term-wrap::before { animation: zd-rain 9s linear infinite;
+  background: linear-gradient(var(--drop)) 4% 30px / 2px 120px repeat-y, linear-gradient(var(--drop)) 17% 0 / 2px 180px repeat-y,
+    linear-gradient(var(--drop)) 29% 70px / 2px 90px repeat-y, linear-gradient(var(--drop)) 43% 10px / 2px 360px repeat-y,
+    linear-gradient(var(--drop)) 58% 50px / 2px 120px repeat-y, linear-gradient(var(--drop)) 71% 140px / 2px 180px repeat-y,
+    linear-gradient(var(--drop)) 86% 20px / 2px 72px repeat-y, linear-gradient(var(--drop)) 97% 100px / 2px 120px repeat-y; }
+[data-look='zeroday'] .term-wrap::after { animation: zd-rain 14s linear infinite; opacity: 0.7;
+  background: linear-gradient(var(--drop)) 10% 60px / 2px 180px repeat-y, linear-gradient(var(--drop)) 23% 20px / 2px 120px repeat-y,
+    linear-gradient(var(--drop)) 36% 200px / 2px 360px repeat-y, linear-gradient(var(--drop)) 51% 0 / 2px 90px repeat-y,
+    linear-gradient(var(--drop)) 64% 80px / 2px 120px repeat-y, linear-gradient(var(--drop)) 79% 40px / 2px 360px repeat-y,
+    linear-gradient(var(--drop)) 92% 10px / 2px 180px repeat-y; }
+[data-look='zeroday'] .toggle-track, [data-look='zeroday'] .toggle-knob { border-radius: 0; }
+[data-look='zeroday'] .theme { border-radius: 0; }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='zeroday'] .term-wrap::before, [data-look='zeroday'] .term-wrap::after, [data-look='zeroday'] .settings-main h2::after { animation: none; }
+}
+:is([data-look='greenbar'], [data-look='zeroday']) { --ws-h: 22px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

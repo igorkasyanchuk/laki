@@ -1,0 +1,50 @@
+/* cassette: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Mixtape: cassettes. Menus are label stickers (striped band, ruled lines, Marker Felt), tabs are spines, buttons are a
+   tape deck's chunky keys, ◎ ◎ reels by the headings */
+[data-look='cassette'] { --radius: 4px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 3px); --r-m: var(--rs, 4px); --r-l: var(--rs, 7px); --r-xl: var(--rs, 9px); --ui-font: 'Helvetica Neue', Helvetica, sans-serif; --hand: 'Marker Felt', Noteworthy, 'Comic Sans MS', sans-serif; --label: #f3ead6;
+  --stripes: linear-gradient(180deg, #ff6b35 0 4px, #ffcf4a 4px 8px, #4fc3d9 8px 12px); --key: linear-gradient(180deg, #d9d9dd, #a9a9b0); }
+[data-look='cassette'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--hand); font-size: var(--fs-5); font-weight: 400; }
+[data-look='cassette'] .settings-main h2::before { content: '\25CE\2009\25CE'; margin-right: 10px; font-family: var(--ui-font); color: var(--accent-ink); }
+[data-look='cassette'] .project-head { font-family: var(--hand); font-size: var(--fs-3); font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--waiting); }
+[data-look='cassette'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #55555c; border-radius: var(--rs, 3px) var(--rs, 3px) var(--rs, 5px) var(--rs, 5px); background: var(--key); color: #1b1a1e; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px; box-shadow: inset 0 1px 0 #fff, 0 3px 0 #55555c; }
+[data-look='cassette'] :is(.buttons button, .seg button, .scripts-tabs button):active { translate: 0 2px; box-shadow: inset 0 1px 0 #fff, 0 1px 0 #55555c; }
+[data-look='cassette'] .seg button.on { background: linear-gradient(180deg, #ff8a5a, #ff6b35); }
+[data-look='cassette'] button.primary { border: 1px solid #a83a10; border-radius: var(--rs, 3px) var(--rs, 3px) var(--rs, 5px) var(--rs, 5px); background: linear-gradient(180deg, #ff8a5a, #e0501f); color: #2a1a10; font-weight: 700;
+  text-transform: uppercase; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 0 #a83a10; }
+[data-look='cassette'] .menu { --fg: #2a2218; --muted: #7a6a54; --sel: #ffe0a8; --line: #d8c8a8; border: none; border-radius: var(--rs, 6px); padding-top: 16px; color: var(--fg);
+  background: var(--stripes) top / 100% 12px no-repeat, repeating-linear-gradient(180deg, transparent 0 25px, rgba(60, 40, 20, 0.12) 25px 26px), var(--label);
+  box-shadow: 0 0 0 4px #2e2c33, 0 16px 40px rgba(0, 0, 0, 0.6); }
+[data-look='cassette'] .menu-item { font-family: var(--hand); font-size: var(--fs-3); }
+[data-look='cassette'] :is(.modal, .tunnel-pop) { padding-top: 22px; background: var(--stripes) top / 100% 12px no-repeat, var(--panel); }
+[data-look='cassette'] .tab { margin-right: 2px; background: #2e2c33; }
+[data-look='cassette'] .tab.sel { --fg: #2a2218; --muted: #7a6a54; background: var(--label); color: var(--fg); box-shadow: inset 0 3px 0 var(--tab-c, var(--accent)); }
+[data-look='cassette'] .ws.sel { --fg: #2a2218; --muted: #7a6a54; background: var(--label); color: var(--fg); border-left-color: var(--accent); font-family: var(--hand); }
+[data-look='cassette'] .settings-nav > button.on { background: var(--label); color: #2a2218; }
+[data-look='cassette'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='cassette'] .theme { border-radius: var(--rs, 4px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* a selected tab filled with a color: its status mark in the tab's own text color (green on orange doesn't read) */
+:is([data-look='cyber'], [data-look='pocket'], [data-look='starship'], [data-look='groovy'], [data-look='bricks'], [data-look='cassette'], [data-look='brass']) .tab.sel .glyph { color: inherit; --running: currentColor; }
+/* the same for a selected row filled with one */
+:is([data-look='brutal'], [data-look='classic'], [data-look='aqua'], [data-look='starship'], [data-look='luna'], [data-look='cassette'], [data-look='receipt'], [data-look='phantom']) .ws.sel :is(.glyph, .ws-pr) { color: inherit; --running: currentColor; } /* a PR's mark too: its shape tells its state */
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

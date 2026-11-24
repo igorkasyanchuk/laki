@@ -1,0 +1,38 @@
+/* amp: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Llama Amp: a 1998 music player. Dark ribbed chrome, gold stripes after the title bars, bevelled buttons, a green
+   play button, the playlist's blue selection, the song display's black for the status bar with a spectrum at its end */
+[data-look='amp'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: Tahoma, Verdana, sans-serif;
+  --ribs: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px); }
+[data-look='amp'] :is(.sidebar, .settings-nav) { border-right: 1px solid #0a0a14; background: var(--ribs), linear-gradient(90deg, #262640, #1e1e30); }
+[data-look='amp'] :is(.settings-main h2, .tunnel-head b) { font-size: var(--fs-4); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #e6e6f0; }
+[data-look='amp'] .settings-main h2::after { content: ''; display: inline-block; width: 90px; height: 7px; margin-left: 12px; vertical-align: 2px;
+  background: repeating-linear-gradient(180deg, #d9a03a 0 1px, transparent 1px 3px); }
+[data-look='amp'] .project-head { color: #d9a03a; letter-spacing: 1.5px; }
+[data-look='amp'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #0a0a14; background: linear-gradient(#4a4a6e, #2c2c46); box-shadow: inset 1px 1px 0 #7a7aa0, inset -1px -1px 0 #1a1a2c; }
+[data-look='amp'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='amp'] .seg button.on { background: linear-gradient(#2c2c46, #4a4a6e); color: #00e000; }
+[data-look='amp'] button.primary { border: 1px solid #003a00; background: linear-gradient(#5aff5a, #00b000); color: #000; font-weight: 700; box-shadow: inset 1px 1px 0 #b0ffb0; }
+[data-look='amp'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 1px solid #0a0a14; background: #000; box-shadow: inset 1px 1px 0 #000, inset -1px -1px 0 #45456a; }
+[data-look='amp'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #0a0a14; background: #22223a; box-shadow: inset 1px 1px 0 #5a5a80, 0 14px 30px rgba(0, 0, 0, 0.7); }
+[data-look='amp'] .menu-item:hover { background: #0000c6; color: #fff; }
+[data-look='amp'] .ws.sel { background: #0000c6; border-left-color: #00e000; color: #fff; }
+[data-look='amp'] .settings-nav > button.on { background: #0000c6; color: #fff; }
+[data-look='amp'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, #00e000); }
+[data-look='amp'] .status { border-top: 2px solid #45456a; background: #000; }
+[data-look='amp'] .status::after { content: ''; flex: none; order: 99; width: 30px; height: 12px;
+  background: linear-gradient(#00e000, #00e000) 0 100% / 3px 50% no-repeat, linear-gradient(#00e000, #00e000) 4px 100% / 3px 80% no-repeat,
+    linear-gradient(#d9e000, #d9e000) 8px 100% / 3px 100% no-repeat, linear-gradient(#00e000, #00e000) 12px 100% / 3px 65% no-repeat,
+    linear-gradient(#00e000, #00e000) 16px 100% / 3px 40% no-repeat, linear-gradient(#00e000, #00e000) 20px 100% / 3px 75% no-repeat,
+    linear-gradient(#00e000, #00e000) 24px 100% / 3px 30% no-repeat, linear-gradient(#00e000, #00e000) 28px 100% / 2px 55% no-repeat; }
+[data-look='amp'] :is(.board-col, .board-card) { border-color: #45456a; }
+[data-look='amp'] .toggle.on .toggle-track { background: #00e000; }
+[data-look='amp'] .theme { border-color: #45456a; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

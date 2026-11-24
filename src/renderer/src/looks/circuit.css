@@ -1,0 +1,56 @@
+/* circuit: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Circuit: a printed circuit board. Green solder mask, gold pads for buttons, copper traces along the edges, fiducial
+   rings in the popups' corners, silkscreen capitals, a grid of vias behind the terminals */
+[data-look='circuit'] { --radius: 3px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 2px); --r-m: var(--rs, 3px); --r-l: var(--rs, 5px); --r-xl: var(--rs, 7px); --trace: #c98b2e; --pad: linear-gradient(180deg, #f3d27e, #c99632);
+  --fiducial: transparent 0 3px, #e0b04a 3.5px 5px, transparent 5.5px; }
+[data-look='circuit'] :is(.project-head, .settings-main h2, .tunnel-head b, .tab) { font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='circuit'] .settings-main h2 { color: var(--fg); }
+[data-look='circuit'] .settings-main h2::before { content: 'U1'; margin-right: 10px; padding: 0 5px; border: 1px solid var(--muted); border-radius: var(--rs, 2px); font-size: var(--fs-1); color: var(--muted); vertical-align: 2px; }
+[data-look='circuit'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #8a6a22; border-radius: var(--rs, 3px); background: var(--pad); color: #2a1f06; font-weight: 600; }
+[data-look='circuit'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):hover { filter: brightness(1.1); }
+[data-look='circuit'] .seg button.on { background: #fff1c2; }
+[data-look='circuit'] button.primary { border: 1px solid #8a6a22; border-radius: 999px; background: var(--pad); color: #2a1f06; font-weight: 700;
+  box-shadow: 0 0 0 3px var(--bg), 0 0 0 4px var(--trace); }
+[data-look='circuit'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 1px solid var(--line); background: #041a13; }
+.theme-font[data-look='circuit'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { font-family: var(--mono); }
+[data-look='circuit'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--trace); border-radius: var(--rs, 3px);
+  background: radial-gradient(circle at 10px 10px, var(--fiducial)), radial-gradient(circle at calc(100% - 10px) calc(100% - 10px), var(--fiducial)), var(--panel);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); }
+[data-look='circuit'] .menu-item:hover { background: var(--pad); color: #2a1f06; }
+[data-look='circuit'] .sidebar { border-right: 3px solid var(--trace); }
+[data-look='circuit'] :is(.tabbar, .settings-head) { --tab-line: 2px solid var(--trace); border-bottom: 2px solid var(--trace); }
+[data-look='circuit'] .status { border-top: 2px solid var(--trace); }
+[data-look='circuit'] .tab { border-radius: var(--rs, 3px) var(--rs, 3px) 0 0; font-size: var(--fs-1); }
+[data-look='circuit'] .tab.sel { box-shadow: inset 0 3px 0 var(--tab-c, var(--accent)); }
+[data-look='circuit'] .ws.sel { background: linear-gradient(90deg, color-mix(in srgb, var(--trace) 30%, transparent), transparent); border-left: 3px solid var(--accent); }
+[data-look='circuit'] .ws.sel::after { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 2px var(--accent); }
+[data-look='circuit'] .settings-nav > button.on { background: var(--pad); color: #2a1f06; }
+[data-look='circuit'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--trace) 22%, transparent) 1.2px, transparent 1.7px) 0 0 / 28px 28px; }
+[data-look='circuit'] .toggle-track { background: #041a13; box-shadow: inset 0 0 0 1px var(--trace); }
+[data-look='circuit'] .toggle.on .toggle-track { background: var(--trace); }
+[data-look='circuit'] .toggle-knob { background: var(--pad); }
+[data-look='circuit'] .theme { border-color: var(--trace); border-radius: var(--rs, 3px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='circuit'], [data-look='topo'], [data-look='cosmos']) { --ws-guide: 1px dotted color-mix(in srgb, var(--accent) 70%, transparent); }
+[data-look='circuit'] :is(.side-panel, .info) { border-left: 3px solid var(--trace); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

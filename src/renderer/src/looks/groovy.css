@@ -1,0 +1,55 @@
+/* groovy: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Groovy: the seventies. Round everything, a Cooper type, the four warm stripes along the sidebar, on top of the
+   popups and under the headings, a rainbow rising in the terminal's corner */
+[data-look='groovy'] { --radius: 18px; --r-xs: var(--rs, 6px); --r-s: var(--rs, 12px); --r-m: var(--rs, 18px); --r-l: var(--rs, 30px); --r-xl: var(--rs, 42px); --cooper: 'Cooper Black', 'Cooper Std', 'Arial Rounded MT Bold', Georgia, serif; --brown: #3b2414;
+  --stripes: linear-gradient(180deg, #e2531f 0 25%, #f0892a 25% 50%, #f2b632 50% 75%, #6f8f2f 75%); }
+[data-look='groovy'] :is(.settings-main h2, .tunnel-head b, .project-head, button.primary) { font-family: var(--cooper); }
+[data-look='groovy'] .settings-main h2 { font-size: var(--fs-5); color: #e2531f; padding-bottom: 12px;
+  background: linear-gradient(90deg, #e2531f 0 25%, #f0892a 25% 50%, #f2b632 50% 75%, #6f8f2f 75%) left bottom / 140px 6px no-repeat; }
+[data-look='groovy'] .project-head { color: #b04118; text-transform: none; font-size: var(--fs-3); letter-spacing: 0.5px; }
+[data-look='groovy'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid var(--brown); border-radius: 999px; background: #f2b632; color: var(--brown); font-weight: 700; }
+[data-look='groovy'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):hover { background: #f0892a; }
+[data-look='groovy'] .seg button.on { background: #5d7827; color: #fff7e8; }
+[data-look='groovy'] button.primary { border: 2px solid var(--brown); border-radius: 999px; background: #c6491b; color: #fff7e8; box-shadow: 0 3px 0 var(--brown); }
+[data-look='groovy'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid #d9b47c; border-radius: var(--rs, 14px); }
+[data-look='groovy'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid var(--brown); border-radius: var(--rs, 26px); padding-top: 18px;
+  background: var(--stripes) top / 100% 12px no-repeat, var(--panel); box-shadow: 0 6px 0 rgba(59, 36, 20, 0.25), 0 20px 50px rgba(59, 36, 20, 0.25); }
+[data-look='groovy'] .menu-item:hover { background: #f6cf8a; border-radius: 999px; }
+[data-look='groovy'] .sidebar { border-right: 12px solid transparent; /* the image is the box's size: its last 12px are the stripes */
+  border-image: linear-gradient(90deg, #e2531f calc(100% - 9px), #f0892a 0 calc(100% - 6px), #f2b632 0 calc(100% - 3px), #6f8f2f 0) 0 12 0 0 / 0 12px 0 0; }
+[data-look='groovy'] :is(.tabbar, .settings-head) { border-bottom: 2px solid var(--brown); }
+[data-look='groovy'] .status { border-top: 2px solid var(--brown); }
+[data-look='groovy'] .tab { border-radius: 999px; height: 26px; margin: 0 2px 4px; }
+[data-look='groovy'] .tab.sel { background: var(--accent); color: var(--accent-fg); border-color: transparent; box-shadow: none; }
+[data-look='groovy'] .tab.sel :is(.x, svg) { color: var(--accent-fg); }
+[data-look='groovy'] .ws.sel { margin: 1px 8px; border-left-color: transparent; border-radius: 999px; background: #f2b632; color: var(--brown); font-weight: 700; }
+[data-look='groovy'] .settings-nav > button.on { background: #f2b632; border-radius: 999px; color: var(--brown); }
+[data-look='groovy'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.13;
+  background: radial-gradient(circle at 100% 100%, transparent 0 90px, #6f8f2f 90px 120px, #f2b632 120px 150px, #f0892a 150px 180px, #e2531f 180px 210px, transparent 210px); }
+[data-look='groovy'] .toggle-track { background: #f0d6a8; }
+[data-look='groovy'] .toggle.on .toggle-track { background: #e2531f; }
+[data-look='groovy'] .theme { border-radius: var(--rs, 22px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='bubble'], [data-look='clay'], [data-look='groovy']) { --ws-guide: none; --ws-indent: 4px; --proj-divider: none; }
+/* a selected tab filled with a color: its status mark in the tab's own text color (green on orange doesn't read) */
+:is([data-look='cyber'], [data-look='pocket'], [data-look='starship'], [data-look='groovy'], [data-look='bricks'], [data-look='cassette'], [data-look='brass']) .tab.sel .glyph { color: inherit; --running: currentColor; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

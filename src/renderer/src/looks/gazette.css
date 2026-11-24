@@ -1,0 +1,38 @@
+/* gazette: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Gazette: a broadsheet. Serif type, ink rules (double where a newspaper has them), a masthead on the popups, small
+   caps, a red drop cap on the headings, a ¶ on the selection, a halftone over the terminals */
+[data-look='gazette'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: Charter, Georgia, 'Times New Roman', serif; --head: 'Big Caslon', Baskerville, 'Times New Roman', serif; }
+[data-look='gazette'] :is(.settings-main h2, .tunnel-head b, .modal h3) { font-family: var(--head); font-weight: 700; letter-spacing: 0.3px; }
+[data-look='gazette'] .settings-main h2 { font-size: var(--fs-5); padding-bottom: 4px; border-bottom: 3px double var(--fg); }
+[data-look='gazette'] .settings-main h2::first-letter { color: var(--accent-ink); font-size: 1.35em; }
+[data-look='gazette'] .project-head { font-family: var(--head); text-transform: none; font-variant: small-caps; font-size: var(--fs-3); letter-spacing: 1.5px; color: var(--fg); border-bottom: 1px solid var(--line); margin: 0 10px; padding-left: 2px; }
+[data-look='gazette'] .sidebar { border-right: 3px double var(--fg); }
+[data-look='gazette'] :is(.tabbar, .settings-head) { --tab-line: 3px double var(--fg); border-bottom: 3px double var(--fg); }
+[data-look='gazette'] .status { border-top: 3px double var(--fg); font-style: italic; }
+[data-look='gazette'] .tab { border-radius: 0; font-style: italic; }
+[data-look='gazette'] .tab.sel { font-style: normal; font-weight: 700; box-shadow: inset 0 3px 0 var(--tab-c, var(--fg)); }
+[data-look='gazette'] .ws.sel { background: transparent; border-left-color: transparent; font-weight: 700; }
+[data-look='gazette'] .ws.sel::before { content: '\00B6'; color: var(--accent-ink); margin-left: -10px; }
+[data-look='gazette'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--fg); border-radius: 0; background: transparent; font-variant: small-caps; letter-spacing: 1px; }
+[data-look='gazette'] button.primary { border: 1px solid var(--fg); border-radius: 0; background: var(--fg); color: var(--bg); font-variant: small-caps; letter-spacing: 1.5px; }
+[data-look='gazette'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-width: 0 0 1px; border-radius: 0; border-color: var(--fg); background: transparent; }
+[data-look='gazette'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--fg); border-top: 5px solid var(--fg); border-radius: 0; box-shadow: 4px 4px 0 rgba(28, 26, 23, 0.14); }
+[data-look='gazette'] .menu-item:hover { background: var(--fg); color: var(--bg); }
+[data-look='gazette'] .settings-nav > button.on { background: transparent; font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+[data-look='gazette'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle, rgba(28, 26, 23, 0.07) 0.6px, transparent 1px) 0 0 / 4px 4px; }
+[data-look='gazette'] .toggle-track, [data-look='gazette'] .toggle-knob { border-radius: 0; }
+[data-look='gazette'] .toggle-track { background: transparent; box-shadow: inset 0 0 0 1px var(--fg); }
+[data-look='gazette'] .toggle.on .toggle-track { background: var(--fg); }
+[data-look='gazette'] .theme { border-radius: 0; }
+[data-look='gazette'] { --ws-guide: none; --ws-indent: 0px; --proj-divider: 3px double color-mix(in srgb, var(--fg) 40%, transparent); }
+[data-look='gazette'] :is(.side-panel, .info) { border-left: 3px double var(--fg); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }
+[data-look='gazette'] .seg button.on { background: var(--fg); color: var(--bg); }

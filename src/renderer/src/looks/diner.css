@@ -1,0 +1,46 @@
+/* diner: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Diner: a 1950s roadside diner. Mint booths, a checkerboard floor under the headings and the tab bar, chrome
+   buttons, a cherry-red pill, Brush Script headings like the neon over the door */
+[data-look='diner'] { --radius: 8px; --r-xs: var(--rs, 3px); --r-s: var(--rs, 5px); --r-m: var(--rs, 8px); --r-l: var(--rs, 13px); --r-xl: var(--rs, 19px); --ui-font: Futura, 'Avenir Next', sans-serif;
+  --checker: repeating-conic-gradient(#2a1e1e 0 25%, #fff 0 50%) 0 0 / 10px 10px;
+  --chrome: linear-gradient(180deg, #fdfdfd, #d9dde0 45%, #f4f6f7 55%, #c4c9cd); }
+[data-look='diner'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Brush Script MT', 'Snell Roundhand', cursive; font-size: 30px; font-weight: 400; color: var(--accent-ink); text-shadow: 1px 1px 0 #fff, 2px 2px 0 rgba(215, 38, 61, 0.25); }
+[data-look='diner'] .settings-main h2::after { content: ''; display: block; height: 10px; margin-top: 6px; background: var(--checker); opacity: 0.85; }
+[data-look='diner'] .project-head { color: var(--accent-ink); letter-spacing: 2px; }
+[data-look='diner'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #a8aeb3; border-radius: var(--rs, 8px); background: var(--chrome); color: #2a1e1e; box-shadow: inset 0 1px 0 #fff, 0 1px 1px rgba(0, 0, 0, 0.15); }
+[data-look='diner'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='diner'] .seg button.on { border-color: var(--accent); }
+[data-look='diner'] .seg button.on { background: #fff; color: var(--accent-ink); }
+[data-look='diner'] button.primary { border: none; border-radius: 999px; background: linear-gradient(180deg, #ef4a5e, #d7263d 60%, #b01428); color: #fff; font-weight: 600; letter-spacing: 1px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 0 #8a0e1e; }
+[data-look='diner'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 1px solid #a8aeb3; border-radius: var(--rs, 8px); background: #fff; }
+[data-look='diner'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 3px solid #c4c9cd; border-radius: var(--rs, 14px); background: var(--panel); box-shadow: inset 0 0 0 1px #fff, 0 16px 40px rgba(42, 30, 30, 0.2); }
+[data-look='diner'] .menu-item:hover { background: var(--sel); border-radius: var(--rs, 8px); }
+[data-look='diner'] .ws.sel { background: var(--sel); border-left-color: var(--accent); }
+[data-look='diner'] .settings-nav > button.on { background: var(--sel); border-radius: var(--rs, 8px); box-shadow: inset 3px 0 0 var(--accent); }
+[data-look='diner'] .tabbar { border-bottom: none; padding-bottom: 6px; background: linear-gradient(var(--side), var(--side)) top / 100% calc(100% - 6px) no-repeat, repeating-conic-gradient(#2a1e1e 0 25%, #fff 0 50%) 0 100% / 12px 12px; } /* a checkerboard floor */
+[data-look='diner'] .tab.sel { box-shadow: inset 0 3px 0 var(--tab-c, var(--accent)); }
+[data-look='diner'] .status { background: var(--chrome); color: #2a1e1e; --muted: #5a4e4a; --running: #1e5885; --waiting: #714e09; --done: #1d5e41; --error: #a51527; border-top: 1px solid #a8aeb3; }
+[data-look='diner'] .term-wrap::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; z-index: 2; pointer-events: none; background: linear-gradient(90deg, var(--accent), #ef7a8a, var(--accent)); opacity: 0.7; }
+[data-look='diner'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='diner'] .toggle-knob { background: var(--chrome); }
+[data-look='diner'] .theme { border-radius: var(--rs, 10px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

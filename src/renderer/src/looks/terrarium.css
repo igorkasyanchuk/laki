@@ -1,0 +1,48 @@
+/* terrarium: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Terrarium: a glass garden. Leaf-shaped buttons, selections and popups, moss along the sidebar, a ❦ by the headings,
+   dew and a few fireflies over the terminals */
+[data-look='terrarium'] { --radius: 12px; --r-xs: var(--rs, 4px); --r-s: var(--rs, 8px); --r-m: var(--rs, 12px); --r-l: var(--rs, 20px); --r-xl: var(--rs, 28px); --leaf: 16px 3px 16px 3px; --moss: radial-gradient(circle at 30% 40%, rgba(155, 227, 122, 0.06) 0 2px, transparent 2.5px) 0 0 / 9px 11px; }
+[data-look='terrarium'] :is(.sidebar, .settings-nav) { background-image: var(--moss); }
+[data-look='terrarium'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Hoefler Text', Georgia, serif; color: var(--accent-ink); font-size: var(--fs-5); }
+[data-look='terrarium'] .settings-main h2::before { content: '\2766  '; }
+[data-look='terrarium'] .project-head { color: var(--accent-ink); }
+[data-look='terrarium'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #3f6a46; border-radius: var(--leaf); background: #1c2e21; }
+[data-look='terrarium'] .seg button.on { background: #2f5a35; border-color: var(--accent); }
+[data-look='terrarium'] button.primary { border: none; border-radius: var(--rs, 22px) var(--rs, 4px) var(--rs, 22px) var(--rs, 4px); background: linear-gradient(135deg, #bff0a3, #6fbf55); color: #0f1a12; font-weight: 700; }
+[data-look='terrarium'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: var(--rs, 10px) var(--rs, 2px) var(--rs, 10px) var(--rs, 2px); border-color: #3f6a46; }
+[data-look='terrarium'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #3f6a46; border-radius: var(--rs, 26px) var(--rs, 6px) var(--rs, 26px) var(--rs, 6px); background: var(--moss), var(--panel);
+  box-shadow: inset 0 0 30px rgba(155, 227, 122, 0.06), 0 20px 50px rgba(0, 0, 0, 0.6); }
+[data-look='terrarium'] .menu-item:hover { background: #22402a; border-radius: var(--rs, 12px) var(--rs, 2px) var(--rs, 12px) var(--rs, 2px); }
+[data-look='terrarium'] .sidebar { border-right: 2px solid transparent; border-image: linear-gradient(180deg, #6fbf55, #2b4532 40%, #6fbf55 70%, #2b4532) 1; }
+[data-look='terrarium'] .tab { border-radius: var(--rs, 14px) var(--rs, 3px) 0 0; }
+[data-look='terrarium'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)); }
+[data-look='terrarium'] .ws.sel { margin: 1px 8px; border-left-color: transparent; border-radius: 0 var(--rs, 18px) 0 var(--rs, 18px); background: linear-gradient(90deg, #2f5a35, #1c2e21); color: #f0ffe8; }
+[data-look='terrarium'] .settings-nav > button.on { border-radius: 0 var(--rs, 16px) 0 var(--rs, 16px); background: #2f5a35; }
+[data-look='terrarium'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at 18% 78%, rgba(230, 255, 140, 0.5) 0 1.5px, rgba(230, 255, 140, 0.12) 3px, transparent 9px),
+    radial-gradient(circle at 74% 28%, rgba(230, 255, 140, 0.45) 0 1.5px, rgba(230, 255, 140, 0.1) 3px, transparent 9px),
+    radial-gradient(circle at 88% 70%, rgba(230, 255, 140, 0.4) 0 1.2px, rgba(230, 255, 140, 0.1) 3px, transparent 8px),
+    radial-gradient(ellipse at 0% 100%, rgba(155, 227, 122, 0.08), transparent 45%), radial-gradient(ellipse at 100% 0%, rgba(122, 201, 227, 0.06), transparent 40%); }
+[data-look='terrarium'] .toggle-track { border-radius: var(--rs, 8px) var(--rs, 2px) var(--rs, 8px) var(--rs, 2px); }
+[data-look='terrarium'] .toggle.on .toggle-track { background: #6fbf55; }
+[data-look='terrarium'] .theme { border-radius: var(--rs, 18px) var(--rs, 4px) var(--rs, 18px) var(--rs, 4px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+[data-look='terrarium'] :is(.side-panel, .info) { border-left: 2px solid transparent; border-image: linear-gradient(180deg, #6fbf55, #2b4532 40%, #6fbf55 70%, #2b4532) 1; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

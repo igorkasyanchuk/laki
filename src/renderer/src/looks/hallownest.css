@@ -1,0 +1,38 @@
+/* hallownest: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Hallownest: a fallen bug kingdom under the earth. Cavern blue-black with pale motes drifting down the sidebar, the
+   bone-white of a mask, a soul's pale blue glow on what's picked, headings in a carved serif between thin flourishes,
+   the dark closing in at the terminal's edges */
+[data-look='hallownest'] { --radius: 6px; --r-xs: var(--rs, 2px); --r-s: var(--rs, 4px); --r-m: var(--rs, 6px); --r-l: var(--rs, 10px); --r-xl: var(--rs, 14px); --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --soul: #a8d8ff; --bone: #e9edf6;
+  --motes: radial-gradient(1.5px 1.5px at 30px 40px, rgba(233, 237, 246, 0.5), transparent), radial-gradient(1px 1px at 120px 150px, rgba(168, 216, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 70px 230px, rgba(233, 237, 246, 0.35), transparent), radial-gradient(2px 2px at 160px 60px, rgba(168, 216, 255, 0.25), transparent); }
+[data-look='hallownest'] :is(.sidebar, .settings-nav) { border-right: 1px solid #1c2540; background: var(--motes), linear-gradient(180deg, #0b1020, var(--side) 60%); background-size: 190px 260px, 190px 260px, 190px 260px, 190px 260px, auto; }
+[data-look='hallownest'] :is(.settings-main h2, .tunnel-head b) { font-family: Cochin, Baskerville, 'Hoefler Text', serif; font-weight: 400; font-variant: small-caps; letter-spacing: 3px; color: var(--bone); text-shadow: 0 0 12px rgba(168, 216, 255, 0.35); }
+[data-look='hallownest'] .settings-main h2::before, [data-look='hallownest'] .settings-main h2::after { content: ''; display: inline-block; width: 18px; height: 1px; margin: 0 10px; vertical-align: 0.35em; background: linear-gradient(90deg, transparent, var(--bone)); }
+[data-look='hallownest'] .settings-main h2::after { background: linear-gradient(90deg, var(--bone), transparent); }
+[data-look='hallownest'] .project-head { font-family: Cochin, Baskerville, serif; font-variant: small-caps; letter-spacing: 1.5px; color: var(--bone); }
+[data-look='hallownest'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2a3556; background: #0d1322; }
+[data-look='hallownest'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='hallownest'] .seg button.on { border-color: var(--soul); color: #fff; box-shadow: 0 0 10px rgba(168, 216, 255, 0.3); }
+[data-look='hallownest'] button.primary { border: none; background: var(--bone); color: #0a0e18; font-weight: 600; box-shadow: 0 0 14px rgba(233, 237, 246, 0.25); }
+[data-look='hallownest'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #25304c; background: #060910; }
+[data-look='hallownest'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #2a3556; background: #0c111e; box-shadow: 0 0 30px rgba(168, 216, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.85); }
+[data-look='hallownest'] .menu-item:hover { background: rgba(168, 216, 255, 0.12); }
+[data-look='hallownest'] .ws.sel { background: radial-gradient(ellipse at 0% 50%, rgba(168, 216, 255, 0.22), transparent 75%); border-left-color: var(--bone); box-shadow: -2px 0 10px rgba(168, 216, 255, 0.5); }
+[data-look='hallownest'] .settings-nav > button.on { background: rgba(168, 216, 255, 0.12); box-shadow: inset 2px 0 0 var(--bone); }
+[data-look='hallownest'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--bone)), 0 6px 14px -8px var(--soul); }
+[data-look='hallownest'] .status { border-top: 1px solid #1c2540; background: #070a12; }
+[data-look='hallownest'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(2, 4, 10, 0.45)); }
+[data-look='hallownest'] :is(.board-col, .board-card) { border-color: #25304c; }
+[data-look='hallownest'] .toggle.on .toggle-track { background: var(--soul); box-shadow: 0 0 10px rgba(168, 216, 255, 0.6); }
+[data-look='hallownest'] .theme { border-color: #25304c; }
+[data-look='hallownest'] { --ws-guide: 1px solid #25304c; --proj-divider: 1px solid #1c2540; }
+[data-look='hallownest'] :is(.side-panel, .info) { border-left-color: #1c2540; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

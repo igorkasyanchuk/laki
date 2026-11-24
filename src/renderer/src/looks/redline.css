@@ -1,0 +1,35 @@
+/* redline: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Redline: a racing game's HUD. Carbon fibre, condensed italic capitals, red racing stripes after the headings, shift
+   lights (green, yellow, red) along the top of the status bar, a rev counter's red arc in the terminals' corner */
+[data-look='redline'] { --radius: 2px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 1px); --r-m: var(--rs, 2px); --r-l: var(--rs, 3px); --r-xl: var(--rs, 5px); --ui-font: 'Roboto', 'Avenir Next', 'Helvetica Neue', sans-serif; --race: 'Avenir Next Condensed', 'DIN Condensed', 'Helvetica Neue', sans-serif;
+  --carbon: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 3px, transparent 3px 6px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.35) 0 3px, transparent 3px 6px); }
+[data-look='redline'] :is(.sidebar, .settings-nav) { border-right: 2px solid #ff2b2b; background: var(--carbon), var(--side); }
+[data-look='redline'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--race); font-style: italic; font-weight: 800; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='redline'] .settings-main h2::after { content: ''; display: inline-block; width: 54px; height: 11px; margin-left: 12px; vertical-align: 2px; background: repeating-linear-gradient(115deg, #ff2b2b 0 6px, transparent 6px 11px); }
+[data-look='redline'] .project-head { font-family: var(--race); font-style: italic; font-weight: 700; font-size: var(--fs-2); letter-spacing: 1px; color: #fff; }
+[data-look='redline'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); border-bottom: 2px solid #ff2b2b; background: var(--carbon), #16161a; font-style: italic; }
+[data-look='redline'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='redline'] .seg button.on { background: #2a1214; color: #fff; }
+[data-look='redline'] button.primary { border: none; background: linear-gradient(180deg, #ff4a4a, #c80000); color: #fff; font-family: var(--race); font-style: italic; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='redline'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: var(--line); background: #08080a; }
+[data-look='redline'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--line); border-top: 2px solid #ff2b2b; background: var(--carbon), var(--panel); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75); }
+[data-look='redline'] .menu-item:hover { background: #2a1214; }
+[data-look='redline'] .ws.sel { background: linear-gradient(90deg, rgba(255, 43, 43, 0.3), transparent); border-left-color: #ff2b2b; font-style: italic; }
+[data-look='redline'] .settings-nav > button.on { background: linear-gradient(90deg, rgba(255, 43, 43, 0.3), transparent); color: #fff; }
+[data-look='redline'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #ff2b2b); font-style: italic; }
+[data-look='redline'] .status { border-top: none; background: repeating-linear-gradient(90deg, transparent 0 16px, #08080a 16px 19px) top / 100% 3px no-repeat,
+  linear-gradient(90deg, #4cff7a 0 45%, #ffcc00 45% 75%, #ff2b2b 75%) top / 100% 3px no-repeat, var(--carbon), var(--side); padding-top: 3px; }
+[data-look='redline'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at 100% 100%, transparent 0 74px, rgba(255, 43, 43, 0.22) 75px 78px, transparent 79px); }
+[data-look='redline'] .board-card { border-bottom: 2px solid #ff2b2b; }
+[data-look='redline'] .toggle.on .toggle-track { background: #ff2b2b; }
+[data-look='redline'] .theme { border-color: var(--line); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

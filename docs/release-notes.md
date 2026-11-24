@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Laki's window and the phone page start lighter: each look's styles load when it's picked, so the first load's CSS went from 596 KB to 358 KB.
 - Needs you groups the same ask from several agents: one card with *×n*, each workspace's name, and each choice *for all n*; *Separately* splits it again. A risky command, a question, a plan or a secret always stays on its own card.
 - ✨ Improve my prompt on the New workspace page knows the project's files: it names real paths from the repo (an outline of its folders and key files) instead of guessing one.
 - Ship can add a reading order to the PR: *Add reading order* puts the Review tab's Walk through at the description's end (*How to read this*: each step, why, and its files, the risky ones marked), so reviewers on GitHub read it in the same order. `laki ship --walk` does it too.

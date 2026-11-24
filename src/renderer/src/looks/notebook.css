@@ -1,0 +1,37 @@
+/* notebook: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Notebook: Ruled lines with a red margin, ink sketches, a highlighter, handwritten headings */
+[data-look='notebook'] { --radius: 3px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 2px); --r-m: var(--rs, 3px); --r-l: var(--rs, 5px); --r-xl: var(--rs, 7px); --ui-font: 'Iowan Old Style', Palatino, Georgia, serif;
+  --sketch: 255px 15px 225px 15px / 15px 225px 15px 255px; }
+[data-look='notebook'] .sidebar { background-image: linear-gradient(90deg, transparent 21px, color-mix(in srgb, var(--error) 45%, transparent) 21px 22px, transparent 22px),
+  repeating-linear-gradient(transparent 0 25px, color-mix(in srgb, var(--accent) 15%, transparent) 25px 26px); }
+[data-look='notebook'] :is(.project-head, .settings-main h2, .tunnel-head b) { font-family: Noteworthy, 'Bradley Hand', 'Marker Felt', cursive; text-transform: none; letter-spacing: 0; color: var(--accent-ink); font-size: 1.15em; }
+[data-look='notebook'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, .run-btn) { border: 1.5px solid var(--fg); border-radius: var(--sketch); }
+[data-look='notebook'] button.primary { background: var(--accent); border-color: var(--accent); box-shadow: 2px 2px 0 color-mix(in srgb, var(--fg) 25%, transparent); }
+[data-look='notebook'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-width: 0 0 1.5px; border-radius: 0; background: transparent; border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+[data-look='notebook'] :is(.menu, .tunnel-pop, .toast, .modal) { border: 1px solid var(--line); border-radius: var(--rs, 2px); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.06), 0 14px 34px rgba(60, 45, 20, 0.18); }
+[data-look='notebook'] .toast { transform: rotate(-0.6deg); }
+[data-look='notebook'] .tab { border-radius: 0; }
+[data-look='notebook'] .tab.sel { box-shadow: none; text-decoration: underline wavy var(--tab-c, var(--accent)); text-underline-offset: 5px; }
+[data-look='notebook'] .ws.sel { background: linear-gradient(transparent 18%, var(--sel) 18% 82%, transparent 82%); border-left-color: transparent; }
+[data-look='notebook'] .status { border-top: 1.5px dashed var(--line); }
+[data-look='notebook'] .theme { border-radius: var(--sketch); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+[data-look='notebook'] { --ws-guide: none; --ws-indent: 12px; } /* the page's red margin is the line */
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

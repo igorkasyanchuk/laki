@@ -30,7 +30,7 @@
   --del-bg: rgba(247, 118, 142, 0.08);
   --find: #ffd60a; /* ⌘F matches */
   --find-active: #ff8a00;
-  /* V2: the design tokens. Space, a 2-4px grid; corners (each a look's own in looks.css; Settings' Corners, --rs, over
+  /* V2: the design tokens. Space, a 2-4px grid; corners (each a look's own in looks/; Settings' Corners, --rs, over
      them all); elevation; control heights; the stacking order. --radius is --r-m's old name */
   /* Density (Settings › Appearance; themes.ts sets --density on the document: Compact 0.82, Roomy 1.18): space and
      control heights from their -base, to whole pixels; type, hairlines, corners and icons never (test/css.test.ts) */
@@ -304,7 +304,7 @@ html.away ::selection { background: color-mix(in srgb, var(--fg) 16%, transparen
 .rail { flex: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) 0 var(--sp-4); background: var(--rail-bg); border-right: 1px solid var(--line); }
 .electron .rail { padding-top: 46px; }
 /* the line between the rail and what's beside it starts under the title bar: the traffic lights (76px from the window's
-   edge, past a rail of 52 or 68) sit on one surface, no line through them (looks.css: Frosted's is the list's left edge).
+   edge, past a rail of 52 or 68) sit on one surface, no line through them (looks/frosted.css: Frosted's is the list's left edge).
    ::before: the grain's overlay is the rail's ::after */
 .app.electron.rail-on .rail { position: relative; border-right-color: transparent; }
 .app.electron.rail-on .rail::before { content: ''; position: absolute; top: 46px; right: -1px; bottom: 0; width: 1px; background: var(--line); pointer-events: none; }
@@ -540,7 +540,7 @@ html[data-scrollbars='overlay'] :not(.xterm-viewport)::-webkit-scrollbar-thumb:i
 /* the sidebar's lines and rows: looks set these variables, Settings › Appearance › The sidebar overrides them */
 .project + .project { border-top: var(--proj-divider, 1px solid var(--line)); } /* a line between projects */
 .project-head { display: flex; align-items: center; gap: 1px; min-height: round(nearest, calc(var(--ph-h, 28px) * var(--density)), 1px); padding: 0 var(--sp-3) 0 var(--sp-5); font-size: var(--fs-2); color: var(--fg); font-weight: 600; } /* V1: sentence case, no spacing; the project's color is its bar */
-.project-ws { margin-left: var(--ws-indent, 11px); border-left: var(--ws-guide, none); } /* its workspaces: indented under the chevron; a guide line only where a look draws one (looks.css), or Settings' */
+.project-ws { margin-left: var(--ws-indent, 11px); border-left: var(--ws-guide, none); } /* its workspaces: indented under the chevron; a guide line only where a look draws one (looks/), or Settings' */
 .project-ws:empty { display: none; }
 /* the Needs you list (Needs.tsx) above Pinned: a card each, waiting ones edged in --waiting, done ones in --done */
 .needs-cards { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-1) var(--sp-4) var(--sp-4) var(--sp-4); }
@@ -583,7 +583,7 @@ html[data-scrollbars='overlay'] :not(.xterm-viewport)::-webkit-scrollbar-thumb:i
 .need-earlier-head:hover { color: var(--fg); }
 .need-earlier .need-all { flex: none; font: inherit; font-size: var(--fs-1); padding: var(--sp-1) var(--sp-3); border-radius: var(--r-m); border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: var(--cur-act); }
 .need-earlier .need-all:hover { border-color: var(--muted); }
-/* Needs you's cards in the default look and Frosted (glass or not; a themed look keeps its own shapes: looks.css): no
+/* Needs you's cards in the default look and Frosted (glass or not; a themed look keeps its own shapes: looks/): no
    outline within an outline. The card a step up the panel's material, its state the glyph beside the name and, on the
    newest card only, a hairline ring in that state's color; its choices fills, the first tinted with the accent, the key
    (1, 2, 3) on the right. Reduced transparency and more contrast give the choices their line back */
@@ -1083,7 +1083,7 @@ button.danger:focus-visible { outline: 2px solid var(--error); outline-offset: 2
 .row > button { flex: none; }
 .actions-only { display: flex; align-items: center; gap: var(--sp-4); } /* Settings › Actions' filter */
 .actions-only select { flex: none; width: auto; min-width: 160px; }
-.seg { display: flex; gap: var(--seg-gap, 0px); } /* a look's rounded buttons stand apart (looks.css) */
+.seg { display: flex; gap: var(--seg-gap, 0px); } /* a look's rounded buttons stand apart (looks/) */
 .seg button { border-radius: 0; margin-left: var(--seg-overlap, -1px); }
 .seg button:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
 .seg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }

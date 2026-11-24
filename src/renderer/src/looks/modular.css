@@ -1,0 +1,56 @@
+/* modular: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Modular: a synth rack. Brushed aluminium panels with screws in the corners, a patch jack by the headings, rubber
+   keys, LEDs for switches, DIN type, and an oscilloscope's trace drifting across the terminals */
+[data-look='modular'] { --radius: 3px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 2px); --r-m: var(--rs, 3px); --r-l: var(--rs, 5px); --r-xl: var(--rs, 7px); --ui-font: 'DIN Alternate', 'Helvetica Neue', sans-serif;
+  --brushed: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px), linear-gradient(180deg, #2e3034, #24262a);
+  --screw: radial-gradient(circle, #b4b8be 0 1.5px, #5a5e64 2px 3px, transparent 3.5px); }
+[data-look='modular'] :is(.sidebar, .settings-nav, .status) { background: var(--brushed); }
+[data-look='modular'] :is(.settings-main h2, .tunnel-head b) { font-family: 'DIN Condensed', var(--ui-font); font-size: var(--fs-5); letter-spacing: 3px; text-transform: uppercase; color: #fff; }
+[data-look='modular'] .settings-main h2::before { content: ''; display: inline-block; width: 14px; height: 14px; margin-right: 10px; vertical-align: -1px; border-radius: 50%;
+  background: radial-gradient(circle, #0b0c0d 0 3px, #9aa0a8 3.5px 5px, #4a4e54 5.5px); }
+[data-look='modular'] .project-head { color: #d5d9de; letter-spacing: 2px; }
+[data-look='modular'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #0b0c0d; border-radius: var(--rs, 3px); background: linear-gradient(#3a3d42, #2a2c30);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 0 #000; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='modular'] .seg button.on { color: var(--accent-ink); }
+[data-look='modular'] button.primary { border: none; border-radius: 999px; background: var(--accent); color: #141517; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='modular'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #0b0c0d; background: #101113; }
+[data-look='modular'] :is(.menu, .modal, .tunnel-pop) { border: 1px solid #0b0c0d; border-radius: var(--rs, 3px);
+  background: var(--screw) left 3px top 3px / 8px 8px no-repeat, var(--screw) right 3px top 3px / 8px 8px no-repeat, var(--screw) left 3px bottom 3px / 8px 8px no-repeat,
+    var(--screw) right 3px bottom 3px / 8px 8px no-repeat, var(--brushed);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 40px rgba(0, 0, 0, 0.6); }
+[data-look='modular'] .menu { padding: 12px 6px; }
+[data-look='modular'] .menu-item:hover { background: rgba(255, 77, 46, 0.18); }
+[data-look='modular'] .tab.sel { background: var(--bg); }
+[data-look='modular'] .ws.sel { background: linear-gradient(90deg, rgba(255, 77, 46, 0.18), transparent); border-left-color: var(--accent); }
+[data-look='modular'] .settings-nav > button.on { background: rgba(255, 77, 46, 0.18); }
+[data-look='modular'] .toggle-track { background: #0b0c0d; box-shadow: inset 0 1px 2px #000; }
+[data-look='modular'] .toggle.on .toggle-track { background: #2a0d08; }
+[data-look='modular'] .toggle.on .toggle-knob { background: var(--accent); box-shadow: 0 0 6px 2px rgba(255, 77, 46, 0.7); }
+[data-look='modular'] .term-wrap { overflow: hidden; }
+[data-look='modular'] .term-wrap::after { content: ''; position: absolute; left: -240px; right: 0; bottom: 18%; height: 60px; z-index: 2; pointer-events: none; opacity: 0.14; animation: mod-scope 5s linear infinite;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='60'%3E%3Cpath d='M0 30 Q30 2 60 30 T120 30 T180 30 T240 30' fill='none' stroke='%233fe0d0' stroke-width='2'/%3E%3C/svg%3E") 0 0 / 240px 60px repeat-x; }
+[data-look='modular'] .theme { border-radius: var(--rs, 3px); }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='modular'] .term-wrap::after, [data-look='abyss'] .term-wrap::before, [data-look='cosmos'] .term-wrap::before { animation: none; }
+}
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

@@ -1,5 +1,5 @@
 /* The bundled fonts: the interface's and the terminals' (fonts/NOTICE.md has their licenses). Loads after styles.css,
-   before components.css and looks.css (main.tsx). */
+   before components.css and looks-base.css (main.tsx; a look's own file after them). */
 
 /* Inter (the interface) and JetBrains Mono (terminals, code): SIL Open Font License, fonts/NOTICE.md */
 @font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap; src: url(./fonts/inter-latin.woff2) format('woff2');

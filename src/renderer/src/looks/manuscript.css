@@ -1,0 +1,48 @@
+/* manuscript: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Manuscript: an illuminated manuscript. Parchment with a darkened edge, Luminari headings with a red and gold capital
+   and a ❧, Hoefler Text, rubricated selections marked ¶, double gold rules on the popups, a wax seal for the main button */
+[data-look='manuscript'] { --radius: 2px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 1px); --r-m: var(--rs, 2px); --r-l: var(--rs, 3px); --r-xl: var(--rs, 5px); --ui-font: 'Hoefler Text', Baskerville, Georgia, serif; --head: Luminari, 'Apple Chancery', serif; --gold: #c9a227; --rubric: #a8201a; }
+[data-look='manuscript'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); font-weight: 400; font-size: var(--fs-5); color: var(--fg); }
+[data-look='manuscript'] .settings-main h2::first-letter { color: var(--rubric); font-size: 1.5em; text-shadow: 1px 1px 0 var(--gold); }
+[data-look='manuscript'] .settings-main h2::after { content: '  \2767'; color: var(--rubric); font-size: 0.8em; }
+[data-look='manuscript'] .project-head { font-family: var(--head); font-size: var(--fs-3); text-transform: none; letter-spacing: 1px; color: var(--rubric); }
+[data-look='manuscript'] .sidebar { background: radial-gradient(ellipse at 30% 20%, rgba(255, 250, 235, 0.6), transparent 60%), var(--side); box-shadow: inset -12px 0 18px -10px rgba(110, 70, 20, 0.35); }
+[data-look='manuscript'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #a88a54; border-radius: var(--rs, 2px); background: var(--panel); font-variant: small-caps; letter-spacing: 0.5px; }
+[data-look='manuscript'] .seg button.on { background: var(--sel); color: var(--rubric); }
+[data-look='manuscript'] button.primary { border: none; border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%; padding-inline: 16px; font-family: var(--head); color: #f8e6c8;
+  background: radial-gradient(circle at 40% 35%, #d0453a, #8a1610 70%); box-shadow: 0 2px 4px rgba(80, 10, 5, 0.4), inset 0 -2px 4px rgba(0, 0, 0, 0.3); }
+[data-look='manuscript'] input:not([type='radio'], [type='checkbox'], [type='range']) { border: none; border-bottom: 1px solid #a88a54; border-radius: 0; background: transparent; }
+[data-look='manuscript'] :is(select, textarea) { border-color: var(--line); background: #fbf4e2; }
+[data-look='manuscript'] :is(.menu, .modal, .tunnel-pop) { border: 1px solid #8a6a3a; border-radius: var(--rs, 2px); box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 4px var(--gold), 0 12px 30px rgba(80, 50, 15, 0.3); }
+[data-look='manuscript'] .menu { padding: 8px; }
+[data-look='manuscript'] .menu-item:hover { background: #ecdcb0; color: var(--rubric); }
+[data-look='manuscript'] .ws.sel { background: transparent; border-left-color: transparent; color: var(--rubric); font-style: italic; }
+[data-look='manuscript'] .ws.sel::before { content: '\00B6'; margin-left: -9px; color: var(--rubric); }
+[data-look='manuscript'] .tab.sel { background: var(--bg); box-shadow: inset 0 2px 0 var(--tab-c, var(--rubric)); }
+[data-look='manuscript'] .settings-nav > button.on { background: transparent; color: var(--rubric); font-style: italic; }
+[data-look='manuscript'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(ellipse at 85% 15%, rgba(150, 100, 30, 0.08), transparent 40%), radial-gradient(ellipse at 10% 90%, rgba(150, 100, 30, 0.07), transparent 45%), radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(120, 80, 20, 0.12)); }
+[data-look='manuscript'] .toggle.on .toggle-track { background: var(--rubric); }
+[data-look='manuscript'] .theme { border-radius: var(--rs, 2px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+[data-look='manuscript'] :is(.side-panel, .info) { box-shadow: inset 12px 0 18px -10px rgba(110, 70, 20, 0.35); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

@@ -19,7 +19,7 @@ function place(g: HTMLElement, el: Element | null | undefined, still: boolean) {
   if (still) void g.offsetWidth, g.removeAttribute('data-still') // drawn there at once, then free to move
 }
 
-// a look that fills the side panel's pick its own way (looks.css): its fill is the mark, an underline sliding over it
+// a look that fills the side panel's pick its own way (looks/): its fill is the mark, an underline sliding over it
 // would be a second one, so that group doesn't slide. Read as the look ends it: the transition skipped, else the new
 // pick reads as it was a frame ago. The default's pick has none (an underline). ponytail:
 // a sibling not under the mouse as the look's plain button (one under it may show its hover)

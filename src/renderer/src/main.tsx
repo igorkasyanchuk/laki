@@ -8,7 +8,8 @@ import { pwaStart } from './pwa'
 import './styles.css'
 import './fonts.css'
 import './components.css'
-import './looks.css'
+import './looks-base.css' // a look's own rules: looks/<look>.css, as it's set (themes.ts lookCss)
+import { lookStart } from './looks.ts'
 
 // a phone's keyboard shrinks only the visual viewport (iOS Safari): the narrow layout fits what's left (--vh), in
 // the page's pixels (× scale: a pinch-zoom shrinks the visual viewport too)
@@ -68,7 +69,7 @@ const w = new URLSearchParams(location.search).get('window') // main's new-works
 const page: Promise<ReactNode> = w
   ? import('./NewWindow').then(m => (w === 'new' ? <m.NewWindow /> : w === 'ai' ? <><m.AiWindow /><FloatNotices /></> : w === 'tab' ? <><m.TabWindow /><FloatNotices /></> : w === 'sim' ? <><m.SimWindow /><FloatNotices /></> : w === 'quick' ? <m.QuickWindow /> : w === 'panel' ? <><m.PanelWindow /><FloatNotices /></> : null))
   : import('./App').then(m => <m.App />)
-Promise.all(['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter', ...MORE].map(f => document.fonts.load(f, 'aĀЖ')))
+Promise.all([...['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter', ...MORE].map(f => document.fonts.load(f, 'aĀЖ')), lookStart()])
   .catch(() => {})
   .then(() => page)
   .then(el => {

@@ -1,0 +1,36 @@
+/* chamber: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Test Chamber: a testing lab. White wall panels on a tile grid, round-cornered and clean, the two portals (blue and
+   orange) before each heading, along the status bar and glowing in the terminals' lower corners */
+[data-look='chamber'] { --radius: 10px; --r-xs: var(--rs, 3px); --r-s: var(--rs, 7px); --r-m: var(--rs, 10px); --r-l: var(--rs, 17px); --r-xl: var(--rs, 23px); --ui-font: 'Source Sans 3', 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --tiles: linear-gradient(#d9dfe3 1px, transparent 1px) 0 0 / 100% 46px, linear-gradient(90deg, #d9dfe3 1px, transparent 1px) 0 0 / 46px 100%; }
+[data-look='chamber'] :is(.sidebar, .settings-nav) { background: var(--tiles), var(--side); }
+[data-look='chamber'] .rail { background: var(--tiles), var(--rail-bg); }
+[data-look='chamber'] :is(.settings-main h2, .tunnel-head b) { font-weight: 300; font-size: var(--fs-5); letter-spacing: 0.5px; }
+[data-look='chamber'] .settings-main h2::before { content: ''; display: inline-block; width: 15px; height: 15px; margin-right: 10px; vertical-align: -1px; border-radius: 50%;
+  background: linear-gradient(90deg, #1f9bff 0 50%, #ff8a1f 50% 100%); }
+[data-look='chamber'] .project-head { color: var(--fg); letter-spacing: 2px; }
+[data-look='chamber'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); background: #fff; box-shadow: 0 1px 0 var(--line); }
+[data-look='chamber'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='chamber'] .seg button.on { border-color: #1f9bff; color: #1f6fb8; }
+[data-look='chamber'] button.primary { border: none; background: #ff8a1f; color: var(--accent-fg); font-weight: 600; box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.2); }
+[data-look='chamber'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--line); border-radius: var(--rs, 12px); box-shadow: 0 16px 40px rgba(42, 49, 54, 0.16); }
+[data-look='chamber'] .menu-item:hover { background: #dff0fb; }
+[data-look='chamber'] .ws.sel { background: #fff; border-left-color: #1f9bff; box-shadow: inset 0 0 0 1px var(--line); }
+[data-look='chamber'] .settings-nav > button.on { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+[data-look='chamber'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #1f9bff); }
+[data-look='chamber'] .status { border-top: 3px solid; border-image: linear-gradient(90deg, #1f9bff 0 50%, #ff8a1f 50% 100%) 1; }
+[data-look='chamber'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at 0 100%, rgba(31, 155, 255, 0.1), transparent 28%), radial-gradient(circle at 100% 100%, rgba(255, 138, 31, 0.1), transparent 28%); }
+[data-look='chamber'] :is(.board-col, .board-card) { border-radius: var(--rs, 12px); }
+[data-look='chamber'] .board-col { background: var(--tiles), var(--side); }
+[data-look='chamber'] .toggle.on .toggle-track { background: #1f9bff; }
+[data-look='chamber'] { --ws-guide: 2px solid #1f9bff; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

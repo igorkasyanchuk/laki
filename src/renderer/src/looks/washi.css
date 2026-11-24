@@ -1,0 +1,51 @@
+/* washi: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Washi: Japanese paper. Mincho headings over a brush stroke, a red hanko seal for the selection and the main button,
+   ink hairlines, an ensō in the terminal's corner */
+[data-look='washi'] { --radius: 3px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 2px); --r-m: var(--rs, 3px); --r-l: var(--rs, 5px); --r-xl: var(--rs, 7px); --ui-font: 'Hiragino Sans', 'Avenir Next', sans-serif; --mincho: 'Hiragino Mincho ProN', 'Yu Mincho', 'Songti SC', serif; --ink: #1f1c18;
+  --fibers: radial-gradient(circle at 20% 30%, rgba(120, 100, 70, 0.05) 0 1px, transparent 1.5px) 0 0 / 7px 9px, radial-gradient(circle at 70% 60%, rgba(120, 100, 70, 0.04) 0 1px, transparent 1.5px) 0 0 / 11px 6px; }
+[data-look='washi'] :is(.sidebar, .settings-page, .info, .side-panel) { background-image: var(--fibers); }
+[data-look='washi'] :is(.settings-main h2, .tunnel-head b, .project-head) { font-family: var(--mincho); }
+[data-look='washi'] .settings-main h2 { font-size: var(--fs-5); font-weight: 600; letter-spacing: 1px; }
+[data-look='washi'] .settings-main h2::after { content: ''; display: block; width: 120px; height: 5px; margin-top: 6px; border-radius: var(--rs, 3px) var(--rs, 8px) var(--rs, 2px) var(--rs, 6px);
+  background: linear-gradient(90deg, var(--ink), rgba(31, 28, 24, 0.55) 70%, transparent); }
+[data-look='washi'] .project-head { color: var(--ink); letter-spacing: 3px; text-transform: none; font-size: var(--fs-2); }
+[data-look='washi'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(31, 28, 24, 0.55); border-radius: var(--rs, 2px); background: transparent; }
+[data-look='washi'] .seg button.on { background: var(--ink); color: var(--panel); }
+[data-look='washi'] button.primary { border: none; border-radius: var(--rs, 4px); background: var(--accent); color: #fff; font-family: var(--mincho); letter-spacing: 2px; transform: rotate(-1deg);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
+[data-look='washi'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-width: 0 0 1px; border-radius: 0; border-color: var(--ink); background: transparent; }
+[data-look='washi'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--ink); border-left: 4px solid var(--accent); border-radius: 0; background: var(--fibers), var(--panel);
+  box-shadow: 0 14px 40px rgba(60, 45, 25, 0.18); }
+[data-look='washi'] .menu-item:hover { background: rgba(31, 28, 24, 0.07); }
+[data-look='washi'] .sidebar { border-right: 1px solid rgba(31, 28, 24, 0.35); }
+[data-look='washi'] :is(.tabbar, .settings-head) { --tab-line: 1px solid rgba(31, 28, 24, 0.35); border-bottom: 1px solid rgba(31, 28, 24, 0.35); }
+[data-look='washi'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--ink)); background: transparent; border-color: transparent; }
+[data-look='washi'] .ws.sel { background: transparent; border-left-color: transparent; font-weight: 600; }
+[data-look='washi'] .ws.sel::after { content: ''; flex: none; width: 11px; height: 11px; border-radius: var(--rs, 2px); background: var(--accent); transform: rotate(-6deg); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45); }
+[data-look='washi'] .settings-nav > button.on { background: transparent; box-shadow: inset 3px 0 0 var(--accent); }
+[data-look='washi'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at calc(100% - 90px) calc(100% - 90px), transparent 0 52px, rgba(31, 28, 24, 0.07) 54px 64px, transparent 67px); }
+[data-look='washi'] .toggle-track { background: transparent; box-shadow: inset 0 0 0 1px var(--ink); }
+[data-look='washi'] .toggle.on .toggle-track { background: var(--accent); box-shadow: none; }
+[data-look='washi'] .theme { border-radius: var(--rs, 2px); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+[data-look='washi'] { --ws-guide: none; --ws-indent: 16px; --proj-divider: none; }
+[data-look='washi'] :is(.side-panel, .info) { border-left: 1px solid rgba(31, 28, 24, 0.35); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

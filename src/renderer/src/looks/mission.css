@@ -1,0 +1,40 @@
+/* mission: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Mission Control: a 1969 control room. Grey-green consoles in brushed metal, engraved label plates for the projects
+   and headings, push buttons, an amber lamp for the main one and beside what's selected, riveted popups, CRT lines */
+[data-look='mission'] { --radius: 3px; --r-xs: var(--rs, 1px); --r-s: var(--rs, 2px); --r-m: var(--rs, 3px); --r-l: var(--rs, 5px); --r-xl: var(--rs, 7px); --ui-font: 'IBM Plex Sans', 'Helvetica Neue', Helvetica, sans-serif;
+  --metal: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px), linear-gradient(180deg, #283028, #1e231e);
+  --rivet: #6a7464; }
+[data-look='mission'] :is(.sidebar, .settings-nav) { border-right: 3px ridge #3d453b; background: var(--metal); }
+[data-look='mission'] :is(.settings-main h2, .tunnel-head b) { width: fit-content; padding: 3px 12px; font-size: var(--fs-4); font-weight: 600; text-transform: uppercase; letter-spacing: 3px;
+  background: #10130f; border: 1px solid #4a5446; border-radius: var(--rs, 2px); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6); }
+[data-look='mission'] .project-head { margin: 4px 8px 2px; padding-left: 14px; color: #e8eadf; letter-spacing: 2px; background: #10130f; border: 1px solid #4a5446; border-radius: var(--rs, 2px); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6); }
+[data-look='mission'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #11140f; background: linear-gradient(180deg, #3a4238, #2a3028); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 0 #000; }
+[data-look='mission'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='mission'] .seg button.on { background: linear-gradient(180deg, #2a3028, #3a4238); color: #ffd27a; }
+[data-look='mission'] button.primary { border: 1px solid #7a5000; background: radial-gradient(circle at 50% 30%, #ffe08a, #ffb000 60%, #c07a00); color: #1b1f1c; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 10px rgba(255, 176, 0, 0.45); }
+[data-look='mission'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a5446; background: #10130f; }
+[data-look='mission'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #4a5446; box-shadow: inset 0 0 0 1px #10130f, 0 18px 40px rgba(0, 0, 0, 0.6);
+  background: radial-gradient(circle at 7px 7px, var(--rivet) 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) 7px, var(--rivet) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 7px calc(100% - 7px), var(--rivet) 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) calc(100% - 7px), var(--rivet) 0 2px, transparent 2.5px), var(--panel); }
+[data-look='mission'] .menu-item:hover { background: #353d33; }
+[data-look='mission'] .ws.sel { background: #2f382d; border-left-color: #ffb000; }
+[data-look='mission'] .ws.sel::after { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #ffb000; box-shadow: 0 0 6px #ffb000; }
+[data-look='mission'] .settings-nav > button.on { background: #10130f; color: #ffd27a; }
+[data-look='mission'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, #ffb000); }
+[data-look='mission'] .status { background: #10130f; border-top: 2px solid #3d453b; }
+[data-look='mission'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.35)); }
+[data-look='mission'] :is(.board-col, .board-card) { border-color: #4a5446; }
+[data-look='mission'] .board-card { background: #10130f; }
+[data-look='mission'] .toggle.on .toggle-track { background: #ffb000; }
+[data-look='mission'] .theme { border-color: #4a5446; }
+[data-look='mission'] { --ws-guide: 2px solid #4a5446; --proj-divider: none; } /* the heads are panels already */
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

@@ -1,0 +1,38 @@
+/* neon: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Neon Arcade: pill buttons, glowing edges and selections */
+[data-look='neon'] { --radius: 10px; --r-xs: var(--rs, 3px); --r-s: var(--rs, 7px); --r-m: var(--rs, 10px); --r-l: var(--rs, 17px); --r-xl: var(--rs, 23px); }
+[data-look='neon'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button) { border-radius: 999px; }
+[data-look='neon'] button.primary { box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 65%, transparent); }
+[data-look='neon'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='neon'] :is(.menu, .modal, .tunnel-pop, .toast) { border-radius: var(--rs, 16px); border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 34px -6px var(--accent), 0 20px 60px rgba(0, 0, 0, 0.6); }
+[data-look='neon'] .tab { border-radius: var(--rs, 12px) var(--rs, 12px) 0 0; }
+[data-look='neon'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)), 0 -8px 22px -12px var(--tab-c, var(--accent)); }
+[data-look='neon'] .ws.sel { box-shadow: inset 3px 0 0 var(--tab-c, var(--accent)), 0 0 22px -8px var(--tab-c, var(--accent)); }
+[data-look='neon'] .sidebar { border-right-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+[data-look='neon'] :is(.tabbar, .settings-head) { --tab-line: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-bottom-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+[data-look='neon'] .status { border-top-color: color-mix(in srgb, var(--tc-pink) 40%, transparent); }
+[data-look='neon'] .project-head { color: var(--accent-ink); text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 70%, transparent); }
+[data-look='neon'] .theme.on { box-shadow: 0 0 18px -2px var(--accent); }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+/* the right panels' edge (Files…, the info panel) as the look draws the sidebar's, mirrored: both are dragged the same way */
+[data-look='neon'] :is(.side-panel, .info) { border-left-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

@@ -1,0 +1,37 @@
+/* cockpit: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Cockpit: a starship's flight HUD. Orange holographic lines on black, a dot grid on the sidebar, target brackets in
+   the corners of the popups, cards and terminals, cut corners on the buttons */
+[data-look='cockpit'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: 'DIN Alternate', 'Avenir Next', 'Helvetica Neue', sans-serif; --hud: #ff8c1a; --cut: polygon(7px 0, 100% 0, 100% 100%, 0 100%, 0 7px);
+  --brackets: linear-gradient(var(--hud), var(--hud)) 0 0 / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 0 0 / 2px 12px no-repeat,
+    linear-gradient(var(--hud), var(--hud)) 100% 0 / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 100% 0 / 2px 12px no-repeat,
+    linear-gradient(var(--hud), var(--hud)) 0 100% / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 0 100% / 2px 12px no-repeat,
+    linear-gradient(var(--hud), var(--hud)) 100% 100% / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 100% 100% / 2px 12px no-repeat; }
+[data-look='cockpit'] :is(.sidebar, .settings-nav) { border-right: 1px solid rgba(255, 140, 26, 0.5); background: radial-gradient(rgba(255, 140, 26, 0.13) 1px, transparent 1.5px) 0 0 / 11px 11px, var(--side); }
+[data-look='cockpit'] :is(.settings-main h2, .tunnel-head b) { text-transform: uppercase; letter-spacing: 3px; font-weight: 600; color: #ffb35a; text-shadow: 0 0 8px rgba(255, 140, 26, 0.6); }
+[data-look='cockpit'] .settings-main h2::before { content: '\25C6  '; color: var(--hud); }
+[data-look='cockpit'] .project-head { color: var(--hud); letter-spacing: 2px; }
+[data-look='cockpit'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(255, 140, 26, 0.45); background: rgba(255, 140, 26, 0.06); clip-path: var(--cut); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='cockpit'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='cockpit'] .seg button.on { background: rgba(255, 140, 26, 0.2); color: #fff2e0; }
+[data-look='cockpit'] button.primary { border: none; background: rgba(255, 140, 26, 0.9); color: #05070a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; clip-path: var(--cut); }
+[data-look='cockpit'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: rgba(255, 140, 26, 0.35); background: #040508; }
+[data-look='cockpit'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(255, 140, 26, 0.3); background: var(--brackets), #080b10; box-shadow: 0 0 18px rgba(255, 140, 26, 0.15), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='cockpit'] .menu-item:hover { background: rgba(255, 140, 26, 0.16); }
+[data-look='cockpit'] .ws.sel { background: linear-gradient(90deg, rgba(255, 140, 26, 0.24), transparent); border-left-color: var(--hud); }
+[data-look='cockpit'] .settings-nav > button.on { background: rgba(255, 140, 26, 0.16); color: #fff2e0; }
+[data-look='cockpit'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--hud)); }
+[data-look='cockpit'] .status { border-top-color: rgba(255, 140, 26, 0.45); background: linear-gradient(180deg, rgba(255, 140, 26, 0.06), transparent), var(--side); }
+[data-look='cockpit'] .term-wrap::after { content: ''; position: absolute; inset: 6px; z-index: 2; pointer-events: none; opacity: 0.45; background: var(--brackets); }
+[data-look='cockpit'] .board-card { border-color: rgba(255, 140, 26, 0.25); background: var(--brackets), var(--panel); }
+[data-look='cockpit'] .toggle.on .toggle-track { background: var(--hud); }
+[data-look='cockpit'] .theme { border-color: rgba(255, 140, 26, 0.3); }
+[data-look='cockpit'] { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); --ws-indent: 14px; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

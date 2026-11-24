@@ -71,11 +71,14 @@ test("themeKey: a theme's id and look, so the same theme painted again (a font, 
   assert.equal(themeKey({ theme: 'kraft' }, true), themeKey({ theme: 'kraft' }, false), 'a fixed theme: the system turning changes nothing')
 })
 
-test('themes: unique ids, and every look has rules in looks.css', async () => {
+test('themes: unique ids, and every look has its file of rules (looks/<look>.css), every file a look', async () => {
   const { THEMES } = await import('../src/renderer/src/themes.ts')
-  const css = (await import('node:fs')).readFileSync(new URL('../src/renderer/src/looks.css', import.meta.url), 'utf8')
+  const fs = await import('node:fs')
+  const dir = new URL('../src/renderer/src/looks/', import.meta.url)
   assert.equal(new Set(THEMES.map(t => t.id)).size, THEMES.length)
-  for (const t of THEMES) if (t.look) assert.ok(css.includes(`[data-look='${t.look}']`), t.look)
+  for (const t of THEMES) if (t.look) assert.ok(fs.readFileSync(new URL(`${t.look}.css`, dir), 'utf8').includes(`[data-look='${t.look}']`), t.look)
+  const looks = new Set([...THEMES.flatMap(t => (t.look ? [t.look] : [])), 'frosted']) // Frosted: a design's (applyTheme)
+  for (const f of fs.readdirSync(dir)) assert.ok(looks.has(f.replace(/\.css$/, '')), `looks/${f}: no theme has that look`)
 })
 
 // themes.ts paints <html>: a stand-in with a style of CSS variables, and the stylesheet's :root (the default theme)

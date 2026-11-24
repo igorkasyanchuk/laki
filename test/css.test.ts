@@ -3,13 +3,15 @@
 // (:only-child, :nth-child, :disabled: BlockNote's, Mantine's, ours), does that. BlockNote's suggested edits' rules
 // are left out by src/renderer/postcss.config.mjs; ours never style a * under a :has().
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import postcss from 'postcss'
 
 // styles.css' rules only a lazy page uses, in a file it imports: they load with it, out of the first load (npm run size)
 const PAGES = ['ai.css', 'board.css', 'extension.css', 'review.css', 'schedules.css', 'uikit.css']
 
+// looks-base.css and every look's own file (looks/<look>.css: themes.ts lookCss)
+const LOOKS = ['looks-base.css', ...readdirSync(new URL('../src/renderer/src/looks/', import.meta.url)).map(f => `looks/${f}`)]
 test("BlockNote's suggested edits left out; its slash menu and what's grouped with them stay", async () => {
   const file: string = '../src/renderer/postcss.config.mjs' // a string: no types for it
   const { default: config } = await import(file)
@@ -20,7 +22,7 @@ test("BlockNote's suggested edits left out; its slash menu and what's grouped wi
 
 test('no * or :not() under a :has() in our stylesheets', () => {
   const under = /:has\((?:[^()]|\([^()]*\))*\)\)?[^,{]*?[ >~+]\s*(\*|:not\()/ // ponytail: commas inside :is() split too, harmless here
-  for (const f of ['styles.css', 'fonts.css', 'components.css', 'looks.css', 'plans.css', 'workflows.css', 'floater.css', ...PAGES]) {
+  for (const f of ['styles.css', 'fonts.css', 'components.css', ...LOOKS, 'plans.css', 'workflows.css', 'floater.css', ...PAGES]) {
     const css = readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
     for (const sel of css.match(/[^{};]+(?=\{)/g) ?? []) for (const s of sel.split(',')) assert.ok(!under.test(s), `${f}: ${s.trim()}`)
   }
@@ -39,7 +41,7 @@ test('no pseudo-element is a drag region', () => {
 // B1: the type scale. A size in px is one of --fs-1…5; its own only under 10px (badges) or over 22px (display numbers);
 // em, rem, inherit, a setting's variable and a calc() are relative to something else
 test('every font-size is a step of the type scale', () => {
-  for (const f of ['styles.css', 'fonts.css', 'components.css', 'looks.css', 'plans.css', 'workflows.css', ...PAGES]) {
+  for (const f of ['styles.css', 'fonts.css', 'components.css', ...LOOKS, 'plans.css', 'workflows.css', ...PAGES]) {
     const css = readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
     for (const [, v] of css.matchAll(/font-size:\s*([^;}]+)/g)) {
       const px = /^(\d+(?:\.\d+)?)px( !important)?$/.exec(v.trim())
@@ -82,8 +84,8 @@ test("V2: styles.css' spacing, corners, shadows, stacking and type are tokens", 
   assert.deepEqual(bad, [])
 })
 
-// V6: the other style sheets' corners are tokens too (0, 50% and the pill allowed); looks.css keeps each look's own shapes
-test("V6: no raw border-radius outside looks.css", () => {
+// V6: the other style sheets' corners are tokens too (0, 50% and the pill allowed); looks/ keeps each look's own shapes
+test("V6: no raw border-radius outside the looks' files", () => {
   const bad: string[] = []
   for (const f of ['styles', 'components', 'plans', 'workflows', 'floater']) {
     const css = readFileSync(new URL(`../src/renderer/src/${f}.css`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^:root \{[\s\S]*?\n\}/m, '')
@@ -107,7 +109,7 @@ test('concentric corners: the inner pieces of capsules, menus, ⌘K, dialogs and
 
 // Density scales space and control heights only: type, hairlines and corners stay
 test('no rule multiplies a type size (--fs-*) by --density', () => {
-  for (const f of ['styles.css', 'components.css', 'looks.css', 'plans.css', ...PAGES]) {
+  for (const f of ['styles.css', 'components.css', ...LOOKS, 'plans.css', ...PAGES]) {
     const css = readFileSync(new URL(`../src/renderer/src/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
     for (const decl of css.split(/[;{}]/)) assert.ok(!(/var\(--fs-\d/.test(decl) && /--density/.test(decl)), `${f}: ${decl.trim()}`)
   }

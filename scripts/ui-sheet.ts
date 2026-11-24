@@ -15,7 +15,7 @@ import { CHANGED } from '../src/shared/pixelDiff.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const src = (f: string) => readFileSync(join(root, 'src/renderer/src', f), 'utf8')
-const looks = [...src('settingsBase.ts').split('export const DESIGNS')[1].split('\n]')[0].matchAll(/^\s*\['([\w-]+)',/gm)].map(m => m[1])
+const looks = [...src('settingsBase.ts').split('export const DESIGNS')[1].split('\n]')[0].matchAll(/^\s*\['([\w-]+)',/gm)].map(m => m[1]).filter(l => !process.env.LAKI_SHEET_LOOKS || process.env.LAKI_SHEET_LOOKS.split(',').includes(l)) // LAKI_SHEET_LOOKS=classic: those designs only (with LAKI_SHEET_THEMES=all, every theme's own look once)
 const themes = process.env.LAKI_SHEET_THEMES === 'all' ? [...src('themes.ts').split('export const THEMES')[1].split('\n]')[0].matchAll(/^\s*id: '([\w-]+)'/gm)].map(m => m[1]) : ['laki', 'laki-light']
 if (!looks.length || !themes.length) throw new Error('no looks or themes found in their sources')
 const at = Date.now()

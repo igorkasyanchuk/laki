@@ -1,0 +1,39 @@
+/* monolith: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Monolith: the ship's computer. Black and white in wide-spaced Futura, nothing else but its red eye: before each
+   heading (slowly breathing), in the status bar, and on what's selected */
+[data-look='monolith'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: Futura, 'Gill Sans', 'Avenir Next', sans-serif;
+  --eye: radial-gradient(circle at 38% 36%, #ffd0c0 0 8%, #ff2a1a 30%, #6a0800 70%, #1a0000 100%); }
+[data-look='monolith'] :is(.sidebar, .settings-nav) { border-right: 1px solid #1a1a1a; }
+[data-look='monolith'] :is(.settings-main h2, .tunnel-head b) { font-weight: 500; text-transform: uppercase; letter-spacing: 6px; color: #fff; }
+[data-look='monolith'] .settings-main h2::before { content: ''; display: inline-block; width: 15px; height: 15px; margin-right: 14px; vertical-align: -1px; border-radius: 50%;
+  background: var(--eye); box-shadow: 0 0 10px rgba(255, 42, 26, 0.7); animation: mono-eye 4s ease-in-out infinite alternate; }
+[data-look='monolith'] .project-head { color: #f2f2f2; letter-spacing: 4px; font-weight: 500; }
+[data-look='monolith'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #333; background: #000; text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='monolith'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='monolith'] .seg button.on { border-color: #f2f2f2; color: #fff; }
+[data-look='monolith'] button.primary { border: none; background: #f2f2f2; color: #000; text-transform: uppercase; letter-spacing: 2px; font-weight: 500; }
+[data-look='monolith'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #333; background: #000; }
+[data-look='monolith'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #333; background: #050505; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.9); }
+[data-look='monolith'] .menu-item:hover { background: #1a1a1a; }
+[data-look='monolith'] .ws.sel { background: linear-gradient(90deg, rgba(255, 42, 26, 0.16), transparent 70%); border-left-color: #ff2a1a; color: #fff; }
+[data-look='monolith'] .settings-nav > button.on { background: #141414; box-shadow: inset 2px 0 0 #ff2a1a; }
+[data-look='monolith'] .tab.sel { box-shadow: inset 0 -1px 0 var(--tab-c, #ff2a1a); }
+[data-look='monolith'] .status { border-top-color: #1a1a1a; background: #000; }
+[data-look='monolith'] .status::after { content: ''; flex: none; order: 99; width: 9px; height: 9px; border-radius: 50%; background: var(--eye); box-shadow: 0 0 7px rgba(255, 42, 26, 0.8); }
+[data-look='monolith'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 120%, rgba(255, 42, 26, 0.07), transparent 60%); }
+[data-look='monolith'] :is(.board-col, .board-card) { border-color: #262626; }
+[data-look='monolith'] .toggle.on .toggle-track { background: #ff2a1a; }
+[data-look='monolith'] .theme { border-color: #262626; }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='monolith'] .settings-main h2::before { animation: none; }
+}
+:is([data-look='monolith'], [data-look='islander']) { --ws-guide: none; --proj-divider: none; --ws-h: 30px; } /* bare, roomy */
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

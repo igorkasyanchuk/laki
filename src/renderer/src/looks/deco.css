@@ -1,0 +1,27 @@
+/* deco: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Art Deco: gold on deep teal, double rules, serif capitals, a sunburst behind the sidebar */
+[data-look='deco'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); }
+[data-look='deco'] .sidebar { border-right: 3px double color-mix(in srgb, var(--accent) 60%, transparent);
+  background-image: repeating-conic-gradient(from -90deg at 50% 100%, color-mix(in srgb, var(--accent) 7%, transparent) 0 4deg, transparent 4deg 9deg); }
+[data-look='deco'] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3) { font-family: Didot, 'Bodoni 72', Georgia, serif; text-transform: uppercase; letter-spacing: 3px; color: var(--accent-ink); }
+[data-look='deco'] .settings-main h2::after { content: ' \25C6'; font-size: 0.6em; vertical-align: middle; }
+[data-look='deco'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, .run-btn) { border-radius: 0; text-transform: uppercase; letter-spacing: 2px; font-size: var(--fs-1); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+[data-look='deco'] button.primary { background: linear-gradient(180deg, #ecd078, #b8902c); border-color: #ecd078; }
+[data-look='deco'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 3px double var(--accent); border-radius: 0;
+  box-shadow: 0 0 0 4px var(--panel), 0 0 0 5px color-mix(in srgb, var(--accent) 35%, transparent), 0 24px 60px rgba(0, 0, 0, 0.6); }
+[data-look='deco'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+[data-look='deco'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1.5px; font-size: var(--fs-1); }
+[data-look='deco'] .tab.sel { box-shadow: inset 0 3px 0 -1px var(--bg), inset 0 4px 0 var(--tab-c, var(--accent)); }
+[data-look='deco'] .ws.sel { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 20%, transparent), transparent); border-left-color: transparent; color: var(--accent-ink); }
+[data-look='deco'] .status { border-top: 3px double color-mix(in srgb, var(--accent) 50%, transparent); }
+[data-look='deco'] .theme.on { outline: 3px double var(--accent); outline-offset: 2px; }
+[data-look='deco'] { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); --proj-divider: 3px double color-mix(in srgb, var(--accent) 50%, transparent); }
+[data-look='deco'] :is(.side-panel, .info) { border-left: 3px double color-mix(in srgb, var(--accent) 60%, transparent); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

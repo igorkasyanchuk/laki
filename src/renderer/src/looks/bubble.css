@@ -1,0 +1,32 @@
+/* bubble: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* Bubblegum: round, soft and floating */
+[data-look='bubble'] { --radius: 12px; --r-xs: var(--rs, 4px); --r-s: var(--rs, 8px); --r-m: var(--rs, 12px); --r-l: var(--rs, 20px); --r-xl: var(--rs, 28px); }
+[data-look='bubble'] .ws { margin: 1px 8px; padding-left: 10px; border-left-width: 0; border-radius: var(--rs, 10px); }
+[data-look='bubble'] .tab { border-radius: var(--rs, 12px) var(--rs, 12px) 0 0; }
+[data-look='bubble'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button) { border-radius: 999px; }
+[data-look='bubble'] button.primary { box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='bubble'] :is(.menu, .modal, .tunnel-pop, .toast) { border-radius: var(--rs, 18px); border-color: transparent; box-shadow: 0 14px 44px color-mix(in srgb, var(--accent) 30%, transparent); }
+[data-look='bubble'] .theme { border-radius: var(--rs, 16px); }
+[data-look='bubble'] .sidebar { border-right-color: transparent; }
+[data-look='bubble'] .tabbar { --tab-line: 1px solid transparent; border-bottom-color: transparent; }
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp']) { --seg-gap: 4px; --seg-overlap: 0px; }
+:is([data-look='bubble'], [data-look='clay'], [data-look='groovy']) { --ws-guide: none; --ws-indent: 4px; --proj-divider: none; }
+[data-look='bubble'] :is(.side-panel, .info) { border-left-color: transparent; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

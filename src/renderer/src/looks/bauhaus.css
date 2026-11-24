@@ -1,0 +1,45 @@
+/* bauhaus: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Bauhaus: Futura, primary colors and pure shapes. A circle, a square and a triangle before the headings, a red dot on
+   the selection, flat color blocks for buttons, round icon buttons, a tricolor band on the popups */
+[data-look='bauhaus'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: Futura, 'Century Gothic', 'Avenir Next', sans-serif;
+  --red: #d7261e; --yellow: #f3c623; --blue: #1f4fa3; --ink: #1d1d1b; }
+[data-look='bauhaus'] :is(.project-head, .settings-main h2, .tunnel-head b, .tab, .buttons button, .seg button, button.primary) { text-transform: uppercase; letter-spacing: 1.2px; }
+[data-look='bauhaus'] .project-head { color: var(--ink); font-weight: 700; }
+[data-look='bauhaus'] .settings-main h2 { font-weight: 700; font-size: var(--fs-4); }
+[data-look='bauhaus'] .settings-main h2::before { content: ''; display: inline-block; width: 50px; height: 14px; margin-right: 12px; vertical-align: -1px;
+  background: radial-gradient(circle at 7px 7px, var(--red) 6.5px, transparent 7px), linear-gradient(var(--blue), var(--blue)) 19px 1px / 12px 12px no-repeat,
+  linear-gradient(to top right, var(--yellow) 50%, transparent 50%) 36px 0 / 14px 14px no-repeat; }
+[data-look='bauhaus'] .sidebar { border-right: 3px solid var(--ink); }
+[data-look='bauhaus'] :is(.tabbar, .settings-head) { --tab-line: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
+[data-look='bauhaus'] .status { border-top: 3px solid var(--ink); }
+[data-look='bauhaus'] .tab { border-radius: 0; font-size: var(--fs-1); font-weight: 600; }
+[data-look='bauhaus'] .tab.sel { background: var(--yellow); color: var(--ink); box-shadow: inset 0 -4px 0 var(--tab-c, var(--ink)); }
+[data-look='bauhaus'] .tab.sel :is(.x, svg) { color: var(--ink); }
+[data-look='bauhaus'] .ws.sel { background: transparent; border-left-color: transparent; font-weight: 700; }
+[data-look='bauhaus'] .ws.sel::before { content: ''; flex: none; width: 9px; height: 9px; margin-left: -8px; border-radius: 50%; background: var(--red); }
+[data-look='bauhaus'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid var(--ink); border-radius: 0; background: var(--panel); font-weight: 600; }
+[data-look='bauhaus'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):hover { background: var(--yellow); }
+[data-look='bauhaus'] .seg button.on { background: var(--blue); color: #fff; }
+[data-look='bauhaus'] button.primary { border: 2px solid var(--ink); border-radius: 0; background: var(--red); color: #fff; font-weight: 700; }
+[data-look='bauhaus'] .ib { border-radius: 50%; }
+[data-look='bauhaus'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid var(--ink); border-radius: 0; }
+[data-look='bauhaus'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 3px solid var(--ink); border-radius: 0; box-shadow: none;
+  background: linear-gradient(90deg, var(--red) 0 33.3%, var(--yellow) 0 66.6%, var(--blue) 0) top / 100% 7px no-repeat, var(--panel); }
+[data-look='bauhaus'] .menu-item:hover { background: var(--blue); color: #fff; }
+[data-look='bauhaus'] .settings-nav > button.on { background: var(--yellow); color: var(--ink); font-weight: 700; }
+[data-look='bauhaus'] .toggle-track { border-radius: 0; background: var(--panel); box-shadow: inset 0 0 0 2px var(--ink); }
+[data-look='bauhaus'] .toggle.on .toggle-track { background: var(--blue); }
+[data-look='bauhaus'] .toggle-knob { background: var(--ink); box-shadow: none; }
+[data-look='bauhaus'] .toggle.on .toggle-knob { background: var(--yellow); }
+[data-look='bauhaus'] .theme { border: 2px solid var(--ink); border-radius: 0; }
+[data-look='bauhaus'] :is(.side-panel, .info) { border-left: 3px solid var(--ink); }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

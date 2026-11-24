@@ -1,0 +1,45 @@
+/* glitch: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Glitch: a corrupted signal. Condensed caps with red and cyan split edges that tear now and then, controls that
+   jump when hovered, misregistered shadows, and a tear rolling down the terminals */
+[data-look='glitch'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: 'Avenir Next Condensed', 'Arial Narrow', sans-serif;
+  --split: -1.5px 0 0 rgba(255, 42, 109, 0.85), 1.5px 0 0 rgba(0, 240, 255, 0.85); --split-sm: -1px 0 0 rgba(255, 42, 109, 0.8), 1px 0 0 rgba(0, 240, 255, 0.8); }
+[data-look='glitch'] :is(.settings-main h2, .tunnel-head b) { font-family: 'DIN Condensed', Impact, var(--ui-font); font-size: var(--fs-5); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: var(--split); }
+[data-look='glitch'] .settings-main h2 { animation: gl-tear 5s steps(1) infinite; }
+[data-look='glitch'] .project-head { color: var(--pink); letter-spacing: 2px; }
+[data-look='glitch'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); border-radius: 0; background: #0b0912; text-transform: uppercase; letter-spacing: 0.5px;
+  box-shadow: 2px 2px 0 rgba(255, 42, 109, 0.55), -2px -2px 0 rgba(0, 240, 255, 0.4); }
+[data-look='glitch'] .seg button.on { background: #1e1838; color: var(--accent-ink); text-shadow: var(--split-sm); }
+[data-look='glitch'] button.primary { border: none; border-radius: 0; background: var(--accent); color: #07060b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; box-shadow: 3px 0 0 #ff2a6d, -3px 0 0 #2a7bff; }
+[data-look='glitch'] :is(.buttons button, .seg button, .scripts-tabs button, button.primary):hover { animation: gl-jump 0.3s steps(1); }
+[data-look='glitch'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-color: var(--line); background: #07060b; }
+[data-look='glitch'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { box-shadow: -2px 0 0 #ff2a6d, 2px 0 0 var(--accent); }
+[data-look='glitch'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--line); border-radius: 0; box-shadow: -3px 0 0 rgba(255, 42, 109, 0.7), 3px 0 0 rgba(0, 240, 255, 0.7), 0 16px 40px rgba(0, 0, 0, 0.6); }
+[data-look='glitch'] .menu-item { border-radius: 0; }
+[data-look='glitch'] .menu-item:hover { background: linear-gradient(90deg, rgba(255, 42, 109, 0.35), rgba(0, 240, 255, 0.22)); color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .sidebar { border-right: 2px solid transparent; border-image: linear-gradient(180deg, #ff2a6d, var(--accent) 50%, #ff2a6d) 1; }
+[data-look='glitch'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='glitch'] .tab.sel { background: var(--bg); color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .ws.sel { background: linear-gradient(90deg, rgba(0, 240, 255, 0.16), transparent); border-left-color: #ff2a6d; color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .settings-nav > button.on { background: linear-gradient(90deg, rgba(0, 240, 255, 0.16), transparent); color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .term-wrap { overflow: hidden; }
+[data-look='glitch'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px); }
+[data-look='glitch'] .term-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 16px; z-index: 2; pointer-events: none; translate: 0 -30px;
+  background: linear-gradient(90deg, rgba(255, 42, 109, 0.13), rgba(0, 240, 255, 0.12) 35%, transparent 55%, rgba(255, 42, 109, 0.1) 80%, transparent); animation: gl-roll 8s steps(48) infinite; }
+[data-look='glitch'] .toggle-track, [data-look='glitch'] .toggle-knob { border-radius: 0; }
+[data-look='glitch'] .toggle.on .toggle-track { box-shadow: -2px 0 0 #ff2a6d; }
+[data-look='glitch'] .theme { border-radius: 0; }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='glitch'] :is(.settings-main h2, .buttons button, .seg button, .scripts-tabs button, button.primary), [data-look='glitch'] .term-wrap::before { animation: none !important; }
+}
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+[data-look='glitch'] :is(.side-panel, .info) { border-left: 2px solid transparent; border-image: linear-gradient(180deg, #ff2a6d, var(--accent) 50%, #ff2a6d) 1; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }

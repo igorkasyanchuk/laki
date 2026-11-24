@@ -1,0 +1,34 @@
+/* noir: its rules out of the old looks.css (themes.ts lookCss loads this file as the look is set, after styles.css
+   and looks-base.css; applyTheme turns off every other look's file). A rule several looks share is in each of their
+   files, and looks-base.css' rules that came after this look's first one are here again in their places: the order
+   of everything that applies to this look is as it was. */
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+/* Noir: a black-and-white detective film. Light through venetian blinds across the terminals, grain and a vignette,
+   letterspaced Didot italics for the headings, title-card menus, and red kept for trouble */
+[data-look='noir'] { --radius: 0px; --r-xs: var(--rs, 0px); --r-s: var(--rs, 0px); --r-m: var(--rs, 0px); --r-l: var(--rs, 0px); --r-xl: var(--rs, 0px); --ui-font: Optima, 'Gill Sans', sans-serif; --head: Didot, 'Bodoni 72', 'Times New Roman', serif;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+[data-look='noir'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); font-style: italic; font-weight: 400; font-size: var(--fs-5); letter-spacing: 3px; text-transform: uppercase; }
+[data-look='noir'] .project-head { letter-spacing: 3px; color: #b8b6b0; }
+[data-look='noir'] .sidebar { background: radial-gradient(ellipse at 0 0, rgba(255, 255, 255, 0.07), transparent 60%), var(--side); }
+[data-look='noir'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a4a4a; border-radius: 0; background: transparent; text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='noir'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='noir'] .seg button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='noir'] button.primary { border: none; border-radius: 0; background: var(--accent); color: var(--accent-fg); text-transform: uppercase; letter-spacing: 2px; }
+[data-look='noir'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border: none; border-bottom: 1px solid #4a4a4a; background: transparent; }
+[data-look='noir'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #3a3a3a; border-radius: 0; background: var(--grain), var(--panel); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8); }
+[data-look='noir'] .menu-item { border-radius: 0; letter-spacing: 0.5px; }
+[data-look='noir'] .menu-item:hover { background: var(--accent); color: var(--accent-fg); }
+[data-look='noir'] .tab { border-radius: 0; letter-spacing: 0.5px; }
+[data-look='noir'] .tab.sel { background: var(--bg); }
+[data-look='noir'] .ws.sel { background: linear-gradient(90deg, #2c2c2c, transparent); border-left-color: var(--accent); color: #fff; }
+[data-look='noir'] .settings-nav > button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='noir'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(ellipse at 60% 35%, transparent 50%, rgba(0, 0, 0, 0.32)), repeating-linear-gradient(-28deg, transparent 0 34px, rgba(255, 255, 255, 0.035) 34px 52px); }
+[data-look='noir'] .term-wrap::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--grain); opacity: 0.05; }
+[data-look='noir'] .toggle-track, [data-look='noir'] .toggle-knob { border-radius: 0; }
+[data-look='noir'] .theme { border-radius: 0; }
+/* a look's own type (its --ui-font and its headings' fonts) only with Settings › Appearance › Interface font: The
+   theme's (html.theme-font, applyTheme): else SF Pro, or the font picked there, everywhere */
+html:not(.theme-font)[data-look] { --ui-font: var(--ui-default); }
+html:not(.theme-font)[data-look] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3, .tab, .buttons button, .seg button, button.primary, .menu-item, .ws.sel) { font-family: var(--ui-font) !important; }
