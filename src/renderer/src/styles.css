@@ -136,22 +136,24 @@ html.material .app:not([data-dz], .narrow, .full) .main { margin: var(--sp-4) va
 :root { --snap-dim: 0.6; } /* the start-up snapshot: how much of the last layout shows until the first view */
 :root { --surface-a: 72%; --surface-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --glass-blur: 24px; --surface-blur: blur(var(--glass-blur)) saturate(1.6); --surface-edge: color-mix(in srgb, var(--fg) 16%, transparent); --surface-lift: var(--lift-1), var(--lift-3); }
 /* Glass › Strength (themes.ts GLASS_LEVELS: applyTheme sets --surface-a from it, html[data-glass-level]): Clear a
-   little more blur, Tinted a little less; Regular as above. Opaque, glass and Reduce transparency: no blur at all */
+   little more blur, Tinted a little less; Regular as above. Opaque, Reduce transparency and the window's full glass
+   (html.glass-full: the main area see-through over the native blur, themes.ts): no blur at all; glass with only the
+   sidebar see-through (Window at 0) keeps it, the main area an opaque canvas under the floats */
 html[data-glass-level='clear'] { --glass-blur: 30px; }
 html[data-glass-level='tinted'] { --glass-blur: 20px; }
-html:is(.opaque, .glass) { --surface-bg: var(--panel); --surface-blur: none; }
+html:is(.opaque, .glass-full) { --surface-bg: var(--panel); --surface-blur: none; }
 @media (prefers-reduced-transparency: reduce) { :root { --surface-bg: var(--panel); --surface-blur: none; } }
 /* V17: Refraction (Settings › Appearance › Window, html.lens: on unless false): a menu bends what's under its edges, as
    thick glass does: main.tsx' #laki-lens before its blur, a lit top and a shade along the bottom. Only where menus blur:
-   not in glass (floats solid there: a backdrop-filter over the native blur flickers), a flat look, Reduce transparency
+   not in full glass (floats solid there: a backdrop-filter over the native blur flickers), a flat look, Reduce transparency
    or Motion: None; the plain blur stays where url() isn't taken. Menus and ⌘K only, not toasts or the bars' groups: each lensed
    surface costs about 1 ms of GPU a frame (12 at once over a printing terminal: 29 ms frames, 17 without), and the bars'
    are always on screen. A menu with a filter or submenus (.rich, often tall) keeps its plain blur. ponytail: a plain
    menu of many items can pass 400px tall; cap it by class if the lens costs there */
 @media (prefers-reduced-transparency: no-preference) {
-  html.lens:not(.opaque, .glass, [data-motion='none']) :is(.menu:not(.rich), .finder, .modal.palette) { box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--surface-lift); }
+  html.lens:not(.opaque, .glass-full, [data-motion='none']) :is(.menu:not(.rich), .finder, .modal.palette) { box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-lo), var(--surface-lift); }
   @supports (backdrop-filter: url(#a)) {
-    html.lens:not(.opaque, .glass, [data-motion='none']) :is(.menu:not(.rich), .finder, .modal.palette) { backdrop-filter: url(#laki-lens) var(--surface-blur); } /* ⌘K's and the finders' too: open a moment, as a menu is */
+    html.lens:not(.opaque, .glass-full, [data-motion='none']) :is(.menu:not(.rich), .finder, .modal.palette) { backdrop-filter: url(#laki-lens) var(--surface-blur); } /* ⌘K's and the finders' too: open a moment, as a menu is */
   }
 }
 button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-control); padding: var(--sp-2) var(--sp-4); cursor: var(--cur-act); }
@@ -4060,8 +4062,8 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 /* V11: macOS 26's glass. A capsule floats over what's under it, apart from the edges: the panel at the floating
    surface's strength (--surface-a: made to read over a busy background, test/contrast.test.ts), a blur and more
    saturation of what's behind, a hairline, a lit top edge, the pill's corners (square in the Square look: --rs).
-   Opaque as before under Reduce transparency and in the looks marked opaque; in glass (the window's own blur) nearly
-   opaque, no backdrop-filter (components.css: it flickers there); never a blur over a terminal (its WebGL canvas
+   Opaque as before under Reduce transparency and in the looks marked opaque; in full glass (the main area over the
+   window's own blur) nearly opaque, no backdrop-filter (components.css: it flickers there); never a blur over a terminal (its WebGL canvas
    would repaint the blur every frame it prints). Its own name, not .glass: that's html's, the window's glass mode */
 :root { --cap-bg: color-mix(in srgb, var(--panel) var(--surface-a), transparent); --cap-blur: blur(calc(var(--glass-blur) * 0.84)) saturate(1.7); --cap-hi: color-mix(in srgb, #fff 9%, transparent); --cap-spec: color-mix(in srgb, var(--glass-hi) 60%, var(--cap-hi)); } /* --cap-spec: a capsule's one specular top edge (the glass's and the capsule's own, once) */
 /* its depth (Liquid Glass): a lit top edge inside, a shade along the bottom, a hairline rim, and a soft light under the
@@ -4087,7 +4089,7 @@ html[data-motion='none'] .main { transition: none; }
 html[data-motion='none'] { --glass-light: transparent; }
 @media (prefers-reduced-transparency: reduce) { :root { --glass-hi: transparent; --glass-lo: transparent; --glass-rim: transparent; --glass-light: transparent; } }
 html.opaque { --cap-bg: var(--panel); --cap-blur: none; }
-html.glass { --cap-bg: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 18%)), transparent); --cap-blur: none; } /* no blur there: near solid, by Strength (Regular's 72%: 90%) */
+html.glass-full { --cap-bg: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 18%)), transparent); --cap-blur: none; } /* no blur there: near solid, by Strength (Regular's 72%: 90%) */
 @media (prefers-reduced-transparency: reduce) { :root { --cap-bg: var(--panel); --cap-blur: none; } }
 .capsule { position: relative; background: color-mix(in srgb, var(--ws) var(--ws-mix), var(--cap-bg)); backdrop-filter: var(--cap-blur); border: 0.5px solid var(--surface-edge); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--cap-spec), inset 0 -1px 0 var(--glass-lo), inset 0 0 0 0.5px color-mix(in srgb, var(--ws) var(--ws-rim), var(--glass-rim)), var(--lift-1); }
 .capsule::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(circle 110px at var(--mx, 50%) var(--my, 50%), var(--glass-light), transparent 70%); opacity: 0; transition: opacity 0.2s; } /* the pointer's light: a soft pool, wider than the capsule is tall */
@@ -4280,7 +4282,8 @@ html[data-motion='none'] .num-roll .num-out { visibility: hidden; }
    reaching --edge-fade below the header (the layers, not its box: its drag area and clicks stay its own). No background
    or rule of its own. --edge-o: how much of it shows (a page's head brings it in as it scrolls: page-head above). Solid
    (--panel, its rule back) where the floating surface is: Reduce transparency, the flat looks (html.opaque) and the
-   window's glass (html.glass: a backdrop-filter over its native blur flickers). Never over a terminal (its WebGL canvas
+   window's full glass (html.glass-full: a backdrop-filter over its native blur flickers; glass with an opaque main
+   area keeps it). Never over a terminal (its WebGL canvas
    would repaint the blur each frame): the tab bar keeps its own */
 @property --edge-o { syntax: '<number>'; inherits: true; initial-value: 1; }
 :root { --edge-blur-1: 14px; --edge-blur-2: 4px; --edge-fade: var(--sp-5); --edge-tint: var(--surface-bg); }
@@ -4289,8 +4292,8 @@ html[data-motion='none'] .num-roll .num-out { visibility: hidden; }
 .edge-blur::before { background: linear-gradient(var(--edge-tint), transparent); backdrop-filter: blur(var(--edge-blur-1)) saturate(1.5); mask-image: linear-gradient(#000, transparent 67%); }
 .edge-blur::after { backdrop-filter: blur(var(--edge-blur-2)); mask-image: linear-gradient(#000, transparent); }
 .sp-change > .sp-row.edge-blur, .sp-change > .sp-row.edge-blur:hover { background: none; } .sp-change > .sp-row.edge-blur:hover::before { background: linear-gradient(var(--hover), transparent), linear-gradient(var(--edge-tint), transparent); }
-html:is(.opaque, .glass) .edge-blur, html:is(.opaque, .glass) .sp-change > .sp-row.edge-blur { background: var(--panel); border-bottom-color: var(--line); }
-html:is(.opaque, .glass) .edge-blur::before, html:is(.opaque, .glass) .edge-blur::after { display: none; }
+html:is(.opaque, .glass-full) .edge-blur, html:is(.opaque, .glass-full) .sp-change > .sp-row.edge-blur { background: var(--panel); border-bottom-color: var(--line); }
+html:is(.opaque, .glass-full) .edge-blur::before, html:is(.opaque, .glass-full) .edge-blur::after { display: none; }
 @media (prefers-reduced-transparency: reduce) {
   .edge-blur, .sp-change > .sp-row.edge-blur { background: var(--panel); border-bottom-color: var(--line); }
   .edge-blur::before, .edge-blur::after { display: none; }

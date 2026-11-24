@@ -1554,7 +1554,9 @@ rows and the side panel's tabs. No background or rule of their own; two layers b
 `--edge-blur-2` blur fading over the whole), reaching `--edge-fade` below the box (the layers, not the box: a head's drag
 area and clicks unchanged), `--edge-o` their opacity (`@property`, a number, so the page head's scroll animation
 moves it). Solid `--panel` and the rule back where the floating surface is: Reduce transparency, `html.opaque`,
-`html.glass`. Not on the tab bar: under it is a terminal's WebGL canvas, which a blur would repaint each frame.
+`html.glass-full` (themes.ts: glass in the app with the Window slider over 0, the main area see-through over the
+window's native blur, where a backdrop-filter flickers; at 0 the main area is an opaque canvas and every blur stays:
+the floats' `--surface-blur`, the lens, capsules, these heads). Not on the tab bar: under it is a terminal's WebGL canvas, which a blur would repaint each frame.
 
 ## Native menus
 

@@ -105,9 +105,11 @@ label.switch-row select { flex: none; width: auto; }
 /* glass: the window behind shows through, blurred (themes.ts makes the backgrounds see-through, as the sliders
    say, and lights them with the theme's glow). Floating things are frosted panes with a lit top edge. */
 html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --glass-hi: rgba(255, 255, 255, 0.08); }
-/* no backdrop-filter in glass: over the see-through (vibrancy) window Electron repaints it badly: flicker on hover,
-   stale tooltips, hard-edged rectangles around menus. The window's own blur is native; floats are nearly opaque. */
-:where(html.glass) :is(.menu, .modal, .tunnel-pop, .toast, .tip) {
+/* no backdrop-filter in full glass (html.glass-full: the main area see-through too): over the see-through (vibrancy)
+   window Electron repaints it badly: flicker on hover, stale tooltips, hard-edged rectangles around menus. The window's
+   own blur is native; floats are nearly opaque. With only the sidebar see-through (Window at 0) the main area is an
+   opaque canvas: floats blur as in any look */
+:where(html.glass-full) :is(.menu, .modal, .tunnel-pop, .toast, .tip) {
   background: color-mix(in srgb, var(--panel) 90%, transparent); border-color: var(--glass-edge);
   box-shadow: inset 0 1px 0 var(--glass-hi), 0 24px 70px rgba(0, 0, 0, 0.42); }
 :where(html.glass) :is(.info, .side-panel) { background: color-mix(in srgb, var(--panel) 75%, transparent); border-left-color: var(--glass-edge); box-shadow: inset 1px 0 0 var(--glass-hi); }

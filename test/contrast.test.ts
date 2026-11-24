@@ -218,5 +218,9 @@ test("Glass › Strength: clear, regular and tinted start at 56, 72 and 88%; any
   const [c, r, k] = (['clear', 'regular', 'tinted'] as const).map(glassLevel => glassOf({ panel: t.panel, side: t.side, bg: t.bg, fg: t.fg, muted: t.muted }, false, { glassLevel }).surface)
   assert.ok(c <= r && r <= k && k >= 88, `${c} ${r} ${k}`)
   const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
-  assert.match(css, /html\.glass \{ --cap-bg: color-mix\(in srgb, var\(--panel\) min\(100%, calc\(var\(--surface-a\) \+ 18%\)\), transparent\);/, "glass's capsules by --surface-a, no alpha of their own")
+  assert.match(css, /html\.glass-full \{ --cap-bg: color-mix\(in srgb, var\(--panel\) min\(100%, calc\(var\(--surface-a\) \+ 18%\)\), transparent\);/, "full glass's capsules by --surface-a, no alpha of their own")
+  // glass with an opaque main area (Window at 0) keeps the floats' blur: only full glass turns it off
+  for (const rule of ['html:is(.opaque, .glass-full) { --surface-bg: var(--panel); --surface-blur: none; }', 'html:is(.opaque, .glass-full) .edge-blur::before, html:is(.opaque, .glass-full) .edge-blur::after { display: none; }']) assert.ok(css.includes(rule), rule)
+  assert.doesNotMatch(css, /html:is\(\.opaque, \.glass\)|html\.lens:not\(\.opaque, \.glass,/, 'no blur off for every glass')
+  assert.match(css, /\.term-wrap \.capsule \{ --cap-blur: none;/, 'never a blur over a terminal')
 })

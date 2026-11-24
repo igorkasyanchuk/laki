@@ -123,6 +123,20 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   applyTheme({ theme: 'circuit', glass: true, glassWindow: 50, glassTerm: 0, glassGlow: false, uiFont: 'Futura' })
   assert.equal(props.get('--ui-font'), `"Futura", ${UI_FALLBACK}`)
   assert.ok(classes.has('glass'))
+  assert.ok(!classes.has('glass-full'), 'a page outside the app: no native blur under it')
+  // in the app: full glass while the main area is see-through (Window over 0); Window at 0, the sidebar alone, its blurs kept
+  Object.assign(globalThis, { laki: {} })
+  try {
+    applyTheme({ theme: 'circuit', glass: true, glassWindow: 50 })
+    assert.ok(classes.has('glass-full'))
+    applyTheme({ theme: 'circuit', glass: true, glassWindow: 0 })
+    assert.deepEqual([classes.has('glass'), classes.has('glass-full')], [true, false])
+    applyTheme({ theme: 'circuit', glass: true })
+    assert.ok(classes.has('glass-full'), "the Window slider's default: 45")
+  } finally {
+    Reflect.deleteProperty(globalThis, 'laki')
+  }
+  applyTheme({ theme: 'circuit', glass: true, glassWindow: 50, glassTerm: 0, glassGlow: false, uiFont: 'Futura' })
   assert.equal(transparent(), false) // nothing shows through the terminals
   assert.equal(html.dataset.motion, 'low') // Motion unset: the usual
   applyTheme({ theme: 'circuit', motion: 'none' })

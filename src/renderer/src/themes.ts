@@ -1412,6 +1412,9 @@ export function applyTheme(p: string | Paint = '', solid = false) {
   // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it
   root.classList.toggle('side-clear', clear > 0 || (!!o.glass && app))
   root.classList.toggle('vibrant', !!o.glass && app && /Mac/.test(navigator.userAgent)) // Frosted's wallpaper only where there's no desktop behind (looks/frosted.css)
+  // full glass: the main area see-through over the window's native blur too (Window over 0), where a backdrop-filter
+  // flickers (styles.css, components.css turn theirs off); Window at 0: the sidebar alone, the main area opaque, blurs kept
+  root.classList.toggle('glass-full', !!o.glass && app && (o.glassWindow ?? GLASS.glassWindow) > 0)
   // a background picture (glass shows the desktop instead): behind everything, the surfaces over it see-through
   const bg = !o.glass && !!o.background?.file && bgImage ? o.background : undefined
   root.classList.toggle('has-bg', !!bg)
