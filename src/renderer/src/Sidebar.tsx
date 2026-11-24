@@ -157,6 +157,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     phone: narrow,
     seenUndo: t => (needsApi.seen(t), toast(`${wsName(live.find(w => w.id === t.workspace) ?? { id: t.workspace })}: marked as seen`, () => void markUnread(t.id), 'Undo', true, false, 4000)),
     openProof: (t, path) => (setDialog(null), selectTab(t), app.openFile({ ws: t.workspace, path, storage: true }), narrow && setSideOpen(false)),
+    proofImage: (t, path) => call<{ image?: string }>('fileRead', { ws: t.workspace, path, storage: true }).then(r => r.image),
     spend: hasCap(view, 'ws.spend') ? t => api.call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: t => (last => (last?.length ? <TurnChips marks={last} widgets={view.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at } })} /> : null))(t.marks?.filter(m => m.at === t.marks!.at(-1)!.at)),
     keys: (t, data) => void api.call('input', { tab: t.id, data }).catch(() => {}),

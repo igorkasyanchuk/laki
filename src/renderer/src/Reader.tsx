@@ -40,7 +40,7 @@ export type ReaderApi = { explain?: (tab: string) => Promise<AskExplained> /* a 
   id: string, name: string, args: unknown) => Promise<unknown>; send: (tab: string, text: string) => Promise<unknown>; answer: (tab: string, n: number,
   label: string, say?: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void;
   mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string, same?: boolean) => unknown; proof?: (tab: TabView) => Proof | undefined;
-  openProof?: (tab: TabView, path: string) => void; spend?: (tab: TabView) => Promise<SpendView>; turnChips?: (tab: TabView,
+  openProof?: (tab: TabView, path: string) => void; proofImage?: (tab: TabView, path: string) => Promise<string | undefined>; spend?: (tab: TabView) => Promise<SpendView>; turnChips?: (tab: TabView,
   marks: TurnMark[]) => React.ReactNode; drag?: (tab: TabView, path: string) => void } // drag (C10): a turn's file dragged out to Finder or any app // turnChips
   // (P5): a turn's chips from turn place extensions; review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell
   // block's command typed into the workspace's terminal
@@ -373,7 +373,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
           )}
           {rows}
           {tab.changes && tab.status !== 'running' && <TurnCard tab={tab} api={api} />}
-          {tab.status !== 'running' && api.openProof && (p => p && <div className="rd-proof"><ProofList p={p} open={path => api.openProof!(tab, path)} spend={api.spend && (() => api.spend!(tab))} /></div>)(api.proof?.(tab))}
+          {tab.status !== 'running' && api.openProof && (p => p && <div className="rd-proof"><ProofList p={p} open={path => api.openProof!(tab, path)} spend={api.spend && (() => api.spend!(tab))} image={api.proofImage && (path => api.proofImage!(tab, path))} /></div>)(api.proof?.(tab))}
           {late.length > 0 && <div className="rd-marks">{api.turnChips!(tab, late)}</div>}
           {tab.status === 'running' && (
             <div className="rd-working muted">

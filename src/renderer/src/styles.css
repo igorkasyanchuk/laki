@@ -4316,6 +4316,10 @@ button.proof-line:not(:disabled) { cursor: var(--cur-act); }
 button.proof-line:not(:disabled):hover .mono { text-decoration: underline; }
 .proof-ok svg { color: var(--done); }
 .proof-bad svg { color: var(--error); }
+.proof-cmp { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-2); } /* Compare: before and after */
+.proof-cmp-stack { display: grid; } .proof-cmp-stack > img { grid-area: 1 / 1; }
+.proof-cmp-side { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.proof-cmp :is(.proof-cmp-stack, .proof-cmp-side) > img { width: 100%; border-radius: var(--r-s); }
 .rd-proof { margin: 0 0 var(--sp-4); padding: var(--sp-2) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); }
 /* P3: Edit layout: each extension in a place dragged by itself (its insides take no pointer), a place's room to drop on */
 [data-edit] { cursor: grab; outline: 1px dashed var(--accent); outline-offset: -1px; position: relative; }

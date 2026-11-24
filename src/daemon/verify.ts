@@ -12,7 +12,7 @@
 
 import { type ChildProcess, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { CHECK_STEPS, type CheckRun, type CheckStepName, checkOk, type Goal, type GoalState, type DoneCheck, type Preset, type Proof, type ProofFacts, type Tab, type Workspace } from '../shared/types.ts'
 import { writeAtomic } from '../shared/conn.ts'
@@ -25,6 +25,7 @@ import { phone } from './phone.ts'
 import { goalOf, meterView } from './meters.ts'
 import { aiOnce } from './ai.ts'
 import { isolationEnv } from '../shared/isolation.ts'
+import { pixelDiff, pngPixels } from '../shared/pixelDiff.ts'
 
 export const CHECK_TRIES = 3 // failures in a row sent back to the agent, then it's over to you
 const STEP_MIN = Number(process.env.LAKI_CHECK_MIN) || 10 // a script's minutes (tests' fewer)
@@ -245,6 +246,9 @@ export function proofShot(o: { ws: string; turn: number; png: string }) {
   p.shots.after = `proof/${p.turn}/after.png`
   const was = turnsIn(top).find(n => Number(n) < p.turn && existsSync(join(top, n, 'after.png')))
   if (was) copyFileSync(join(top, was, 'after.png'), join(folder, 'before.png')), (p.shots.before = `proof/${p.turn}/before.png`)
+  // how much of the picture changed (shared/pixelDiff.ts), as a percent to a tenth: the card's badge
+  const [a, b] = was ? [pngPixels(readFileSync(join(folder, 'before.png'))), pngPixels(png)] : []
+  if (a && b) p.shots.diff = Math.round(pixelDiff(a.px, a.w, a.h, b.px, b.w, b.h) * 1000) / 10
   writeAtomic(join(folder, 'proof.json'), `${JSON.stringify(p, null, 1)}\n`, 0o600)
   changed()
   return p.shots

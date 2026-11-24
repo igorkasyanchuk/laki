@@ -36,6 +36,7 @@ export type NeedsApi = {
   allowKey?: string // Allow all's key, for its tip
   unbox?: (t: TabView) => void // a command its sandbox stopped (t.boxed): restart it without the sandbox, after a confirm
   netAllow?: (t: TabView, host: string) => void // the host its sandbox refused (t.boxed.host): allowed in its project's list
+  proofImage?: (t: TabView, path: string) => Promise<string | undefined> // a Proof card picture as a data URL (Compare)
   openProof?: (t: TabView, path: string) => void // the Proof card's file (a script's output, a picture): its storage folder's
   spend?: (t: TabView) => Promise<SpendView> // its workspace's Where it went (wsSpend), on the Proof card
   turnChips?: (t: TabView) => React.ReactNode // P5: its last turn's chips from turn place extensions
@@ -319,7 +320,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
       ) : (
         <>
           {last && <div className="need-q need-last">{last}</div>}
-          {w.proof?.tab === t.id && api.openProof && <ProofList p={w.proof} open={path => api.openProof!(t, path)} spend={api.spend && (() => api.spend!(t))} />}
+          {w.proof?.tab === t.id && api.openProof && <ProofList p={w.proof} open={path => api.openProof!(t, path)} spend={api.spend && (() => api.spend!(t))} image={api.proofImage && (path => api.proofImage!(t, path))} />}
           {api.turnChips?.(t)}
           {t.boxed && api.unbox && <Boxed t={t} unbox={api.unbox} netAllow={api.netAllow} />}
           <div className="need-acts" onClick={stop}>

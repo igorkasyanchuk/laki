@@ -63,9 +63,12 @@
   workspace `proof` (the last checked turn's; gone as that tab's next turn starts: `turnStarts`), with the worktree's
   `tree` it checked (Ship's `proofMd`: stale when another ships). The `proof` event:
   SidePanel's Preview, when it's open on a local page that loaded, captures (main's `capture`) and calls `proofShot`
-  (the app only: FROM, AGENT_NO, REMOTE_NO): `after.png`, the newest earlier turn's copied as `before.png`. Proof.tsx
-  `ProofList`: a line each under the Reader's last turn and on Needs you's finish card (`proof.tab` that tab's), a click
-  opens the file from the storage folder (`openFile`, `storage`). `proof/` is Laki's: core's `proofIn` refuses it to
+  (the app only: FROM, AGENT_NO, REMOTE_NO): `after.png`, the newest earlier turn's copied as `before.png`, and with both
+  `shots.diff`, the percent of pixels that changed (shared/pixelDiff.ts' `pngPixels`, node's zlib: an 8-bit RGB or RGBA
+  PNG, Chromium's; then `pixelDiff`). Proof.tsx `ProofList`: a line each under the Reader's last turn and on Needs you's
+  finish card (`proof.tab` that tab's), a click opens the file from the storage folder (`openFile`, `storage`); with both
+  pictures a *n% changed* tag and *Compare* (`Compare`: the pictures by `fileRead`'s data URLs, the app's `proofImage`;
+  Slider: the after over the before, `clip-path: inset(0 X% 0 0)` by a named range; Side by side; Overlay at half). `proof/` is Laki's: core's `proofIn` refuses it to
   workflows' save block; `storageFull` and the Artifacts count leave it out. ponytail: the agent's shell can still write
   there (it's its `LAKI_STORAGE_FOLDER`).
 - Reader view (F6: a line's `at`/`end` are its transcript lines' times, a `you`'s `cost` its turn's claude usage at API

@@ -33,6 +33,8 @@ import { SNAP_MAX, SNAP_VERSION, snapOf, snapshotOf } from '../src/renderer/src/
 import { hexToOklch, inP3, oklchToHex, p3Boost } from '../src/renderer/src/color.ts'
 import { OUT_MAX, type OutItem, outAdd, outParams, outReplay } from '../src/renderer/src/outbox.ts'
 import { sleep } from './helpers.ts'
+import { deflateSync } from 'node:zlib'
+import { pixelDiff, pngPixels } from '../src/shared/pixelDiff.ts'
 
 test('newReview: a new thread or a higher count is new; the same or a lower count (a comment hidden) is not', () => {
   assert.equal(newReview('t1:1'), true, 'nothing sent yet')
@@ -1684,4 +1686,35 @@ test('Labs › HDR glow: only when it is on, the display has HDR, and neither Re
   assert.equal(hdrOn(true, false, false, false), false, 'an SDR display: as always')
   assert.equal(hdrOn(true, true, true, false), false, 'Reduce motion')
   assert.equal(hdrOn(true, true, false, true), false, 'Reduce transparency')
+})
+
+test("Proof card's Compare: a PNG's pixels (zlib, each row filter) and the percent that changed; its slider and switch have names", () => {
+  // a PNG of w×h RGBA pixels, each row with the filter given (0 none, 1 sub, 2 up, 3 average, 4 Paeth), as Chromium's
+  const png = (w: number, h: number, px: (x: number, y: number) => number[], filter = (y: number) => y % 5) => {
+    const raw: number[] = []
+    const rows: number[][] = []
+    for (let y = 0; y < h; y++) rows.push(Array.from({ length: w }, (_, x) => px(x, y)).flat())
+    const paeth = (a: number, b: number, c: number) => (q => (Math.abs(q - a) <= Math.abs(q - b) && Math.abs(q - a) <= Math.abs(q - c) ? a : Math.abs(q - b) <= Math.abs(q - c) ? b : c))(a + b - c)
+    rows.forEach((r, y) => {
+      const f = filter(y)
+      const up = rows[y - 1] ?? r.map(() => 0)
+      raw.push(f, ...r.map((v, i) => (v - [0, i >= 4 ? r[i - 4] : 0, up[i], ((i >= 4 ? r[i - 4] : 0) + up[i]) >> 1, paeth(i >= 4 ? r[i - 4] : 0, up[i], i >= 4 ? up[i - 4] : 0)][f] + 256) & 255))
+    })
+    const chunk = (t: string, d: Buffer) => (b => (b.writeUInt32BE(d.length, 0), b))(Buffer.concat([Buffer.alloc(4), Buffer.from(t, 'latin1'), d, Buffer.alloc(4)])) // its CRC zeros: pngPixels doesn't read it
+    const ihdr = Buffer.alloc(13)
+    ihdr.writeUInt32BE(w, 0), ihdr.writeUInt32BE(h, 4), (ihdr[8] = 8), (ihdr[9] = 6)
+    return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.from(raw))), chunk('IEND', Buffer.alloc(0))])
+  }
+  const shade = (x: number, y: number) => [(x * 37 + y * 11) & 255, (x * 5 + y * 90) & 255, (x * y) & 255, 255]
+  const a = pngPixels(png(10, 10, shade))!
+  assert.deepEqual([a.w, a.h, [...a.px.subarray(0, 4)], [...a.px.subarray((3 * 10 + 7) * 4, (3 * 10 + 8) * 4)]], [10, 10, shade(0, 0), shade(7, 3)], 'every filter undone')
+  // 15 of 100 pixels another color: 15%
+  const b = pngPixels(png(10, 10, (x, y) => (y < 3 && x < 5 ? [255, 0, 0, 255] : shade(x, y))))!
+  assert.equal(Math.round(pixelDiff(a.px, a.w, a.h, b.px, b.w, b.h) * 1000) / 10, 15)
+  assert.equal(pngPixels(Buffer.from('not a png')), undefined)
+  // the compare's controls: the range named and saying its value, the switch a named group of pressed buttons
+  const src = readFileSync(new URL('../src/renderer/src/Proof.tsx', import.meta.url), 'utf8')
+  assert.match(src, /<input type="range"[^>]*aria-label="How much of the after shows, from the left"[^>]*aria-valuetext=/)
+  assert.match(src, /role="group" aria-label="How to compare"/)
+  assert.match(src, /clipPath: `inset\(0 \$\{100 - x\}% 0 0\)`/)
 })

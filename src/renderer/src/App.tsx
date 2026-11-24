@@ -2116,6 +2116,7 @@ export function App() {
     mentions: t => mentionsOf(viewRef.current, t.workspace), // @ in its box: your other workspaces, your projects
     proof: t => (p => (p?.tab === t.id ? p : undefined))(view?.workspaces.find(w => w.id === t.workspace)?.proof), // the Proof card: its last checked turn's
     openProof: (t, path) => openFile({ ws: t.workspace, path, storage: true }),
+    proofImage: (t, path) => call<{ image?: string }>('fileRead', { ws: t.workspace, path, storage: true }).then(r => r.image),
     drag: bridge?.dragOut && ((t, path) => (w => w?.path && !w.host && bridge!.dragOut!(`${w.path}/${path}`, w.path))(view?.workspaces.find(x => x.id === t.workspace))),
     spend: hasCap(view, 'ws.spend') ? t => call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: (t, marks) => <TurnChips marks={marks} widgets={view?.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at }, back: dialog })} />,
