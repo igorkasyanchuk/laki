@@ -71,7 +71,7 @@ These appear in Laki's source as links you click, text shown to you, samples or 
 
 - Links that open in your browser when you click them: `laki.sh` (About), `github.com` (the repo, issues, PRs),
   `raw.githubusercontent.com` (the widget schema's address for editors), `tailscale.com` (its download page),
-  `docs.claude.com`, `claude.ai`, `antigravity.google`, `opencode.ai`, `cursor.com` (an agent's install command and docs, shown for you to run),
+  `docs.claude.com`, `claude.ai`, `antigravity.google`, `opencode.ai`, `cursor.com`, `docs.github.com` (an agent's install command and docs, shown for you to run),
   `www.youtube.com`, `youtu.be` (forms of a video's address), `openfontlicense.org` (the fonts' licence).
 - `dev.laki.app`: only a name in the Referer header YouTube's embed asks of apps; nothing is sent to it.
 - Push formats' placeholders in Settings: `ntfy.sh`, `hooks.slack.com`, `example.com`.

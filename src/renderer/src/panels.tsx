@@ -4,7 +4,7 @@ import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { hasCap } from '../../shared/caps'
 import { version } from '../../../package.json'
-import { CURSOR_INSTALL, INSTALL } from '../../shared/install'
+import { COPILOT_INSTALL, CURSOR_INSTALL, INSTALL } from '../../shared/install'
 import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, planLeft, resetOf, usageOld, usageRow, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
@@ -2719,9 +2719,9 @@ export function McpStrip({ tab, onAct }: { tab: TabView; onAct: (name: string, a
 }
 
 // R12: a tab whose agent isn't installed (the shell's "command not found"): how to get it, and a way on (C6: Cursor's too)
-export function InstallStrip({ agent, onCopy, onInstall, onAgain }: { agent: Agent | 'cursor'; onCopy: (text: string) => void; onInstall: (cmd: string) => void; onAgain: () => void }) {
-  const i = agent === 'cursor' ? CURSOR_INSTALL : INSTALL[agent]
-  const name = agent === 'cursor' ? 'Cursor' : AGENT_NAMES[agent]
+export function InstallStrip({ agent, onCopy, onInstall, onAgain }: { agent: Agent | 'cursor' | 'copilot'; onCopy: (text: string) => void; onInstall: (cmd: string) => void; onAgain: () => void }) {
+  const i = agent === 'cursor' ? CURSOR_INSTALL : agent === 'copilot' ? COPILOT_INSTALL : INSTALL[agent]
+  const name = agent === 'cursor' ? 'Cursor' : agent === 'copilot' ? 'GitHub Copilot' : AGENT_NAMES[agent]
   return (
     <div className="queue-strip show-strip hook-strip" data-dock="bottom" role="region" aria-label={`${name} isn't installed`}>
       <div className="queue-head">

@@ -782,6 +782,17 @@ for an `acp` tab (its effort unchecked: the agent's own to refuse, said on the t
 MCP server: `~/.cursor/mcp.json`'s `mcpServers`, shown to paste). Not installed: the tab's 127, *Install in a terminal*
 (`CURSOR_INSTALL`).
 
+**GitHub Copilot** (`shared/install.ts` `COPILOT`, `isCopilot`): a ready-made profile as Cursor's, `copilot --acp`
+with `acp: true`, in a fresh install's list when `copilot` is on PATH and in Settings' *Add a profile for…*. From its
+docs (Nov 2026): Copilot CLI's ACP server is `copilot --acp` (stdio by default; public preview,
+https://docs.github.com/en/copilot/reference/acp-server); one-shot runs are `-p`, a session resumes with `--resume` /
+`--continue`, `--model`, permission flags (`--allow-tool`, `--allow-all-tools`…), hooks only from its own files
+(`~/.copilot/hooks/*.json`, a repo's `.github/hooks`: never written by Laki), its version by `copilot version` (agentCli.ts'
+`ver`), its update `copilot update`, npm's `@github/copilot` for the newest; skills in `~/.copilot/skills`, its MCP
+servers in `~/.copilot/mcp-config.json`'s `mcpServers` (skill.ts). Over ACP it's an ACP tab like any (its turns, asks,
+Stop, `session/load` on a restart). ponytail: no sign-in band (its login is in its own TUI: run `copilot` once) and no
+model menu until its ACP server says its models. `test/copilot.test.ts` (fake: `test/fakes/copilot`).
+
 ### Signed out (A2, C6: `daemon/signin.ts`)
 
 A claude or codex turn that ends signed out (`signedOutIn`: *Not logged in · Please run /login*, an expired or revoked

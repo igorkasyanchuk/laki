@@ -22,7 +22,7 @@ import { TurnStrip } from './TurnStrip'
 import { api, bridge, openExternal, openKeptLink } from './api'
 import { colorOf, wsName } from './appCtx'
 import { hasCap } from '../../shared/caps'
-import { isCursor, notInstalled, tabAgent } from '../../shared/install'
+import { isCopilot, isCursor, notInstalled, tabAgent } from '../../shared/install'
 import { keepFile } from './PromptInput'
 import { pendingWords, prNo } from './text'
 import { resize, tabsOf } from '../../shared/layout'
@@ -131,7 +131,7 @@ export function bodyOf(app: AppCtx) {
                             onInstall={cmd => void call<{ id: string }>('tabNew', { ws: t.workspace, kind: 'shell' }).then(sh => call('send', { target: sh.id, text: cmd, enter: false })).catch(fail)}
                             onAgain={() => void call('input', { tab: t.id, data: '\r' }).catch(fail)}
                           />
-                        ))(tabAgent(t, view?.presets) ?? (t.preset === 'acp' && isCursor(view?.presets.find(x => x.name === t.profile)) ? ('cursor' as const) : undefined))}
+                        ))(tabAgent(t, view?.presets) ?? (t.preset === 'acp' ? (pr => (isCursor(pr) ? ('cursor' as const) : isCopilot(pr) ? ('copilot' as const) : undefined))(view?.presets.find(x => x.name === t.profile)) : undefined))}
                         <SignInStrip tab={t} onAct={act => void call('signIn', { tab: t.id, act }).catch(fail)} />
                         <McpStrip tab={t} onAct={(name, act) => void call<{ ws?: string; tab?: string }>('mcpSignIn', { tab: t.id, name, act }).then(r => r.ws && r.tab && (setReveal(x => [...x, r.ws!]), selectTab({ id: r.tab, workspace: r.ws })), fail)} />
                         <GoalStrip tab={t} onCmd={cmd => void call('send', { target: t.id, text: cmd }).catch(fail)} onOwn={a => void call(a === 'clear' ? 'goalClear' : 'goalSet', { tab: t.id, ...(a === 'resume' && { resume: true }) }).catch(fail)} />

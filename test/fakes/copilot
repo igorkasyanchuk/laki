@@ -1,0 +1,52 @@
+#!/usr/bin/env node
+// fake GitHub Copilot CLI: `copilot version` prints its version; `copilot --acp` speaks ACP v1 on stdio (its public
+// preview's server): initialize (loadSession), session/new, session/load (replays the chat), session/prompt (a prompt
+// with "perm" asks one permission first: a shell command, kind execute), the chat kept in $HOME/.copilot-fake/<id>.json.
+// Every message it gets goes to $FAKE_ACP_LOG, a JSON line each
+const fs = require('fs'), path = require('path')
+const home = path.join(process.env.HOME, '.copilot-fake')
+const args = process.argv.slice(2)
+if (args[0] === 'version') return void process.stdout.write('GitHub Copilot CLI 0.0.400\n')
+if (!args.includes('--acp')) return void (process.stderr.write(`copilot ${args.join(' ')}?\n`), (process.exitCode = 2))
+fs.mkdirSync(home, { recursive: true })
+const log = m => fs.appendFileSync(process.env.FAKE_ACP_LOG || '/dev/null', JSON.stringify({ bin: 'copilot', ...m }) + '\n')
+const out = m => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n')
+const update = (sessionId, update) => out({ method: 'session/update', params: { sessionId, update } })
+const chatOf = id => { try { return JSON.parse(fs.readFileSync(path.join(home, `${id}.json`), 'utf8')) } catch { return { said: [] } } }
+const keep = (id, c) => fs.writeFileSync(path.join(home, `${id}.json`), JSON.stringify(c))
+let n = 1000
+const asked = new Map() // a permission's id → { prompt's id, session, text }
+const answer = (id, sid, text, picked) => {
+  const c = chatOf(sid)
+  const said = `copilot: ${text}${picked ? ` (picked ${picked})` : ''}`
+  c.said.push({ who: 'you', text }, { who: 'agent', text: said })
+  keep(sid, c)
+  update(sid, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: said } })
+  out({ id, result: { stopReason: 'end_turn' } })
+}
+require('readline').createInterface({ input: process.stdin }).on('line', line => {
+  const m = JSON.parse(line)
+  log(m)
+  if (m.method === 'initialize') return out({ id: m.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true }, agentInfo: { name: 'copilot', title: 'GitHub Copilot' }, authMethods: [] } })
+  if (m.method === 'session/new') return (id => (keep(id, chatOf(id)), out({ id: m.id, result: { sessionId: id } })))(`cop-${Date.now().toString(36)}`)
+  if (m.method === 'session/load') {
+    for (const s of chatOf(m.params.sessionId).said) update(m.params.sessionId, { sessionUpdate: s.who === 'you' ? 'user_message_chunk' : 'agent_message_chunk', content: { type: 'text', text: s.text } })
+    return out({ id: m.id, result: {} })
+  }
+  if (m.method === 'session/prompt') {
+    const sid = m.params.sessionId
+    const text = m.params.prompt.map(b => b.text).join('')
+    if (!/perm/.test(text)) return answer(m.id, sid, text)
+    const id = ++n
+    asked.set(id, { p: m.id, sid, text })
+    update(sid, { sessionUpdate: 'tool_call', toolCallId: 'c1', title: 'npm test', kind: 'execute', status: 'pending', rawInput: { command: 'npm test' } })
+    return out({ id, method: 'session/request_permission', params: { sessionId: sid, toolCall: { toolCallId: 'c1', title: 'npm test', kind: 'execute', rawInput: { command: 'npm test' } }, options: [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }, { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' }] } })
+  }
+  if (m.id !== undefined && asked.has(m.id)) {
+    const a = asked.get(m.id)
+    asked.delete(m.id)
+    update(a.sid, { sessionUpdate: 'tool_call_update', toolCallId: 'c1', status: 'completed' })
+    return answer(a.p, a.sid, a.text, m.result?.outcome?.optionId ?? m.result?.outcome?.outcome)
+  }
+  if (m.id !== undefined && m.method) out({ id: m.id, error: { code: -32601, message: `Method not found: ${m.method}` } })
+})

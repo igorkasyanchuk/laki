@@ -7,19 +7,20 @@ import { randomUUID } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { AGENT_NAMES, type AgentCli, type Tab } from '../shared/types.ts'
-import { isCursor } from '../shared/install.ts'
+import { isCopilot, isCursor } from '../shared/install.ts'
 import { changed, log, presetOf, quickNew, run, save, sessions, spawnTab, state } from './core.ts'
 import { inRig } from './dir.ts'
 
 // each CLI: its command, the npm package that carries it (its newest version; an npm install's update), its own
 // updater (installed by its own script: claude update…)
-export const CLIS: { id: string; name: string; cmd: string; npm?: string; self?: string }[] = [
+export const CLIS: { id: string; name: string; cmd: string; npm?: string; self?: string; ver?: string[] }[] = [
   { id: 'claude', name: AGENT_NAMES.claude, cmd: 'claude', npm: '@anthropic-ai/claude-code', self: 'claude update' },
   { id: 'codex', name: AGENT_NAMES.codex, cmd: 'codex', npm: '@openai/codex' },
   { id: 'gemini', name: AGENT_NAMES.gemini, cmd: 'agy', self: 'agy update' }, // Antigravity CLI: its install script's binary, not on npm (ponytail: no newest shown; agy update says)
   { id: 'grok', name: AGENT_NAMES.grok, cmd: 'grok' }, // ponytail: several CLIs carry the name: its package only from an npm install
   { id: 'opencode', name: AGENT_NAMES.opencode, cmd: 'opencode', npm: 'opencode-ai', self: 'opencode upgrade' },
   { id: 'cursor', name: 'Cursor', cmd: 'cursor-agent', self: 'cursor-agent update' },
+  { id: 'copilot', name: 'Copilot', cmd: 'copilot', npm: '@github/copilot', self: 'copilot update', ver: ['version'] }, // its docs name `copilot version`, not --version
 ]
 
 const pathOf = (cmd: string) => (process.env.PATH ?? '').split(':').map(d => d && join(d, cmd)).find(p => p && realOk(p))
@@ -72,7 +73,7 @@ export async function agentVersions(p: { fresh?: boolean } = {}): Promise<AgentC
       const path = pathOf(c.cmd)
       if (!path) return { c }
       const real = realpathSync(path)
-      const version = await run(c.cmd, ['--version'], { timeout: 8000, env: { ...process.env, ...state.settings?.env } }).then(r => /\d+\.\d+\.\d+[\w.+-]*/.exec(`${r.stdout}`)?.[0], () => undefined)
+      const version = await run(c.cmd, c.ver ?? ['--version'], { timeout: 8000, env: { ...process.env, ...state.settings?.env } }).then(r => /\d+\.\d+\.\d+[\w.+-]*/.exec(`${r.stdout}`)?.[0], () => undefined)
       return { c, path, version, ...howOf(real, c.self) }
     }),
   )
@@ -86,7 +87,7 @@ export async function agentVersions(p: { fresh?: boolean } = {}): Promise<AgentC
     const t = u && state.tabs.find(x => x.id === u.tab)
     const s = t && sessions.get(t.id)
     const update = u && t ? { tab: t.id, ws: u.ws, state: !s || !s.exited ? 'running' : s.exitCode === 0 ? 'done' : 'failed', ...(s?.exited && { code: s.exitCode ?? undefined }) } as AgentCli['update'] : undefined
-    const running = state.tabs.filter(x => x.kind === 'agent' && (f.c.id === 'cursor' ? x.preset === 'acp' && isCursor(presetOf(x) ?? { cmd: x.cmd, acp: true }) : x.preset === f.c.id) && sessions.get(x.id) && !sessions.get(x.id)!.exited).length
+    const running = state.tabs.filter(x => x.kind === 'agent' && (f.c.id === 'cursor' || f.c.id === 'copilot' ? x.preset === 'acp' && (f.c.id === 'cursor' ? isCursor : isCopilot)(presetOf(x) ?? { cmd: x.cmd, acp: true }) : x.preset === f.c.id) && sessions.get(x.id) && !sessions.get(x.id)!.exited).length
     const nv = newest.v[f.c.id]
     return { id: f.c.id, name: f.c.name, ...(f.path && { path: f.path, version: f.version, how: f.how, cmd: f.cmd }), ...(nv && { newest: nv }), ...(running && { running }), ...(update && { update }) } as AgentCli
   })

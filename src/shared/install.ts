@@ -23,3 +23,9 @@ export const notInstalled = (t: { kind?: string; status?: string; code?: number 
 export const CURSOR = { name: 'cursor', agent: 'command' as const, cmd: 'cursor-agent acp', acp: true }
 export const CURSOR_INSTALL = { cmd: 'curl https://cursor.com/install -fsS | bash', docs: 'https://cursor.com/docs/cli/overview' }
 export const isCursor = (p?: { cmd?: string; acp?: boolean }) => !!p?.acp && /^\s*(?:\S*\/)?cursor-agent(?:\s|$)/.test(p.cmd ?? '')
+// GitHub Copilot CLI: its ACP server (`copilot --acp`, stdio; public preview, docs.github.com/en/copilot/reference/acp-server),
+// a ready-made profile as Cursor's, in a fresh install's list when copilot is on PATH. Its hooks live only in its own
+// files (~/.copilot/hooks, .github/hooks): ACP's turns are what Laki hears
+export const COPILOT = { name: 'copilot', agent: 'command' as const, cmd: 'copilot --acp', acp: true }
+export const COPILOT_INSTALL = { cmd: 'npm install -g @github/copilot', docs: 'https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli' }
+export const isCopilot = (p?: { cmd?: string; acp?: boolean }) => !!p?.acp && /^\s*(?:\S*\/)?copilot(?:\s|$)/.test(p.cmd ?? '')

@@ -9,7 +9,7 @@ import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '.
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
-import { CURSOR, isCursor } from '../../shared/install'
+import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
@@ -3357,9 +3357,10 @@ export function SettingsPage(p: {
                 </Group>
               ))}
               <div className="row">
-                <select value="" aria-label="Add a profile for another agent" onChange={e => e.target.value && setPresets([...presets, e.target.value === 'cursor' ? { ...CURSOR, name: freeProfile('cursor') } : { name: freeProfile(e.target.value), agent: e.target.value as Preset['agent'], ...wrapNew(e.target.value) }])}>
+                <select value="" aria-label="Add a profile for another agent" onChange={e => e.target.value && setPresets([...presets, e.target.value === 'cursor' ? { ...CURSOR, name: freeProfile('cursor') } : e.target.value === 'copilot' ? { ...COPILOT, name: freeProfile('copilot') } : { name: freeProfile(e.target.value), agent: e.target.value as Preset['agent'], ...wrapNew(e.target.value) }])}>
                   <option value="">Add a profile for…</option>
                   {!presets.some(x => isCursor(x)) && <option value="cursor">Cursor (its agent CLI, cursor-agent)</option>}
+                  {!presets.some(x => isCopilot(x)) && <option value="copilot">GitHub Copilot (its CLI, copilot)</option>}
                   {[...AGENTS, 'command' as const]
                     .filter(a => !presets.some(x => x.agent === a) && !isAccountAgent(a))
                     .map(a => (

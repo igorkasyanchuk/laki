@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- GitHub Copilot's CLI as a ready-made profile (over ACP): Settings › Agents & profiles › Add a profile for…, or found on its own when it's installed.
 - The Proof card compares the Preview's before and after with a slider, side by side or overlaid, and says how much of the picture changed.
 - The side panel in its own window has your extensions' tabs, and the Preview's pick and screenshot there go to the agent you're looking at.
 - *What will this do?* explains Codex's, Antigravity's and Grok's command asks and bigger file changes too.

@@ -53,7 +53,7 @@ import { type Client, Session } from './session.ts'
 import { HostPty, ptyForget, ptyGone, ptyList, ptyOn, ptyPid, ptyTakes, ptyUp, ptyVersion, ptyWhy } from './ptyHost.ts'
 import { AcpPty } from './acp.ts'
 import { SECRETS_DIR, secretsDrop } from './secrets.ts'
-import { CURSOR } from '../shared/install.ts'
+import { COPILOT, CURSOR } from '../shared/install.ts'
 import { type SignedOut, signedOutView, turnSignedOut } from './signin.ts'
 import type { McpAuth } from './mcpAuth.ts'
 import { PTY_PROTO, ptySock } from '../ptyhost/proto.ts'
@@ -155,7 +155,7 @@ export const firstLine = (e: unknown) => String((e as { stderr?: string }).stder
 let found: Preset[] | undefined
 export const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
 // a new install's (settings.sandboxNew) start claude and codex in their sandbox, claude's network to its list (netList)
-export const presets = (): Preset[] => state.settings?.presets ?? (found ??= [...AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(agentBin(a))).map(a => ({ name: a, agent: a }) as Preset), ...(onPath('cursor-agent') ? [{ ...CURSOR }] : [])]).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true, ...(NET_OK[p.agent as Agent]?.includes('list') && { net: 'list' as const }) } : p))
+export const presets = (): Preset[] => state.settings?.presets ?? (found ??= [...AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(agentBin(a))).map(a => ({ name: a, agent: a }) as Preset), ...(onPath('cursor-agent') ? [{ ...CURSOR }] : []), ...(onPath('copilot') ? [{ ...COPILOT }] : [])]).map(p => (state.settings?.sandboxNew && SANDBOX[p.agent as Agent] ? { ...p, sandbox: true, ...(NET_OK[p.agent as Agent]?.includes('list') && { net: 'list' as const }) } : p))
 export const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
 export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 

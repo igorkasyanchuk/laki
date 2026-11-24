@@ -48,6 +48,7 @@ test('A9: Settings › Versions: each CLI, the newest from the registry, a dot i
   assert.deepEqual([by('opencode').version, by('opencode').newest, by('opencode').how, by('opencode').cmd], ['0.8.1', '0.9.0', 'npm', 'npm install -g opencode-ai@latest'])
   assert.deepEqual([by('gemini').name, by('gemini').how, by('gemini').cmd], ['Antigravity', 'its installer', 'agy update'], 'agy: its own script, not npm')
   assert.match(by('cursor').path, /fakes\/cursor-agent$/, 'C6: the fake on PATH')
+  assert.deepEqual([by('copilot').version, by('copilot').cmd], ['0.0.400', 'copilot update'], 'its version by `copilot version`, its own updater')
   assert.ok(asked.includes('/opencode-ai/latest'))
   assert.deepEqual((await rig.rpc('state')).agentUpdates, ['Claude Code', 'OpenCode'], 'the dot: newer ones out')
 
