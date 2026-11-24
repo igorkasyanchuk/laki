@@ -489,7 +489,7 @@ test('wrapper sandbox: a wrapped agy starts through sandbox-exec; a missing one 
   assert.equal((await rig.rpc('state')).presets.find((x: { name: string }) => x.name === 'gem-box').wrap, 'macos')
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gem-box', prompt: 'hello' })
   const run = await until(() => rig.fakeLog().find(l => l.bin === 'agy'), 'agy, through the wrapper')
-  assert.ok(run.args.includes('hello'))
+  assert.ok(run.args.some((a: string) => a.endsWith('\n\nhello'))) // after Laki's note (core.ts memoryFirst)
   const said = readFileSync(args, 'utf8').split('\0')
   assert.equal(said[0], '-p')
   assert.match(said[1], /^\(version 1\)\n\(allow default\)/)

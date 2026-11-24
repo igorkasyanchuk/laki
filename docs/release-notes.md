@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Antigravity, Grok and OpenCode get your project's memory at start too, as Claude Code and Codex do; What it sees says how each one gets it.
 - Labs: HDR glow lights the edge glow and the newest Needs you card brighter than white on an HDR display, with a probe in Appearance to see whether yours can.
 - On a phone, the bottom bar is a floating glass capsule that folds to its icons as you scroll down and comes back as you scroll up.
 - Dragging a sidebar row, a tab or a Board card lifts it, tilted with a shadow, a gap left where it was.

@@ -1,6 +1,6 @@
 // Settings' agent sections: AI (Laki AI's backend, model, key, spending), Voice, the agent skill, and each agent's
 // accounts in Agents & profiles. Settings.tsx re-exports it.
-import { type Account, type AccountAgent, type AccountView, type Agent, type AgentCli, type AgentContext, AGENT_NAMES, skillNotes, type AgentUsage, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
+import { type Account, type AccountAgent, type AccountView, type Agent, type AgentCli, type AgentContext, AGENT_NAMES, skillNotes, type AgentUsage, AI_CONTEXT_MAX, MEMORY_HOW, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type Doctor, EFFORTS, HOME_ACCOUNT, IMAGE_DAYS, type Preset, VOICE_MODEL, type VoiceModel, type VoiceSettings } from '../../shared/types'
 import { useEffect, useRef, useState } from 'react'
 import { heardText, micTest, TEST_MS, useLevel } from './voice'
 import { SILENCES } from '../../shared/talk'
@@ -810,7 +810,7 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
             <p className="muted small">No {agent === 'claude' ? 'CLAUDE.md' : 'AGENTS.md'} files.</p>
           )}
           <p className="muted small">
-            Laki's memory, added to its instructions: {c.memory.global} global, {c.memory.mine} of this project's from you, {c.memory.learned} learned ({kb(c.memory.bytes)}).
+            Laki's memory, added to its instructions {MEMORY_HOW[agent]}: {c.memory.global} global, {c.memory.mine} of this project's from you, {c.memory.learned} learned ({kb(c.memory.bytes)}). The other agents get it too: {Object.entries(MEMORY_HOW).filter(([a]) => a !== agent).map(([a, how]) => `${AGENT_NAMES[a as Agent] ?? a} ${how}`).join(', ')}.
           </p>
           {!!c.held?.length && (
             <>

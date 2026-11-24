@@ -356,6 +356,13 @@ Claude and Codex are told about Laki at every start (`LAKI_NOTE` and Settings' g
 the preset's args set their own, nor for codex when its `config.toml` has `developer_instructions` (`codexOwn`: `-c` would
 replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki new .`, `laki browser`,
 `$LAKI_STORAGE_FOLDER` (`STORAGE_NOTE`: files, and a link to what it publishes). The CLI's `rename`/`pr` take `.` for `$LAKI_WORKSPACE` (`wsSet` name, `prAttach`).
+The other agents get the same text (its byte cap and control-character filter are `memoryNote`'s), each its own way
+(types.ts `MEMORY_HOW`, shown in What it sees): grok by `--rules` ("extra rules to append to the system prompt", from its
+`--help`; each start, a resume too: not in the chat), OpenCode by its config's `instructions` (`OPENCODE_CONFIG_CONTENT`,
+with a profile's own and its model: a 0600 file of the tab's, `<data>/opencode/notes/<tab>.md`, `memoryFile`, gone with
+the tab), and agy, which has no flag or setting for it, in front of a new chat's first message (`memoryFirst`: fenced,
+introduced as background rules, the task after it): its `-i` prompt, else the first message Laki types into it (the
+tab's `noteDue`: `send` and a queued one's `deliver`, `noteFirst`); a resumed agy chat isn't told again.
 
 Hooks in the background: this Mac's claude runs its PreToolUse and PostToolUse hooks with `"async": true` (claude
 2.1.318 has it; it doesn't wait, and it enforces no timeout on them), so a tool call no longer waits for two starts of

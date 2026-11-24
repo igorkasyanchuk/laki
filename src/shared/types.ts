@@ -1300,6 +1300,10 @@ export type HookSeen = { at?: number; tabs: number; deaf: number; native?: Nativ
 // name only, tokens masked; off: turned off in its config)
 export type AgentRule = { path: string; at: string; scope: 'managed' | 'user' | 'project' | 'local'; size: number; from?: string }
 export type AgentServer = { name: string; scope: 'user' | 'project' | 'local' | 'laki'; file: string; transport: string; command?: string; args?: string[]; url?: string; env?: string[]; headers?: string[]; off?: boolean; signIn?: true /* a live tab of this agent here says it needs a sign-in (mcpAuth.ts) */ }
+// how Laki's note (its own and the project's memory) reaches each agent at start (core.ts agentCmd): a flag of its own
+// (claude's --append-system-prompt, codex's developer_instructions, grok's --rules, opencode's config instructions), or,
+// with none (agy), in front of a new chat's first message
+export const MEMORY_HOW: Record<string, 'by flag' | 'in the first message'> = { claude: 'by flag', codex: 'by flag', grok: 'by flag', opencode: 'by flag', gemini: 'in the first message' }
 export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; profile?: string; envAllow?: string[]; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[]; skills?: AgentSkill[] /* every agent's (sees.ts skillsAudit): what each loads, by size, for drift between them */ }
 // an agent's skill (its skills/<name>/SKILL.md in its folder, or a project's .claude/skills, .codex/skills): approxTokens
 // its size over 4; frontmatterBytes what every session reads of it (the rest loads when it's used)

@@ -1,6 +1,6 @@
 // Each agent in the daemon: claude's hooks, codex's notify, grok's quiet screen, agy's OSC 7501, opencode's plugin.
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { agentRuns, agyResume } from '../src/daemon/core.ts'
@@ -118,7 +118,7 @@ test('grok: Laki picks its chat id, a quiet screen ends its turn, a restart resu
   await rig.stop()
   await rig.start()
   await until(() => rig.fakeLog().filter(l => l.bin === 'grok').length === 2, 'grok restarted')
-  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'grok')[1].args, ['--resume', tab.resumeId])
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'grok')[1].args.slice(0, 3), ['--resume', tab.resumeId, '--rules']) // Laki's note each start: memory test below
 })
 
 test('grok, agy and opencode: a scheduled task, a workflow agent block and sleep each work as for claude', async t => {
@@ -163,7 +163,8 @@ test('agy (the gemini agent): no hooks, its OSC 7501 says each turn and ask; the
   assert.ok((await rig.rpc('state')).presets.some((x: any) => x.name === 'gemini'), 'agy on PATH: a default preset')
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gemini', prompt: 'hello agy' })
   const run = await until(() => rig.fakeLog().find(l => l.bin === 'agy'), 'agy up')
-  assert.deepEqual(run.args, ['-i', 'hello agy']) // interactive: -p would answer and exit
+  assert.deepEqual([run.args.length, run.args[0]], [2, '-i']) // interactive: -p would answer and exit
+  assert.match(run.args[1], /^Background rules from Laki[^]*\n```\n\nhello agy$/) // Laki's note in front of a new chat's first message
   const tab = await rig.tab(ws.id)
   await until(async () => (await rig.screen(tab.id)).includes('answer: hello agy'), 'its answer')
   await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle: state=done', 3000) // not 8 s of a quiet screen
@@ -221,11 +222,11 @@ test("opencode's model: in its inline config, not -m (some TUIs refuse it), over
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, name: 'glm', preset: 'opencode', model: 'openrouter/z-ai/glm-5.3', prompt: 'hi' })
   const run = await until(() => rig.fakeLog().find(l => l.bin === 'opencode'), 'opencode up')
-  assert.deepEqual([run.args, JSON.parse(run.config)], [['--prompt', 'hi'], { model: 'openrouter/z-ai/glm-5.3' }])
+  assert.deepEqual([run.args, JSON.parse(run.config).model, JSON.parse(run.config).instructions.length], [['--prompt', 'hi'], 'openrouter/z-ai/glm-5.3', 1]) // and Laki's note as its instructions
   await rig.rpc('settingsSet', { presets: [{ name: 'kimi', agent: 'opencode', model: 'openrouter/moonshotai/kimi-k3', env: { OPENCODE_CONFIG_CONTENT: '{"theme":"x","model":"old"}' } }] })
   await rig.rpc('wsNew', { project: p.id, name: 'kimi', preset: 'kimi', prompt: 'hi' })
   const two = await until(() => rig.fakeLog().filter(l => l.bin === 'opencode')[1], 'the profile one')
-  assert.deepEqual(JSON.parse(two.config), { theme: 'x', model: 'openrouter/moonshotai/kimi-k3' })
+  assert.deepEqual((({ instructions, ...o }) => [o, instructions.length])(JSON.parse(two.config)), [{ theme: 'x', model: 'openrouter/moonshotai/kimi-k3' }, 1])
   // one opencode doesn't know (it would start on its last used one, saying nothing): refused before anything is made, the close ones named
   const before = (await rig.rpc('state')).workspaces.length
   await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'guess', preset: 'opencode', model: 'openrouter/mistralai/mistral-large-4', prompt: 'hi' }), /opencode doesn't know the model openrouter\/mistralai\/mistral-large-4: [^]*close: openrouter\/mistralai\/mistral-large-4-0, openrouter\/mistralai\/mistral-large-2512/)
@@ -387,4 +388,57 @@ test("No, and say why: the tell-why choice, then the words as its next prompt; a
   await sleep(300) // answer's hold (core's answering: 0.2 s after the last one here)
   assert.deepEqual(await rig.rpc('answer', { tab, n: 2, say: 'build it first' }), { picked: 'No' })
   await until(async () => /picked: No\r?\n[\s\S]*answer: build it first/.test(await screen()), 'the No, then the words')
+})
+
+// a project's memory reaches every agent at start: claude by --append-system-prompt, codex by developer_instructions,
+// grok by --rules, opencode by its config's instructions (a 0600 file of the tab's), agy in front of its new chat's
+// first message (fenced, as background rules); once each, and a resumed agy chat isn't told again
+test("a project's memory: every agent gets it once at start, by flag or in a new chat's first message; not again on a resume", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const LINE = 'Prices are in cents, never floats'
+  await rig.rpc('memoryAdd', { project: p.id, text: LINE, auto: false })
+  const count = (s: string) => s.split(LINE).length - 1
+  const runs: Record<string, any> = {}
+  for (const preset of ['grok', 'opencode', 'gemini', 'claude', 'codex']) {
+    const ws = await rig.rpc('wsNew', { project: p.id, preset, name: `m-${preset}`, prompt: 'start here' })
+    const bin = preset === 'gemini' ? 'agy' : preset
+    runs[preset] = { ws, run: await until(() => rig.fakeLog().find(l => l.bin === bin && l.args.join(' ').length && (preset !== 'claude' || l.args.includes('--append-system-prompt'))), `${preset} up`) }
+  }
+  const all = (r: any) => [...r.args, r.config ?? ''].join('\n')
+  // by flag: in its args once (grok's --rules)
+  const g = runs.grok.run
+  assert.equal(count(g.args[g.args.indexOf('--rules') + 1]), 1, "grok's --rules has it")
+  assert.equal(count(all(g)), 1)
+  // opencode: its config names a file that has it; its args don't
+  const oc = runs.opencode.run
+  const cfg = JSON.parse(oc.config)
+  assert.equal(cfg.instructions.length, 1)
+  assert.equal(count(readFileSync(cfg.instructions[0], 'utf8')), 1)
+  assert.equal((statSync(cfg.instructions[0]).mode & 0o777).toString(8), '600')
+  assert.equal(count(oc.args.join(' ')), 0)
+  // agy: the first message (-i), fenced, then the prompt
+  const ag = runs.gemini.run
+  const first = ag.args[ag.args.indexOf('-i') + 1]
+  assert.equal(count(first), 1)
+  assert.match(first, /^Background rules from Laki for this project[^]*```text\n[^]*\n```\n\nstart here$/)
+  // claude and codex as before: once each
+  assert.equal(count(all(runs.claude.run)), 1)
+  assert.equal(count(all(runs.codex.run)), 1)
+  // resumed after a restart: agy's chat isn't told again; the flags are each start's (not in the chat), once
+  const before = rig.fakeLog().length
+  await rig.stop()
+  await rig.start()
+  const again = (bin: string) => until(() => rig.fakeLog().slice(before).find(l => l.bin === bin), `${bin} resumed`, 15000)
+  const ag2 = await again('agy')
+  assert.equal(count(all(ag2)), 0, "agy's resumed chat: not again")
+  assert.equal(count(all(await again('grok'))), 1)
+  // an agy chat started with no prompt: the first message Laki types into it carries the note, the next doesn't
+  const quiet = await rig.rpc('wsNew', { project: p.id, preset: 'gemini', name: 'm-quiet' })
+  const qt = await until(async () => (x => x?.status === 'idle' && x)(await rig.tab(quiet.id)), 'agy idle', 15000)
+  assert.equal(count(all(await until(() => rig.fakeLog().filter(l => l.bin === 'agy').at(-1), 'its run'))), 0, 'no prompt: nothing in its args')
+  await rig.rpc('send', { target: qt.id, text: 'first words' })
+  await until(async () => (await rig.rpc('screen', { target: qt.id, lines: 80 })).includes('first words'), 'typed')
+  const scr = await rig.rpc('screen', { target: qt.id, lines: 200 })
+  assert.equal(count(scr.replace(/\s+/g, ' ')), 1, 'the first message has it')
 })

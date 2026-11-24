@@ -16,7 +16,8 @@ const conv = (args.find(a => a.startsWith('--conversation=')) ?? '').slice(15) |
 let osc = false
 const say = st => osc && process.stdout.write(`\x1b]7501;state=${st}\x07`)
 let asking = ''
-const turn = t => {
+const turn = all => {
+  const t = all.includes('\n```\n\n') ? all.slice(all.lastIndexOf('\n```\n\n') + 6) : all // Laki's fenced note first (core.ts memoryFirst): the task is after it
   if (t.startsWith('/')) return void process.stdout.write(`${t}: done here, no turn\r\n> `) // a command of its own: no OSC 7501
   say('working')
   process.stdout.write('⠋ Thinking... (esc to cancel)\r\n')

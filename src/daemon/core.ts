@@ -166,7 +166,7 @@ export type Runtime = { held?: string /* F15: the always-ask glob its ask touche
   waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a
   project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm;
   permCmd?: string; permCut?: boolean; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number;
-  last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string;
+  last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; noteDue?: string /* agy's: Laki's note, in front of the first message typed into a new chat (memoryFirst) */; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string;
   published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string; saved?: 'project' | 'all' };
   changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait;
   // permCmd: a Bash ask's whole command (2,000 characters at most; perm's what is a line of 300), with it, for askExplain; permCut: it was longer than that;
@@ -2083,6 +2083,16 @@ function statusLineEnv(ws: Workspace, tab: Tab): Record<string, string> {
   return { LAKI_STATUSLINE_DIR: statusDir, ...(own && { LAKI_STATUSLINE_CMD: own }) }
 }
 
+// Laki's note (its own and the project's memory) for an agent with no flag that adds instructions (agy): in front of the
+// first message of a new chat, fenced, said to be background rules and not the task. memoryFile: OpenCode's, a 0600
+// file of the tab's its config's instructions name (gone with the tab: tabFilesGone)
+export const memoryFirst = (note: string, text: string) => `Background rules from Laki for this project (context for the whole chat, not a task; the task follows after them):\n\n\`\`\`text\n${note.replace(/\`\`\`/g, "'''")}\n\`\`\`\n\n${text}`
+function memoryFile(tab: Tab, note: string) {
+  const f = join(dir, 'opencode', 'notes', `${tab.id.replace(/[^\w.-]/g, '')}.md`)
+  mkdirSync(dirname(f), { recursive: true, mode: 0o700 })
+  writeAtomic(f, note, 0o600)
+  return f
+}
 // an agent's command line, and its values: a plain word goes in as it is, anything else in the tab's env (LAKI_ARG_n)
 // named as "$LAKI_ARG_n", which sh, bash, zsh and fish all expand whole and never read as code (fish reads \' inside
 // single quotes as an escape: q's quoting would let a prompt out). ponytail: the values are in the agent's environment
@@ -2135,11 +2145,15 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     // exit line was read (agy's /resume) is resumed as the old one
     const solo = !state.tabs.some(t => t.id !== tab.id && t.workspace === tab.workspace && t.preset === 'gemini')
     argv = again ? ['agy', `--conversation=${again}`] : resume && solo ? ['agy', '-c'] : ['agy']
+    // no flag or setting of its own adds instructions: a new chat's first message carries Laki's note (memoryFirst),
+    // fenced; the prompt it starts with, else the first one Laki types into it. A resumed chat had it already
+    if (told && !resume) ask.length ? (ask = [memoryFirst(told, ask[0])]) : (rtOf(tab.id).noteDue = told)
     if (ask.length) ask = ['-i', ...ask] // -p would answer it and exit
   } else if (tab.preset === 'grok') {
     // grok takes the id of a new chat, so the tab knows its chat from the start
     if (!again) (tab.resumeId = randomUUID()), save()
     argv = ['grok', again ? '--resume' : '--session-id', tab.resumeId!]
+    if (told && !pr?.args?.includes('--rules')) argv.push('--rules', told) // "extra rules to append to the system prompt": each start (not in the chat, so a resume needs them again)
   } else if (tab.preset === 'opencode') {
     argv = again ? ['opencode', '--session', again] : ['opencode']
     if (ask.length) ask = ['--prompt', ...ask] // its positional is a folder
@@ -2153,12 +2167,16 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const effort = tab.effort || (EFFORTS[tab.preset as Agent]?.includes(pr?.effort ?? '') ? pr!.effort : undefined)
   // opencode's model goes in its inline config: some versions' TUI refuses -m ("Unrecognized flag"), every one reads
   // OPENCODE_CONFIG_CONTENT, over a preset's own of it. ponytail: one in settings' or the project's env is replaced
-  if (model && tab.preset === 'opencode') {
+  // its instructions too: Laki's note in a 0600 file of the tab's (<data>/opencode/notes), named in the config's
+  // instructions with a preset's own (OpenCode reads them as rules, every start)
+  const ocNote = tab.preset === 'opencode' && told && h === localHooks ? memoryFile(tab, told) : undefined
+  if ((model || ocNote) && tab.preset === 'opencode') {
     let own: unknown = {}
     try {
       own = JSON.parse(pr?.env?.OPENCODE_CONFIG_CONTENT ?? '{}')
     } catch {}
-    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...(own && typeof own === 'object' && !Array.isArray(own) ? own : {}), model })
+    const o = (own && typeof own === 'object' && !Array.isArray(own) ? own : {}) as Record<string, unknown>
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...o, ...(model && { model }), ...(ocNote && { instructions: [...(Array.isArray(o.instructions) ? o.instructions : []), ocNote] }) })
   }
   const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' || tab.preset === 'gemini' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' || tab.preset === 'gemini' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs, pr?.net) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
@@ -3278,6 +3296,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
 function tabFilesGone(id: string) {
   rmSync(join(dir, 'net', `${id}.json`), { force: true })
   rmSync(join(dir, 'mcp', `${id}.json`), { force: true })
+  rmSync(join(dir, 'opencode', 'notes', `${id.replace(/[^\w.-]/g, '')}.md`), { force: true }) // memoryFile's
   proxyDrop(id)
 }
 
@@ -4984,11 +5003,19 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
       return { tab: tab.id, queued: tab.queue.length }
     }
   }
-  typeInto(s, textFor(tab, p.text))
+  typeInto(s, textFor(tab, noteFirst(tab, p.text)))
   promptTyped(tab, p.text)
   if (tracked(tab)) r.status = 'running'
   changed()
   return { tab: tab.id, sent: true }
+}
+// agy's new chat started with no prompt: the first message Laki types carries the note (agentCmd's noteDue), once
+export function noteFirst(tab: Tab, text: string) {
+  const r = rtOf(tab.id)
+  if (!r.noteDue) return text
+  const note = r.noteDue
+  delete r.noteDue
+  return memoryFirst(note, text)
 }
 // an agent with no hooks (agy, grok) says no prompt it took: what Laki types into it stands for its UserPromptSubmit
 // (the workspace's title, A1b's goal paused by yours). ponytail: one typed in its terminal by hand isn't seen
@@ -5007,7 +5034,7 @@ function deliver(id: string) {
   if (!tab.queue.length) delete tab.queue
   save()
   wsLog({ id: tab.workspace }, `to ${tab.name}: a queued message typed in${tab.queue?.length ? ` (${tab.queue.length} more waiting)` : ''}: ${msg.split('\n')[0].slice(0, 120)}`)
-  typeInto(s, textFor(tab, msg))
+  typeInto(s, textFor(tab, noteFirst(tab, msg)))
   promptTyped(tab, msg)
   r.status = 'running'
   changed()

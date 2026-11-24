@@ -17,7 +17,7 @@ const turn = t => {
   if (t.startsWith('ask')) return void ((asking = t), title('⚠ Action Required - s - grok'), process.stdout.write('allow? (y/n)\r\n'))
   setTimeout(() => (title('s - grok'), process.stdout.write(`answer: ${t}\r\n> `)), 300)
 }
-const flags = ['--resume', '--session-id', '--model']
+const flags = ['--resume', '--session-id', '--model', '--rules']
 const positional = args.filter((a, i) => !a.startsWith('--') && !flags.includes(args[i - 1]))
 process.stdin.setRawMode(true) // before its banner: keys sent once it shows are read raw (cooked, a \r would be a \n)
 if (positional.length) turn(positional.at(-1))
