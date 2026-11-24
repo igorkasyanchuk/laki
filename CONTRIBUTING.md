@@ -45,8 +45,9 @@ LAKI_HOME=/tmp/laki-x/data node bin/laki.js stop        # afterwards (and stop v
 
 ## How the code works
 
-[AGENTS.md](AGENTS.md) is the map: build and test, the architecture, the invariants, every file and the conventions. It's
-written for coding agents: give it to yours. How each part works and why it's so is in [docs/dev/](docs/dev/), a file per
+[AGENTS.md](AGENTS.md) is the map: build and test, the architecture, the invariants and the conventions; what each file
+is, in the AGENTS.md of its folder (`src/daemon/AGENTS.md`, `test/AGENTS.md`…: the root's at most 20 KB,
+`test/docs.test.ts`). It's written for coding agents: give it to yours. How each part works and why it's so is in [docs/dev/](docs/dev/), a file per
 part; read the one for the part you're changing.
 
 ## A pull request

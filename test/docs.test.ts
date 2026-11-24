@@ -1,4 +1,4 @@
-// The numbers the docs state, kept true: AGENTS.md's API range and achievements count, docs/api-history.md's last entry,
+// The numbers the docs state, kept true: AGENTS.md's API range, src/shared/AGENTS.md's achievements count, docs/api-history.md's last entry,
 // and the themes count in docs/features.md and docs/guide.md (no daemon: in test:fast)
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -16,7 +16,7 @@ test("the docs' numbers: API's range and last entry, the achievements, the theme
   assert.equal(Number(/what each `API` number added, 1 to (\d+)/.exec(agents)?.[1]), API, 'AGENTS.md: "1 to N" is src/shared/types.ts API')
   const last = read('docs/api-history.md').trimEnd().split('\n').reverse().find(l => /^\d+: /.test(l))
   assert.equal(Number(last?.split(':')[0]), API, "docs/api-history.md's last entry is API")
-  assert.equal(Number(/the achievements \((\d+)\)/.exec(agents)?.[1]), ACHIEVEMENTS.length, 'AGENTS.md: achievements (N)')
+  assert.equal(Number(/the achievements \((\d+)\)/.exec(read('src/shared/AGENTS.md'))?.[1]), ACHIEVEMENTS.length, 'src/shared/AGENTS.md: achievements (N)')
   const looks = THEMES.filter(t => t.look).length
   assert.match(read('docs/features.md'), new RegExp(`\\b${THEMES.length} themes, ${looks} of which`), 'docs/features.md: N themes, M of which change shapes')
   assert.match(read('docs/guide.md'), new RegExp(`\\b${THEMES.length} themes\\b`), 'docs/guide.md: N themes')
@@ -97,4 +97,15 @@ test("SECURITY.md: the settings it says an agent can and can't change are gates.
     assert.ok(cant.includes(name), `SECURITY.md says an agent can't change ${name}`)
     for (const k of keys) assert.ok(!AGENT_SETTINGS_OK.has(k) && (AGENT_SETTINGS_NO.has(k) || REMOTE_KEYS.test(k)), `${name}: ${k} is the user's`)
   }
+})
+
+// AGENTS.md is read into every agent's session: the root stays a map (its Files rows live in each folder's AGENTS.md),
+// and every source file of the daemon, main and shared is named somewhere an agent reads
+test('AGENTS.md: the root at most 20,000 bytes; every .ts in src/daemon, src/main and src/shared named in an AGENTS.md or docs/dev', () => {
+  const root = new URL('..', import.meta.url).pathname
+  assert.ok(statSync(join(root, 'AGENTS.md')).size <= 20_000, `AGENTS.md is ${statSync(join(root, 'AGENTS.md')).size} bytes: move a folder's details to its own AGENTS.md`)
+  const walk = (d: string): string[] => readdirSync(join(root, d), { withFileTypes: true }).flatMap(e => (e.name === 'node_modules' || e.name.startsWith('.') || ['dist', 'out'].includes(e.name) ? [] : e.isDirectory() ? walk(join(d, e.name)) : e.name === 'AGENTS.md' ? [join(d, e.name)] : []))
+  const docs = [...walk('.'), ...readdirSync(join(root, 'docs/dev')).filter(f => f.endsWith('.md')).map(f => `docs/dev/${f}`)].map(read).join('\n')
+  const missing = ['src/daemon', 'src/main', 'src/shared'].flatMap(d => readdirSync(join(root, d)).filter(f => f.endsWith('.ts')).filter(f => !docs.includes(`${d.slice(4)}/${f}`) && !new RegExp(`[\`(]${f.replace('.', '\\.')}\\b`).test(docs)).map(f => `${d}/${f}`))
+  assert.deepEqual(missing, [], 'name each in its folder\'s AGENTS.md (a row of its table) or the docs/dev page of its part')
 })

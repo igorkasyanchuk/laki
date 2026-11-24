@@ -1,4 +1,4 @@
-// Off the app's own binary for what runs as node (AGENTS.md "Fuses", docs/dev/helper.md): the app's binary has the
+// Off the app's own binary for what runs as node (build/AGENTS.md "Fuses", docs/dev/helper.md): the app's binary has the
 // runAsNode fuse off, so hooks, the CLI, `laki mcp`, the daemon and what it starts (the pty host, extensions' scripts)
 // run on Laki Node, a binary of its own inside the bundle with its own copy of Electron's framework (fuse on), its own
 // bundle id and no privacy usage strings (scripts/after-pack.cjs): what it runs doesn't inherit Laki's grants by its

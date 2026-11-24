@@ -1,0 +1,14 @@
+# AGENTS.md: scripts/
+
+What this folder's files are. Read the root [AGENTS.md](../AGENTS.md) first: the commands, the architecture, the invariants, the conventions.
+
+## Notes
+
+- `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
+  window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
+
+## Files
+
+| file | what |
+|---|---|
+| `scripts/` | `dmg.sh` (npm run dmg), `audit.ts` and `audit-allow.json` (npm run audit:deps), `demo.ts`, `ui-smoke.ts`, `cov.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts`, `icon-packs.ts` |
