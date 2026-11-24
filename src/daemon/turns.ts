@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { createInterface } from 'node:readline'
 import { basename, join, sep } from 'node:path'
 import { AGENT_NAMES, aiOn, type Tab, type TurnFile, type TurnKept, type Workspace } from '../shared/types.ts'
-import { addTab, broadcast, changed, findWs, input, presets, rtOf, save, sessions, state, storageOf, tabsOf, tracked, turnEnds, turnStarts, wsLog, wsNew } from './core.ts'
+import { addTab, broadcast, changed, findWs, input, presets, reviewNotesTurn, rtOf, save, sessions, state, storageOf, tabsOf, tracked, turnEnds, turnStarts, wsLog, wsNew } from './core.ts'
 import { phoneLong } from './phone.ts'
 import { widgetEvent } from './widgets.ts'
 import { dir } from './dir.ts'
@@ -247,7 +247,9 @@ async function turnEnded(tab: Tab, ws: Workspace) {
     const r = rtOf(tab.id)
     const files = before && before !== after ? await filesOf(ws, before, after) : []
     c.turn = files.length ? { before: before!, after, files } : undefined
-    if (files.length) await turnKeep(ws, { tab: tab.id, name: tab.name, prompt: firstLine(r.asked), started: c.at, before: before!, after, files, cost: costOf(tab) }).catch(e => said(ws, e)) // kept before the view says the turn changed: the strip under the tab asks then (E3's flow caught it missing)
+    const kept = files.length ? await turnKeep(ws, { tab: tab.id, name: tab.name, prompt: firstLine(r.asked), started: c.at, before: before!, after, files, cost: costOf(tab) }).catch(e => said(ws, e)) : undefined // kept before the view says the turn changed: the strip under the tab asks then (E3's flow caught it missing)
+    // the Review tab's comments sent to this tab: changed here or not, by this turn's diff (-U0: the lines it touched)
+    if (before) await reviewNotesTurn(ws, tab.id, c.at, paths => (files.some(f => paths.includes(f.path)) ? g(ws, ['diff', '--no-color', '--no-ext-diff', '--no-renames', '-U0', '--src-prefix=a/', '--dst-prefix=b/', before, after, '--', ...paths]) : Promise.resolve('')), kept?.n).catch(e => said(ws, e))
     c.at = undefined
     r.changes = files.length ? { at: Date.now(), add: files.reduce((n, f) => n + f.add, 0), del: files.reduce((n, f) => n + f.del, 0), n: files.length, files: files.slice(0, TURN_FILES) } : undefined
     changed()

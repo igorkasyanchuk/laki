@@ -15,6 +15,7 @@
 // first change), ⌘⏎ sends to the agent.
 import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent } from 'react'
 import type { Blame, PR } from '../../shared/types'
+import type { ReviewNote } from '../../shared/reviewNotes'
 import { hunkKey, REST, risksOf, startOf, type Walk } from '../../shared/walk'
 import { globTest } from '../../shared/widgetSchema'
 import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_ANNOTS, useAnnots, atHead, canPage, ChangeMap, changeLine, CommentBox, CopyComment, DiffFind, useExpand, diffByFile, type DiffLine, DiffRows, Near, type FileDiff, IMAGE, ImageDiff, lineClass, localStore, NO_DIFF, parentOf, RiskMark, sameLine, ScopeSeg, type Side, ThreadCard, threadKey, useGhViewed, useLoad, useRevert, useScope, useSuggestions, webItems, webSub } from './Diff'
@@ -25,7 +26,7 @@ import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu, ac
 import { fileTree, hunkNext, prName, prNo, reviewList } from './text'
 import './review.css'
 
-export type ReviewNote = { id: string; path: string; line: number; startLine?: number; side: 'LEFT' | 'RIGHT'; body: string; quote: string } // quote: the line as it was
+export type { ReviewNote } // sent ones carry when, to which tab, and what its turn did (shared/reviewNotes.ts)
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)
 export type Talk = { author: string; body: string; at: string; url?: string; state?: string }
 export type ReviewApi = PanelApi & {
@@ -65,6 +66,9 @@ const hash = (s: string) => {
   return (h >>> 0).toString(36)
 }
 const numOf = (l: DiffLine, side: 'LEFT' | 'RIGHT') => (side === 'LEFT' ? l.old : l.new)
+// a sent comment's chip: what its turn did
+const NOTE_SAID = { sent: 'sent', changed: 'changed here', unchanged: 'not changed' } as const
+const NOTE_TIP = { sent: 'Sent to the agent: its turn hasn\'t ended yet', changed: 'Its turn changed these lines', unchanged: 'Its turn left these lines as they were' } as const
 const where = (n: Pick<ReviewNote, 'path' | 'line' | 'startLine' | 'side'>) => `${n.path}:${n.startLine ? `${n.startLine}-` : ''}${n.line}${n.side === 'LEFT' ? ' (taken out)' : ''}`
 // the comments as one message to an agent
 export const reviewText = (notes: ReviewNote[]) =>
@@ -87,7 +91,7 @@ const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous fil
 // next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
 // (asked only then: the queue walks every workspace)
 type Next = { name: string; files?: number; pr: string; more: number; key?: string; go: () => void } // files: its diff's, once scanned
-export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, onOpen, onTight, next }: { ws: string; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: () => Next | undefined }) {
+export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, notesAt, onOpen, onTight, next }: { ws: string; notesAt?: number; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: () => Next | undefined }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
@@ -366,6 +370,17 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     )
     return () => ((on = false), notesFlush())
   }, [ws])
+  // a sent comment's turn ended (the daemon's reviewNotesTurn): what it found, onto this window's copy
+  useEffect(() => {
+    if (!notesAt) return
+    let on = true
+    wsApi.notesGet().then(r => {
+      if (!on) return
+      const by = new Map(r.notes.map(n => [n.id, n]))
+      setNotesNow(ns => (next => (keepFor(NOTES, ws, next.length ? next : undefined), next))(ns.map(n => (d => (d && d.sentAt === n.sentAt && d.state !== n.state ? { ...n, state: d.state, turn: d.turn, hunk: d.hunk } : n))(by.get(n.id)))))
+    }, () => {})
+    return () => void (on = false)
+  }, [notesAt])
   const setNotes = (f: (n: ReviewNote[]) => ReviewNote[]) =>
     setNotesNow(n => {
       const next = f(n)
@@ -448,7 +463,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
     }
   }
   // a line of a file (a comment's, a thread's), unfolded and lit; the filter let go when it hides the file
-  const goLine = (path: string, n?: number, side: 'LEFT' | 'RIGHT' = 'RIGHT') => {
+  const goLine = (path: string, n?: number, side: 'LEFT' | 'RIGHT' = 'RIGHT', end = n) => {
     if (!matches(path)) setQ('')
     setShown([path], true)
     setCur(path)
@@ -459,8 +474,10 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
       if (!el && n && k < 8) return void look(k + 1) // its rows not drawn yet
       if (!el) return sec?.scrollIntoView({ block: 'start' })
       el.scrollIntoView({ block: 'center' })
-      el.classList.add('fr-flash')
-      setTimeout(() => el.classList.remove('fr-flash'), 1600)
+      // its lines lit: the one, or a turn's hunk (What changed) through end
+      const lit = [el, ...Array.from({ length: Math.max(0, Math.min((end ?? n!) - n!, 200)) }, (_, i) => sec?.querySelector<HTMLElement>(`[data-${side === 'LEFT' ? 'old' : 'new'}="${n! + i + 1}"]`))].filter((x): x is HTMLElement => !!x)
+      for (const x of lit) x.classList.add('fr-flash')
+      setTimeout(() => lit.forEach(x => x.classList.remove('fr-flash')), 1600)
     }, 60)
     look(0)
   }
@@ -477,21 +494,34 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState('')
   const [menu, openMenu] = useMenu()
-  const send = (tab: string) => {
-    if (busy || !notes.length) return
+  // sent: kept, stamped (its tab, when), so the turn that answers says what it changed (state); remind: the ones it
+  // didn't, sent again to the tab they went to
+  const fresh = notes.filter(n => !n.sentAt && !n.done)
+  const notDone = notes.filter(n => !n.done)
+  const unchanged = notDone.filter(n => n.state === 'unchanged')
+  const send = (tab: string, out = fresh, remind = false) => {
+    if (busy || !out.length) return
     setBusy(true)
     setSent('')
-    const out = notes
+    const ids = out.map(n => n.id)
     api
-      .send(tab, reviewText(out))
-      .then(() => (setNotes(n => n.filter(x => !out.includes(x))), void api.mark().catch(() => {})), e => setSent(String(e?.message ?? e)))
+      .send(tab, remind ? `${reviewText(out).replace(/^A review of your changes:/, 'Not changed yet, from my review:')}` : reviewText(out))
+      .then(() => {
+        const at = Date.now()
+        setNotes(n => n.map(x => (ids.includes(x.id) ? { ...x, sentAt: at, tab, state: 'sent' as const, turn: undefined, hunk: undefined } : x)))
+        void api.mark().catch(() => {})
+      }, e => setSent(String(e?.message ?? e)))
       .finally(() => setBusy(false))
   }
+  const remind = () => {
+    const to = api.agents.find(a => unchanged.some(n => n.tab === a.id)) ?? api.agents[0] // its tab closed since: the first agent's
+    if (to) send(to.id, unchanged.some(n => n.tab === to.id) ? unchanged.filter(n => n.tab === to.id) : unchanged, true)
+  }
   const post = () => {
-    if (busy || !notes.length) return
+    if (busy || !notDone.length) return
     setBusy(true)
     setSent('')
-    const out = notes
+    const out = notDone
     api
       .post(out.map(({ path, line, startLine, side, body }) => ({ path, line, startLine, side, body })))
       .then(() => (setNotes(n => n.filter(x => !out.includes(x))), void api.mark().catch(() => {})), e => setSent(String(e?.message ?? e))) // GitHub's no: all of them stay
@@ -893,7 +923,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
           <button type="button" className="fr-strip" onClick={() => hideNotes(false)} data-tip={autoOff ? 'The comments: folded while the diff has no room (widen the window, or hide the files)' : 'Show the comments'}>
             <Icon name="messages" />
             <span className="fr-vert">
-              Comments{notes.length > 0 && ` · ${notes.length}`}
+              Comments{notDone.length > 0 && ` · ${notDone.length}`}
               {pr && ' · PR'}
               {pr && ghN > 0 && ` · GitHub ${ghN}`}
             </span>
@@ -906,7 +936,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                 {pr ? (
                   <span className="seg">
                     <button type="button" className={tab === 'mine' ? 'on' : ''} onClick={() => pickTab('mine')} data-tip="Your comments, not sent yet">
-                      Yours{notes.length > 0 && ` ${notes.length}`}
+                      Yours{notDone.length > 0 && ` ${notDone.length}`}
                     </button>
                     <button type="button" className={tab === 'pr' ? 'on' : ''} onClick={() => pickTab('pr')} data-tip={`${prName(pr)}: its title and description`}>
                       PR
@@ -916,30 +946,42 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                     </button>}
                   </span>
                 ) : (
-                  <h3>Comments {notes.length > 0 && <span className="sp-count">{notes.length}</span>}</h3>
+                  <h3>Comments {notDone.length > 0 && <span className="sp-count">{notDone.length}</span>}</h3>
                 )}
                 <span className="grow" />
                 <IconButton icon="chevronsRight" title="Hide the comments" onClick={() => hideNotes(true)} />
               </div>
               {tab === 'mine' ? (
                 <>
-                  {!notes.length && <p className="muted small">Click a line to comment on it, or drag over lines. They wait here until you send them.</p>}
+                  {!notDone.length && <p className="muted small">Click a line to comment on it, or drag over lines. They wait here until you send them.</p>}
                   {shownAnnots.length > 0 && (
                     <button type="button" className="link small" onClick={addAll} title="Each extension's note on a line of this diff, as a comment of yours">
                       Add {shownAnnots.length} extension note{shownAnnots.length === 1 ? '' : 's'}
                     </button>
                   )}
-                  {notes.map(n => (
+                  {notDone.map(n => (
                     <div key={n.id} className={`fr-note ${outdated(n) ? 'outdated' : ''}`}>
                       <div className="fr-note-head">
                         <button className="link small mono" onClick={() => goLine(n.path, n.line, n.side)} data-tip="Go to the line">
                           {where(n)}
                         </button>
-                        {outdated(n) && <span className="tag" data-tip="Its line isn't in the diff as it was any more">outdated</span>}
+                        {n.state ? <span className="tag fr-state" data-state={n.state} data-tip={NOTE_TIP[n.state]}>{NOTE_SAID[n.state]}</span> : outdated(n) && <span className="tag" data-tip="Its line isn't in the diff as it was any more">outdated</span>}
                         <span className="grow" />
                         <IconButton icon="pencil" title="Edit" onClick={() => setEditing(n.id)} />
                         <IconButton icon="x" title="Remove" onClick={() => setNotes(ns => ns.filter(x => x.id !== n.id))} />
                       </div>
+                      {n.state && n.state !== 'sent' && (
+                        <div className="fr-note-acts">
+                          {n.state === 'changed' && (
+                            <button type="button" className="link small" onClick={() => goLine(n.path, n.hunk?.[0], 'RIGHT', n.hunk?.[1])} data-tip={`Its turn's change${n.turn ? ` (turn ${n.turn})` : ''}, lit in the diff`}>
+                              What changed
+                            </button>
+                          )}
+                          <button type="button" className="link small" onClick={() => setNotes(ns => ns.map(x => (x.id === n.id ? { ...x, done: true } : x)))} data-tip="Done with it: under Done">
+                            Accept
+                          </button>
+                        </div>
+                      )}
                       <code className="fr-quote">{n.quote.slice(1).trim() || ' '}</code>
                       {editing === n.id ? (
                         <textarea
@@ -960,20 +1002,36 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                       )}
                     </div>
                   ))}
+                  {unchanged.length > 0 && agent && (
+                    <button type="button" className="link small" disabled={busy} onClick={remind} data-tip="Only the comments its turn didn't change, sent again">
+                      Remind the agent ({unchanged.length})
+                    </button>
+                  )}
+                  {notes.length > notDone.length && (
+                    <details className="fr-done">
+                      <summary>Done {notes.length - notDone.length}</summary>
+                      {notes.filter(n => n.done).map(n => (
+                        <div key={n.id} className="fr-note-done small">
+                          <span className="mono">{where(n)}</span> {n.body}
+                          <IconButton icon="x" title="Remove" onClick={() => setNotes(ns => ns.filter(x => x.id !== n.id))} />
+                        </div>
+                      ))}
+                    </details>
+                  )}
                   {sent && <div className="warn small">{sent}</div>}
                   <div className="fr-send">
                     {agent ? (
                       <span className="split">
-                        <button className="primary" disabled={busy || !notes.length} onClick={() => send(agent.id)} data-tip="One message, when its turn ends · ⌘⏎">
+                        <button className="primary" disabled={busy || !fresh.length} onClick={() => send(agent.id)} data-tip="The comments not sent yet, one message, when its turn ends · ⌘⏎">
                           Send to {agent.name}
                         </button>
-                        {api.agents.length > 1 && <IconButton icon="chevron" title="Another agent" disabled={busy || !notes.length} onClick={e => openMenu(e, api.agents.map(a => ({ label: a.name, icon: 'send', run: () => send(a.id) })))} />}
+                        {api.agents.length > 1 && <IconButton icon="chevron" title="Another agent" disabled={busy || !fresh.length} onClick={e => openMenu(e, api.agents.map(a => ({ label: a.name, icon: 'send', run: () => send(a.id) })))} />}
                       </span>
                     ) : (
                       <span className="muted small">No agent running here</span>
                     )}
                     {pr && (
-                      <button disabled={busy || !notes.length || pr.forge === 'gitlab'} onClick={post} data-tip={pr.forge === 'gitlab' ? 'GitHub only for now: send them to the agent' : `One review on GitHub, as you: each line must be in PR #${pr.number}'s diff`}>
+                      <button disabled={busy || !notDone.length || pr.forge === 'gitlab'} onClick={post} data-tip={pr.forge === 'gitlab' ? 'GitHub only for now: send them to the agent' : `One review on GitHub, as you: each line must be in PR #${pr.number}'s diff`}>
                         Post on {prNo(pr)}
                       </button>
                     )}
@@ -1062,14 +1120,14 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
       </div>
       {nx && (
         // every file viewed (or none changed): the next one to review, ⌘⏎ (keydown.ts reviewNext) unless comments wait to go
-        <div className="fr-next" data-go={notes.length ? undefined : ''} role="status">
+        <div className="fr-next" data-go={fresh.length ? undefined : ''} role="status">
           <Icon name="check" />
           <span className="grow">
             Next: <b>{nx.name}</b>{nx.files !== undefined && ` · ${nx.files} file${nx.files === 1 ? '' : 's'}`} · {nx.pr}
             {nx.more > 0 && <span className="muted"> · {nx.more} more to review</span>}
           </span>
-          <button type="button" className="primary sm" onClick={nx.go} data-tip={notes.length ? 'Your comments here stay; ⌘⏎ sends them first' : undefined}>
-            Review it{nx.key && !notes.length && <kbd>{nx.key}</kbd>}
+          <button type="button" className="primary sm" onClick={nx.go} data-tip={fresh.length ? 'Your comments here stay; ⌘⏎ sends them first' : undefined}>
+            Review it{nx.key && !fresh.length && <kbd>{nx.key}</kbd>}
           </button>
         </div>
       )}

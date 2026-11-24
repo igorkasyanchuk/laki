@@ -310,6 +310,7 @@ export type Workspace = {
   created: number
   archived?: boolean
   imported?: boolean // a worktree made outside Laki (worktreeImport): a delete or archive leaves its folder to git worktree remove
+  notesAt?: number // its Review tab's comments changed by the daemon (a sent one's turn ended: core.ts reviewNotesTurn): an open Review tab reads them again
   setupWait?: boolean // made while its project's .laki.json wasn't trusted: its copy and setup run as you trust it
   noSetup?: boolean // made without its setup script (wsNew noSetup): Run ▾'s Run the setup script (run's setup) clears it
   archivedAt?: number // when (ms), for settings.archivedDays
@@ -1531,7 +1532,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 223
+export const API = 224
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

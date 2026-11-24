@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- A Review tab comment sent to an agent stays, with what its next turn did: *changed here* (What changed lights it) or *not changed* (Remind the agent sends those again); Accept puts it under Done.
+
 ## 0.63.0 · Nov 24, 2026
 
 - Telegram at Control: `/stop` and a workspace's ⏹ Stop end a turn, and 🔀 Merge on a green PR asks once more before it merges; Laki AI's questions come with a button per answer.

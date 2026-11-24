@@ -1186,6 +1186,14 @@ The Review tab's room (U6): FullReview watches its own width (a ResizeObserver o
 `onTight` has App hide the side panel while the Review tab shows (`reviewTight`, back as you leave the tab); under
 `HEAD_MIN` (720px) the head's count is `+a −d` without its "n files".
 
+Sent comments (FullReview's `send`, `remind`): *Send to* sends only those with no `sentAt` and stamps them (`sentAt`,
+`tab`, `state: 'sent'`) instead of dropping them; the daemon sets `changed` or `unchanged` as that tab's next turn ends
+(docs/dev/api.md `reviewNotesSet`) and the workspace's `notesAt` makes the tab read them again (`notesAt` effect: what
+it found onto this window's copy, by id and `sentAt`). Each sent one has a chip (`.fr-state[data-state]`), *What
+changed* (`goLine` with an end: the turn's `hunk` lit, `fr-flash`), *Accept* (`done`: under the *Done n* fold, out of
+the counts and of Post); *Remind the agent (n)* resends the unchanged ones to the tab they went to (the first agent if
+it's gone). A note without the fields is drawn as before.
+
 Walk through (R13): the Review tab head's *Walk through* (ReviewApi's `walk`, App's `reviewApi`: the daemon's
 `reviewSteps`, `review.steps` cap; `walkOff`: Laki AI is off, the button says so; on *PR #n* it says to pick Branch, the
 daemon's diff being the branch's or Uncommitted's). The daemon (ai.ts `reviewSteps`) reads the diff (files.ts `diff`),

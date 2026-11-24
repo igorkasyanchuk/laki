@@ -609,7 +609,10 @@ selected workspace's PR is in the status bar.
   open ones first, resolved folded, a click goes to the line; then the PR's conversation and each review's summary
   (approved, changes requested), with a box under it whose *Comment* (⌘⏎) replies there, as you. Click a line to comment on it, or drag over lines for a range; *Add to the review*
   (⌘⏎) puts it in *Yours*, kept until it's sent, and a comment whose line is no longer in the diff says *outdated*.
-  *Send to <agent>* gives them all to the workspace's agent as one message when its turn ends (▾: another agent);
+  *Send to <agent>* gives the ones not sent yet to the workspace's agent as one message when its turn ends (▾: another
+  agent). Sent ones stay, with a chip: *sent*, then, as that agent's next turn ends, *changed here* (the turn changed
+  their lines, 3 around them, or deleted the file: *What changed* lights its lines in the diff) or *not changed*;
+  *Accept* puts one under *Done*, and *Remind the agent* sends only the ones not changed again;
   *Post on #n* posts them on GitHub as one review, as you; a line not in the PR's diff stops it, by name, and nothing
   goes. A file's pin (p, or its right click's *Pin to the top*) keeps it first in the list and in the diff, in the order
   you pinned them, until you unpin it; kept on this Mac per workspace. Keys: j / k the next or last file, ] / [ the next or

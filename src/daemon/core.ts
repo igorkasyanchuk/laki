@@ -5,6 +5,8 @@
 // reads another's const or let as it loads (test/load-order.test.ts); the data folder is dir.ts', out of it.
 import type { Sent } from '../shared/viewPatch.ts'
 import { artHostOk } from '../shared/artHosts.ts'
+import { noteStates } from '../shared/reviewNotes.ts'
+import type { ReviewNote } from '../shared/reviewNotes.ts'
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
@@ -3367,10 +3369,18 @@ export function reviewNotesSet(p: { ws?: unknown; notes?: unknown }) {
   if (!Array.isArray(p?.notes)) throw new Error('notes: a list')
   if (p.notes.length > NOTES_MAX) throw new Error(`${NOTES_MAX} comments at most`)
   const STR = ['id', 'path', 'body', 'quote']
+  const num = (v: unknown) => v === undefined || (typeof v === 'number' && Number.isFinite(v))
+  const was = new Map((readJson<{ notes: ReviewNote[] }>(notesFile(ws))?.notes ?? []).map(n => [n.id, n]))
   const notes = p.notes.map((n, i) => {
     const o = n && typeof n === 'object' ? (n as Record<string, unknown>) : undefined
     if (!o || STR.some(k => typeof o[k] !== 'string') || typeof o.line !== 'number' || (o.startLine !== undefined && typeof o.startLine !== 'number') || (o.side !== 'LEFT' && o.side !== 'RIGHT')) throw new Error(`comment ${i + 1}: id, path, line, side, body and quote`)
-    const one = { id: o.id, path: o.path, line: o.line, ...(o.startLine !== undefined && { startLine: o.startLine }), side: o.side, body: o.body, quote: o.quote }
+    // sent to an agent: when, its tab, what its turn did (state, turn, hunk), Accept's done
+    if (!num(o.sentAt) || !num(o.turn) || (o.tab !== undefined && (typeof o.tab !== 'string' || !/^[\w.-]{1,64}$/.test(o.tab))) || (o.state !== undefined && !['sent', 'changed', 'unchanged'].includes(o.state as string)) || (o.done !== undefined && typeof o.done !== 'boolean') || (o.hunk !== undefined && !(Array.isArray(o.hunk) && o.hunk.length === 2 && o.hunk.every(x => Number.isInteger(x))))) throw new Error(`comment ${i + 1}: sentAt, tab, state, turn, hunk or done`)
+    const one: ReviewNote = { id: o.id as string, path: o.path as string, line: o.line, ...(o.startLine !== undefined && { startLine: o.startLine as number }), side: o.side, body: o.body as string, quote: o.quote as string }
+    for (const k of ['sentAt', 'tab', 'state', 'turn', 'hunk', 'done'] as const) if (o[k] !== undefined) Object.assign(one, { [k]: o[k] })
+    // what a turn found, set here meanwhile (reviewNotesTurn), isn't undone by a window's copy from before it
+    const old = was.get(one.id)
+    if (old && old.sentAt === one.sentAt && one.state === 'sent' && (old.state === 'changed' || old.state === 'unchanged')) Object.assign(one, { state: old.state, ...(old.turn !== undefined && { turn: old.turn }), ...(old.hunk && { hunk: old.hunk }) })
     if (Buffer.byteLength(JSON.stringify(one)) > NOTE_MAX) throw new Error(`comment ${i + 1}: 4 KB at most`)
     return one
   })
@@ -3378,6 +3388,24 @@ export function reviewNotesSet(p: { ws?: unknown; notes?: unknown }) {
   const at = Date.now()
   writeAtomic(notesFile(ws), JSON.stringify({ notes, at }), 0o600)
   return { at }
+}
+// as a tab's turn ends (turns.ts): its comments sent before that turn started get what the turn did to their lines
+// (noteStates against the turn's diff); the view's notesAt tells an open Review tab to read them again
+export async function reviewNotesTurn(ws: Workspace, tab: string, started: number | undefined, diff: (paths: string[]) => Promise<string>, turn?: number) {
+  const file = notesFile(wsSafe(ws.id))
+  const kept = readJson<{ notes: ReviewNote[] }>(file)
+  const mine = (kept?.notes ?? []).filter(n => n.state === 'sent' && n.tab === tab && n.sentAt !== undefined && (started === undefined || started >= n.sentAt)) // the turn after it was sent (whenIdle: once that tab's idle); ponytail: codex has no turn start: its next end counts
+  if (!mine.length) return
+  const states = noteStates(mine, await diff([...new Set(mine.map(n => n.path))]))
+  const now = readJson<{ notes: ReviewNote[] }>(file) // read again: a window's change meanwhile kept
+  if (!now) return
+  let n = 0
+  const notes = now.notes.map(x => (s => (s && x.state === 'sent' && x.sentAt === mine.find(m => m.id === x.id)?.sentAt ? (n++, { ...x, state: s.state, ...(s.state === 'changed' && turn !== undefined && { turn }), ...(s.hunk && { hunk: s.hunk }) }) : x))(states.get(x.id)))
+  if (!n) return
+  writeAtomic(file, JSON.stringify({ notes, at: Date.now() }), 0o600)
+  ws.notesAt = Date.now()
+  save()
+  changed()
 }
 
 // ⇧⌘T, the + menu's Reopen: a tab you closed back in its workspace (the newest, or index's), its chat resumed, as it

@@ -40,3 +40,10 @@ html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-sof
 .fr-care .seg button { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .fr-care .seg button:not(.on) .icon-svg { color: var(--waiting); }
 .fr-step-bar { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--line); color: var(--muted); }
+/* a sent comment (shared/reviewNotes.ts): its chip by what the agent's turn did, What changed and Accept, Done's fold */
+.fr-state[data-state='changed'] { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, transparent); }
+.fr-state[data-state='unchanged'] { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }
+.fr-note-acts { display: flex; gap: var(--sp-4); }
+.fr-done > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-1); }
+.fr-note-done { display: flex; align-items: center; gap: var(--sp-2); color: var(--muted); padding: var(--sp-1) 0; }
+.fr-note-done .mono { flex: none; }
