@@ -977,7 +977,7 @@ use on its own (reading a file outside its folder), it asks in the chat while it
 chat* (that tool, until *New chat*) or *Deny*; no answer in about 5 minutes is a no. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
 into one line you can open, a pasted image is a thumbnail (a click shows it big), *Stop* ends an ask, *New chat* starts
 over. What you send while it answers waits over the box (✕ takes one back) and goes as one message once the answer
-ends. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
+ends; what you sent from the Mac still waits after Laki restarts, and goes then. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
 goes on), the trash deletes it. A workspace or tab it names is a link: a click
 opens it in Laki (from the bubbles' window too); a tool line's *Open* goes to the workspace it worked on. The *Calls* tab
 lists every ask with its backend and model, tokens in and out, cost and time; *Info* says how it runs and how it's paid

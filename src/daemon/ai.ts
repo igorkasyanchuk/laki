@@ -313,10 +313,13 @@ export function aiMayAlert(chat?: string) {
 // ended: a spec's or brainstorm's chat unused PLAN_CHAT_IDLE: the next ask starts it again, empty
 type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string; allowed?: Set<string>; asked?: boolean; shots?: string[]; queue?: Queued[] } // about: a widget chat's brief for this ask (aboutWidget); allowed: the tools Always in this chat let its agent use
 const threads = new Map<string, Thread>()
-// what you send while it answers (aiAsk queue): kept in memory, the next ask as the answer ends (any end, Stop too);
-// aiUnqueue drops one first. rpc: its sender's own (your window's, a phone's with remote access's gates): it runs with
-// it, never with the ask it waited behind. ponytail: a restart forgets them
+// what you send while it answers (aiAsk queue): the next ask as the answer ends (any end, Stop too); aiUnqueue drops one
+// first. rpc: its sender's own (your window's, a phone's with remote access's gates): it runs with it, never with the ask
+// it waited behind. The Mac's (aiHooks.local's) are kept in the chat's file too (`queued`) and go as it loads again after a
+// restart (aiResume: the AI page's chat as the daemon starts; another chat as it's opened). ponytail: a phone's or
+// Telegram's aren't kept: their sender's gates don't outlive its socket, and a restart never runs them with the Mac's
 type Queued = { text: string; images: string[]; context?: string; rpc: Rpc }
+export const aiHooks: { local?: Rpc } = {} // main.ts: the Mac's own rpc (a window's, the CLI's)
 const QUEUE_MAX = 10
 // the chats whose ask is at work, each its stop: one ask per chat, AI_AT_ONCE chats at a time (a new extension starts
 // while another builds); laki_ask's aiQuestion and aiPermission find theirs by the chat its tools pass (laki mcp's
@@ -338,19 +341,26 @@ function thread(id = ''): Thread {
   const file = !id ? chatPath : id.startsWith('widget:') ? widgetChatFile(id) : AGENT_CHAT.test(id) ? join(dir, `ai-agent-${id.slice(6)}.json`) : planOfChat(id).file // a spec's gone, or off: that says so, each time
   const known = threads.get(id)
   if (known) return known
-  const j = readJson<{ chat?: unknown; resume?: Thread['resume']; at?: unknown; ended?: number }>(file) ?? {}
+  const j = readJson<{ chat?: unknown; resume?: Thread['resume']; at?: unknown; ended?: number; queued?: unknown }>(file) ?? {}
   const t: Thread = { id, file, chat: Array.isArray(j.chat) ? j.chat : [], resume: j.resume ?? {}, at: Number(j.at) || Date.now(), ended: j.ended }
+  const local = aiHooks.local
+  const kept = Array.isArray(j.queued) ? (j.queued as Partial<Queued>[]).filter(q => q && typeof q.text === 'string').slice(0, QUEUE_MAX) : []
+  if (local && kept.length) t.queue = kept.map(q => ({ text: q.text!, images: (Array.isArray(q.images) ? q.images : []).filter((x): x is string => typeof x === 'string' && imageOk(x)), ...(typeof q.context === 'string' && { context: q.context }), rpc: local }))
   for (const m of t.chat) if (m.ask?.perm && m.ask.picked === undefined) m.ask.picked = 'Not answered' // its agent ended with the daemon
   // a Yes to several the daemon ended in the middle of: the one under way, and the ones it never got to, say so
   for (const m of t.chat) if (m.ask?.picked !== undefined) for (const i of m.ask.act?.items ?? []) if (!i.said || i.said === '…') i.said = i.said ? 'not known: Laki quit meanwhile' : 'not done: Laki quit meanwhile'
   if (id && !t.ended && t.chat.length && Date.now() - t.at > PLAN_CHAT_IDLE) t.ended = t.at + PLAN_CHAT_IDLE // ran out while the daemon wasn't looking
   threads.set(id, t)
+  if (t.queue?.length) setImmediate(() => !busy.has(t.id) && drain(t)) // what you'd sent before a restart: it goes now
   return t
 }
+// the AI page's chat as the daemon starts: what was waiting in it goes (main.ts)
+export const aiResume = () => void thread('')
 function changed(t: Thread) {
   t.chat = t.chat.slice(-KEEP)
+  const queued = t.queue?.filter(q => q.rpc === aiHooks.local).map(({ text, images, context }) => ({ text, images, ...(context && { context }) }))
   try {
-    writeAtomic(t.file, JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at, ended: t.ended }), 0o600) // R7: whole or not at all
+    writeAtomic(t.file, JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at, ended: t.ended, ...(queued?.length && { queued }) }), 0o600) // R7: whole or not at all
   } catch {}
   broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy.has(t.id), ended: t.ended, queue: queueOf(t), seenFrom: seenFrom(t) })
 }
@@ -463,8 +473,11 @@ export function aiImage(p: { path: string }) {
   if (!imageOk(p.path)) throw new Error("that image isn't kept any more")
   return dataUrl(p.path)
 }
-// chat: only that chat's ask (none: any, as shutdown and Settings › Resources' Stop)
-export function aiStop(p: { chat?: string } = {}) {
+// chat: only that chat's ask (none: any, as shutdown and Settings › Resources' Stop); quit: the daemon's shutdown, what
+// waits stays in its chat's file for the next start (drain sends nothing)
+let quitting = false
+export function aiStop(p: { chat?: string; quit?: boolean } = {}) {
+  if (p.quit) quitting = true
   const on = [...busy].filter(([id]) => p.chat === undefined || id === p.chat)
   for (const [, kill] of on) kill()
   return { stopped: on.length > 0 }
@@ -569,6 +582,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
 // rpc (one caller's: main.ts aiRpcOf), the rest after it ends; refused before it asked (Laki AI off, too many chats at
 // work): said, not lost, and the next sender's goes; another ask that took the chat first: they wait for its end
 function drain(t: Thread) {
+  if (quitting) return
   const q = t.queue ?? []
   const n = q.findIndex(x => x.rpc !== q[0].rpc)
   const next = q.splice(0, n < 0 ? q.length : n)

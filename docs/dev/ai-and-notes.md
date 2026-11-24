@@ -302,3 +302,5 @@ null (`envJson`). A value still in state.json (v1, a restored older backup) move
 its dated copies are saved without it at once (`scrubCopies`). `laki backup` writes the same copy; its manifest's
 `secrets` names them and says the values stay in this Mac's Keychain (on another Mac: set each again). A diagnostics
 bundle and the logs never have a value (`keysWhere`'s names), the view only in your own window (main.ts' `masked`).
+
+**The queue** (ai.ts `Queued`): what you send while an ask works waits on its chat and goes as the answer ends (`drain`, its sender's rpc). The Mac's (`aiHooks.local`, main.ts' `localAi`) are kept in the chat's file as `queued` (text, images, context; never the rpc) and go as it loads again (`thread`'s load; `aiResume` for the AI page's chat as the daemon starts; another chat as it's opened); shutdown's `aiStop({ quit })` leaves them waiting (`drain` sends nothing then; an RPC's `aiStop` never sets `quit`). A phone's or Telegram's aren't kept: their gates end with their socket. `test/ai.test.ts`.

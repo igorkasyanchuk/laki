@@ -12,7 +12,7 @@ import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import { chatImport, chatList } from './chats.ts'
-import { askExplain, reviewSteps, promptQuestions, promptImprove, agentChat, aiAnswer, aiCredits, aiUsage, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
+import { aiHooks, aiResume, askExplain, reviewSteps, promptQuestions, promptImprove, agentChat, aiAnswer, aiCredits, aiUsage, aiAsk, aiHelp, aiOpenApp, aiShot, aiChatRm, aiChats, aiContinue, aiEndpointKey, aiEndpointTest, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, aiUnqueue, studioChatRm, studioChats, voiceModels, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
@@ -547,7 +547,7 @@ const api = {
   aiOpen: p => aiOpen(p),
   aiChatRm: p => aiChatRm(p),
   aiImage: p => aiImage(p), // a message's pasted image as a data URL
-  aiStop: ({ from, ...p }) => aiStop(core.agentCaller(from) ? { chat: agentChat(String(from.tab)) } : p),
+  aiStop: ({ from, ...p }) => aiStop(core.agentCaller(from) ? { chat: agentChat(String(from.tab)) } : { chat: p.chat }), // quit: shutdown's alone
   aiContinue: p => aiContinue(p), // an ended chat (a spec's, unused 12 hours) taken up again
   aiTick: p => aiTick(p.now), // tests move the clock
   aiKey: p => aiKey(p),
@@ -1198,6 +1198,8 @@ const takesFrom = (method: string) => FROM.has(method) || (RECORDED.has(method) 
 // gates), the same one each time, so a message queued behind another's ask runs with its own sender's (ai.ts drain)
 // and one sender's in a row stay one ask
 const localAi = (method: string, params: unknown) => call(method, params) as Promise<any>
+aiHooks.local = localAi // ai.ts: the queue it keeps across a restart runs with it
+aiResume() // what you'd sent to the AI page's chat before a restart goes now
 const remoteAi = new WeakMap<core.Conn, typeof localAi>()
 const aiRpcOf = (c?: core.Conn) => (!c?.remote ? localAi : (remoteAi.get(c) ?? (r => (remoteAi.set(c, r), r))((method: string, params: unknown) => call(method, params, c) as Promise<any>)))
 const asAgent = (from: Params) => (method: string, params: Params) => {
@@ -2350,7 +2352,7 @@ function shutdown(keep: unknown = false) {
   remoteMod.stopShares()
   remoteMod.remoteDown() // kept in state.json too (D2)
   flowStopAll() // a run block's command
-  aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
+  aiStop({ quit: true }) // its claude -p or codex would go on, and their laki mcp start a daemon again; what waits is kept for the next start
   hostsMod.stopHosts()
   widgetsStop() // dev mode's watchers
   core.queued.clear() // a restart's tabs not started yet: none starts now (each keeps its `again` for the next start)
