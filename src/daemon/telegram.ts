@@ -12,7 +12,7 @@ import { readCapped, writeAtomic } from '../shared/conn.ts'
 import { esc, mdToTg } from '../shared/tgmd.ts'
 import type { Tab, Telegram, TelegramView, TgLevel, Webhook } from '../shared/types.ts'
 import { LIMITS, limitsOf } from './clients.ts'
-import { changed, fileSave, imageSave, log, resolveTarget, rtOf, save, sessions, state, tracked } from './core.ts'
+import { changed, fileSave, imageSave, log, prs, resolveTarget, rtOf, save, sessions, state, tracked } from './core.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
 import { askOfMsg, hidden, pickedFor, takeTap, tgDrop } from './phone.ts'
@@ -102,7 +102,9 @@ const chat = () => T().user!.id
 // our HTML's words without its tags, as plain text
 const plainOf = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
 // main.ts' gate for what a message makes Laki do (TELEGRAM_OK at its level, remote access's answer-level checks), then the call
-export const tgHooks: { call?: (method: string, params: Record<string, unknown>) => Promise<unknown>; ai?: (p: { text: string; images: string[]; context: string }, rpc: (method: string, params?: Record<string, unknown>) => Promise<any>) => Promise<{ text?: string }> } = {} // ai: main.ts' aiAsk
+type AiRpc = (method: string, params?: Record<string, unknown>) => Promise<any>
+// ai: main.ts' aiAsk; aiPick: its aiAnswer (a laki_ask button's tap); aiAsked: Laki AI's open plain question, if any
+export const tgHooks: { call?: (method: string, params: Record<string, unknown>) => Promise<unknown>; ai?: (p: { text: string; images: string[]; context: string }, rpc: AiRpc) => Promise<{ text?: string }>; aiPick?: (p: { id: string; n: number; context: string }, rpc: AiRpc) => Promise<{ text?: string }>; aiAsked?: () => { id: string; text: string; options: string[] } | undefined } = {}
 // P3: trusted clients' limits (clients.ts LIMITS): messages and answers a sliding minute, workspaces a sliding hour
 const used: Record<'send' | 'ws', number[]> = { send: [], ws: [] }
 function spend(kind: 'send' | 'ws') {
@@ -119,7 +121,7 @@ const said = (line: string) => activity({ device: 'Telegram', line }, Date.now()
 export const telegramLog = (p: { n?: unknown } = {}) => activityList(Math.min(1000, Math.max(1, Number(p?.n) || 200)), 'telegram-log')
 const tabWords = (id: unknown) => (t => (t ? `${state.workspaces.find(w => w.id === t.workspace)?.name ?? t.workspace} · ${t.name}` : String(id)))(state.tabs.find(x => x.id === id))
 const lineOf = (method: string, p: Record<string, unknown>) =>
-  method === 'send' ? `to ${tabWords(p.target)}: "${clip80(p.text)}"` : method === 'answer' ? `answered ${tabWords(p.tab)}: ${clip80(p.label ?? p.n)}` : method === 'wsNew' ? `new workspace in ${p.project}: "${clip80(p.prompt)}"` : method === 'dndSet' ? (p.off ? 'Do not disturb off' : `Do not disturb for ${p.minutes} minutes`) : `${method}${p.ws || p.target ? ` (${p.ws ?? tabWords(p.target)})` : ''}`
+  method === 'send' ? `to ${tabWords(p.target)}: "${clip80(p.text)}"` : method === 'answer' ? `answered ${tabWords(p.tab)}: ${clip80(p.label ?? p.n)}` : method === 'wsNew' ? `new workspace in ${p.project}: "${clip80(p.prompt)}"` : method === 'dndSet' ? (p.off ? 'Do not disturb off' : `Do not disturb for ${p.minutes} minutes`) : method === 'stopAll' ? `stopped ${tabWords(p.tab)}` : method === 'aiQuestion' ? `Laki AI asked: "${clip80(p.text)}"` : method === 'prAct' ? `merged ${String(p.ws)}'s PR` : `${method}${p.ws || p.target ? ` (${p.ws ?? tabWords(p.target)})` : ''}`
 const READ = new Set(['state', 'screen', 'diff', 'chatRead']) // chatRead: a card's last reply, read as it shows
 async function act<R = unknown>(method: string, params: Record<string, unknown>): Promise<R> {
   try {
@@ -525,6 +527,7 @@ async function wsView(id: string): Promise<NavView | undefined> {
     text: [`<b>${esc(w.name || w.id)}</b> in ${esc(proj?.name ?? w.project)}${w.branch ? ` · <code>${esc(w.branch)}</code>` : ''}`, ...(lines.length ? lines : ['No agent in it now.']), ...(last ? ['', mdToTg(redact(cut(last, 1500)))] : []), ...(talking ? ['', '💬 Your messages go here.'] : [])].join('\n'),
     kb: [
       [...(tabs.length ? [btn(talking ? '🔇 Stop talking here' : '💬 Talk here', `nav:t:${k}`)] : []), ...(titles || !tabs.length ? [] : [btn('📺 Screen', `nav:s:${k}`), btn('📝 Diff', `nav:d:${k}`)])],
+      [...(levelAtLeast('control') && tabs.some(t => rtOf(t.id).status === 'running') ? [btn('⏹ Stop', `nav:x:${k}`)] : []), ...(levelAtLeast('control') && greenPr(w.id) ? [btn(`🔀 Merge #${greenPr(w.id)!.number}`, `nav:m1:${k}`)] : [])],
       [...(i > 0 ? [btn('⬆ Previous', `nav:w:${kOf(`w:${list[i - 1].id}`)}`)] : []), ...(i >= 0 && i < list.length - 1 ? [btn('⬇ Next', `nav:w:${kOf(`w:${list[i + 1].id}`)}`)] : [])],
       [btn(`⬅ ${proj?.name ?? 'Back'}`, `nav:p:${kOf(`p:${w.project}`)}:${Math.floor(Math.max(0, i) / PAGE)}`), btn('🔄', `nav:w:${k}`)],
     ].filter(r => r.length),
@@ -575,6 +578,16 @@ async function nav(q: Tap, gap: boolean) {
     ans('Your messages go to Laki AI now')
     return void say(AI_HELLO)
   }
+  if (kind === 'q') {
+    // a laki_ask button: its option goes back to Laki AI (aiAnswer), its next answer comes here; the question says what was picked
+    const q = tgHooks.aiAsked?.()
+    const why = aiNo() || (aiAt ? 'Laki AI is still answering' : '')
+    if (why) return ans(why)
+    if (!q || q.id !== a || q.options[Number(c)] === undefined) return void (ans('That question moved on: ask again'), q?.id !== a && edit('<i>That question moved on.</i>'))
+    ans()
+    await edit(`🤖 ${mdToTg(redact(cut(q.text, 1500)))}\n<i>Picked: ${esc(cut(q.options[Number(c)], 80))}</i>`)
+    return aiGo(q.options[Number(c)], [], undefined, { id: q.id, n: Number(c) })
+  }
   if (kind === 'P') return show(projectsView(Number(a) || 0))
   if (kind === 'p') return p ? show(projectView(p, Number(c) || 0)) : old()
   if (kind === 'w') return w ? show(await wsView(w)) : old()
@@ -585,6 +598,18 @@ async function nav(q: Tap, gap: boolean) {
     save()
     said(on ? `talking to ${wsName(w)}` : 'talking stopped')
     return show(await wsView(w), on ? `Your messages go to ${wsName(w)} now` : 'Stopped: reply to a push, or pick again')
+  }
+  if (kind === 'x' || kind === 'm1' || kind === 'm2') {
+    if (!levelAtLeast('control')) return ans('That needs the Control level: Settings › Telegram')
+    if (!w || !shownWs(w)) return old()
+    if (kind === 'x') return void (ans(), say(await stopIn(w)))
+    const pr = greenPr(w)
+    if (!pr || (kind === 'm2' && String(pr.number) !== c)) return show(await wsView(w), 'Not green now (its checks, a conflict, or GitHub would not merge it): look again')
+    // two steps: what it merges, then Merge #n; a stale confirm (another PR since) is refused above
+    if (kind === 'm1') return void (ans(), edit(`Merge <b>#${pr.number}</b> ${esc(cut(pr.title ?? '', 120))} into <code>${esc(pr.base ?? 'its base')}</code>?\nIts checks passed and GitHub would merge it now. It can't be undone from here.`, [[btn(`✅ Merge #${pr.number}`, `nav:m2:${a}:${pr.number}`)], [btn('Cancel', `nav:w:${a}`)]]))
+    ans('Merging…')
+    const r = await act<{ merged?: boolean }>('prAct', { ws: w, act: 'merge' }).then(() => `Merged <b>#${pr.number}</b> in <b>${esc(wsName(w))}</b>.`, e => `Not merged: ${esc(scrub((e as Error).message))}`)
+    return void edit(r, [[btn('⬅ Back', `nav:w:${a}`)]])
   }
   if (kind === 's' || kind === 'd') {
     if (state.telegram?.detail === 'titles') return ans('Titles only is on: nothing off a screen comes here')
@@ -637,7 +662,8 @@ async function nav(q: Tap, gap: boolean) {
 // Laki AI's own chat (the AI page's, on the Mac too); its tools only what this chat may do (act: TELEGRAM_OK at its
 // level, the limits, What Telegram did), its answer back as Telegram's HTML. Never with a CLI backend (claude, codex:
 // their tools call Laki as you, past this gate) nor with Titles only (an answer can carry a screen). One ask at a time.
-// ponytail: its questions (laki_ask) and pages aren't the chat's: it asks in words, and the Mac's AI page shows the rest
+// Its laki_ask (a plain question) comes as buttons, a tap its answer (aiPick); one Laki acts on (a removal, a run, an
+// extension) is refused by the gate: it asks in words, and the Mac's AI page shows the rest
 const AI = '@ai' // focus: Laki AI, not a workspace
 const AI_HELLO = '🤖 <b>Laki AI</b>: ask it anything: type, or send a voice note or a photo. It can look at your workspaces, message their agents and, at Control, start new ones. /talk off stops.'
 const AI_WHERE = "Telegram, on their phone: answer short, in plain Markdown; laki:// links and Laki's pages don't open there. From there your tools do only what the chat may: read the workspaces, screens and diffs, message an agent, and at the Control level start a workspace; anything else is for the Mac"
@@ -675,7 +701,7 @@ async function askAi(m: TgMessage, heardText?: string) {
   }
   if (text || images.length) return aiGo(text, images, m.message_thread_id)
 }
-function aiGo(text: string, images: string[], thread?: number) {
+function aiGo(text: string, images: string[], thread?: number, pick?: { id: string; n: number }) {
   const why = aiNo() || (aiAt ? 'Laki AI is still answering: send it once it has' : !tgHooks.ai ? 'not ready' : '')
   if (why) return void say(esc(why), thread)
   try {
@@ -684,17 +710,22 @@ function aiGo(text: string, images: string[], thread?: number) {
     return void say(esc((e as Error).message), thread)
   }
   aiAt = Date.now()
-  said(`asked Laki AI: "${clip80(text || '(a picture)')}"`)
+  said(pick ? `picked for Laki AI: "${clip80(text)}"` : `asked Laki AI: "${clip80(text || '(a picture)')}"`)
   // its answer to the person who asked: nothing once unpaired or another paired meanwhile (chat() is whoever is now)
   const who = chat()
   const still = () => state.telegram?.user?.id === who
   const typing = () => void (still() && out('sendChatAction', { chat_id: who, action: 'typing', ...(thread && { message_thread_id: thread }) }).catch(() => {}))
   typing()
   const tick = setInterval(typing, 4500)
-  tgHooks
-    .ai!({ text, images, context: AI_WHERE }, aiCall)
+  ;(pick && tgHooks.aiPick ? tgHooks.aiPick({ ...pick, context: AI_WHERE }, aiCall) : tgHooks.ai!({ text, images, context: AI_WHERE }, aiCall))
     .then(
-      r => (t => still() && say(`${mdToTg(redact(cut(t, AI_MAX)))}${t.length > AI_MAX ? "\n<i>The rest: Laki AI's page on your Mac.</i>" : ''}`, thread))((r.text ?? '').trim() || '(no answer)'),
+      r => {
+        if (!still()) return
+        const q = tgHooks.aiAsked?.() // its laki_ask: the question, a button per option
+        const t = (r.text ?? '').trim()
+        if (t || !q) void say(`${mdToTg(redact(cut(t || '(no answer)', AI_MAX)))}${t.length > AI_MAX ? "\n<i>The rest: Laki AI's page on your Mac.</i>" : ''}`, thread)
+        if (q) void out('sendMessage', { chat_id: who, text: `🤖 ${mdToTg(redact(cut(q.text, 1500)))}`, parse_mode: 'HTML', ...(thread && { message_thread_id: thread }), reply_markup: { inline_keyboard: q.options.slice(0, 6).map((o, n) => [btn(o, `nav:q:${q.id}:${n}`)]) } }).catch(e => log(`telegram: ${scrub((e as Error).message)}`))
+      },
       e => still() && say(`Laki AI: ${esc(scrub((e as Error).message))}`, thread),
     )
     .finally(() => (clearInterval(tick), (aiAt = 0)))
@@ -738,6 +769,7 @@ const COMMANDS: [string, string, TgLevel][] = [
   ['ai', 'Laki AI: /ai <question>, or /ai and then just type', 'answer'],
   ['quiet', 'Do not disturb: /quiet 2h, /quiet 30m, /quiet off', 'answer'],
   ['new', 'Start a workspace: /new <project> <task>', 'control'],
+  ['stop', "Stop an agent's turn: reply to its push, or /stop <workspace>", 'control'],
 ]
 const commandsSet = () => {
   if (!state.telegram?.user) return
@@ -814,12 +846,29 @@ async function command(c: string, arg: string, m: TgMessage) {
     if (!p || !task) return void sayIn(m, `/new &lt;project&gt; &lt;task&gt;, a project of: ${esc(state.projects.filter(x => !x.kind && !x.archived && !(state.settings?.recording && x.private)).map(x => x.name).join(', ') || 'none yet')}`)
     return void sayIn(m, await started(p.id, task))
   }
+  if (c === 'stop') {
+    // the push it replies to, else the workspace it names (or the one talked to): its agents' turns under way, each Esc
+    const one = m.reply_to_message && tabFor(m, '')
+    const w = one ? one.workspace : arg ? state.workspaces.find(x => shownWs(x.id) && (x.name ?? x.id).toLowerCase() === arg.toLowerCase())?.id : (f => (f && f !== AI && shownWs(f) ? f : undefined))(state.telegram?.focus)
+    if (!w) return void sayIn(m, 'Which one? Reply /stop to an agent\'s push, or /stop &lt;workspace&gt;.')
+    return void sayIn(m, await stopIn(w, one || undefined))
+  }
   if (titles) return void sayIn(m, 'Titles only is on (Settings › Telegram): nothing off a screen comes here.')
   const t = tabFor(m, arg)
   if (!t) return void sayIn(m, `Which one? Reply /${c} to an agent's push, or /${c} &lt;workspace&gt;.`)
   return void sayIn(m, c === 'screen' ? await screenOf(t) : await diffOf(t))
 }
 const headOf = (t: Tab) => `<b>${esc(t.name)}</b> in <b>${esc(shownWs(t.workspace)?.name ?? t.workspace)}</b>`
+// /stop's and a card's ⏹ (Control): each agent turn under way in a workspace (or one tab's) gets Esc, as its Stop
+async function stopIn(ws: string, one?: Tab) {
+  const ts = (one ? [one] : agentsOf(ws)).filter(t => rtOf(t.id).status === 'running') // a waiting one's Esc would be a No: answer it instead
+  if (!ts.length) return `Nothing is working in <b>${esc(wsName(ws))}</b>.`
+  for (const t of ts) await act('stopAll', { tab: t.id })
+  return `Stopped ${ts.map(t => `<b>${esc(t.name)}</b>`).join(', ')} in <b>${esc(wsName(ws))}</b>: its tab and its work stay.`
+}
+// a workspace's PR that may be merged from the chat (Control): open, not a draft, its checks passed, GitHub would merge
+// it now, GitHub's (not a GitLab MR), not a fork's
+const greenPr = (ws: string) => (p => (p && p.state === 'OPEN' && !p.draft && p.checks === 'pass' && p.ready === true && !p.conflict && !p.forge && !p.cross ? p : undefined))(prs.get(ws))
 // /screen's and a card's 📺: its last 40 lines
 async function screenOf(t: Tab) {
   const text = await act<string>('screen', { target: t.id, lines: 40 })

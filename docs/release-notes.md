@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Telegram at Control: `/stop` and a workspace's ⏹ Stop end a turn, and 🔀 Merge on a green PR asks once more before it merges; Laki AI's questions come with a button per answer.
 - The Reader's message box has a mic, on your phone's page too: an Answer only device may dictate now.
 - Allow all, Deny all and the hotkeys never pick Antigravity's choices that hold for the whole conversation or persist ("always grant", "always deny … (Persist to …)", Auto mode), and OpenCode's skills go under `$XDG_CONFIG_HOME` when you set it.
 - Telegram › What it sends › Only when I ask: nothing comes on its own; `/status`, `/screen` and the menu show what's going on, and the workspace you talk to there still says when its turn ends.

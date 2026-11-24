@@ -9,7 +9,7 @@ export const CONFIRM = {
   remoteStart: 'start remote access',
   remotePair: 'pair a device with remote access',
   telegramPair: 'pair a Telegram chat with Laki',
-  telegramControl: 'let Telegram start workspaces',
+  telegramControl: 'let Telegram start workspaces, stop turns and merge green PRs',
   bypass: 'turn on Bypass permissions',
   bypassNew: 'start an agent with Bypass permissions',
   hookSecret: "show a webhook's secret",

@@ -1439,7 +1439,7 @@ async function answerMany(t: Thread, m: AiMsg, n: number, only: unknown, rpc: Rp
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
-export async function aiAnswer(p: { id: string; n: number; chat?: string; only?: string[] }, rpc: Rpc) {
+export async function aiAnswer(p: { id: string; n: number; chat?: string; only?: string[]; context?: string }, rpc: Rpc) {
   const t = thread(p.chat)
   const chat = t.chat
   const m = chat.find(m => m.ask?.id === p.id)
@@ -1461,7 +1461,7 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string; only?:
   if (pick === undefined) throw new Error('no such option')
   const act = m.ask.act
   if (!act) {
-    const r = aiAsk({ text: pick, chat: p.chat }, rpc) // its checks (on, a key) are before its first await: busy once they pass
+    const r = aiAsk({ text: pick, chat: p.chat, ...(typeof p.context === 'string' && { context: p.context }) }, rpc) // its checks (on, a key) are before its first await: busy once they pass; context: Telegram's
     if (busy.has(t.id)) (m.ask.picked = pick), changed(t) // refused: the buttons stay, for another try
     return r
   }

@@ -2,7 +2,7 @@
 // state.json, the view and the log; pairing by a one-time code; only the paired user's private chat counts; the long
 // poll's 409 and 401; the old webhook format migrated
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -121,7 +121,7 @@ test('Touch ID on: pairing a chat and raising Telegram to control each take a ti
   await assert.rejects(rig.rpc('telegramPair', { touchTicket: await ticket('bypassNew') }), /Touch ID first/, "another action's")
   await assert.rejects(rig.rpc('telegramPair', { touchTicket: await ticket('telegramControl') }), /Touch ID first/, "control's")
   assert.match((await rig.rpc('telegramPair', { touchTicket: await ticket('telegramPair') })).link, /start=/)
-  await assert.rejects(rig.rpc('telegramSet', { level: 'control' }), /to let Telegram start workspaces, Laki asks for Touch ID first/)
+  await assert.rejects(rig.rpc('telegramSet', { level: 'control' }), /to let Telegram start workspaces, stop turns and merge green PRs, Laki asks for Touch ID first/)
   await assert.rejects(rig.rpc('telegramSet', { level: 'control', touchTicket: await ticket('bypassNew') }), /Touch ID first/)
   await rig.rpc('telegramSet', { level: 'control', touchTicket: await ticket('telegramControl') })
   assert.equal((await rig.rpc('state')).telegram.level, 'control')
@@ -310,10 +310,68 @@ test('P2: a photo or a file in a reply is saved through Laki and its path goes t
   await until(() => b.of('sendMessage').some(c => /Not sent: over 20 MB/.test(c.body.text)), 'too big')
 })
 
-test('P3: TELEGRAM_OK is the whole of what a chat can do: never Stop, Ship, merge, archive, delete, settings, secrets, terminals, remote access', () => {
-  assert.deepEqual(Object.keys(TELEGRAM_OK).sort(), ['answer', 'chatRead', 'diff', 'dndSet', 'screen', 'send', 'state', 'voiceText', 'wsNew'])
-  for (const m of ['stopAll', 'longStop', 'input', 'run', 'ship', 'prAct', 'wsArchive', 'wsRm', 'settingsSet', 'secretGive', 'remoteStart', 'telegramSet', 'tabNew', 'turnRewind']) assert.ok(!Object.hasOwn(TELEGRAM_OK, m), m)
-  assert.equal(TELEGRAM_OK.wsNew, 'control')
+test('P3: TELEGRAM_OK is the whole of what a chat can do: one Stop and a merge at Control; never Ship, archive, delete, settings, secrets, terminals, remote access', () => {
+  assert.deepEqual(Object.keys(TELEGRAM_OK).sort(), ['aiQuestion', 'answer', 'chatRead', 'diff', 'dndSet', 'prAct', 'screen', 'send', 'state', 'stopAll', 'voiceText', 'wsNew'])
+  for (const m of ['longStop', 'input', 'run', 'ship', 'wsArchive', 'wsRm', 'settingsSet', 'secretGive', 'remoteStart', 'telegramSet', 'tabNew', 'turnRewind']) assert.ok(!Object.hasOwn(TELEGRAM_OK, m), m)
+  assert.deepEqual([TELEGRAM_OK.wsNew, TELEGRAM_OK.stopAll, TELEGRAM_OK.prAct, TELEGRAM_OK.aiQuestion], ['control', 'control', 'control', 'answer'])
+})
+
+test("Control: /stop a turn; a green PR's Merge asked twice on its card; the gate lets only a merge and one tab's Stop through; Laki AI's laki_ask as buttons", async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [])
+  const { b, rig } = await paired(t, { LAKI_AI_API: or.url })
+  mkdirSync(rig.env.FAKE_GH)
+  writeFileSync(join(rig.env.FAKE_GH, 'pr.json'), JSON.stringify({ number: 9, state: 'OPEN', title: 'Fix the total', baseRefName: 'main', url: 'https://github.com/o/r/pull/9', headRefOid: 'aaa', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }))
+  const { ws, tab } = await claude(rig)
+  await rig.rpc('projectSet', { id: (await rig.rpc('state')).projects[0].id, config: { pr: { land: true } } })
+  await rig.rpc('prRefresh')
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.pr?.checks === 'pass', 'its PR green')
+  const sent = () => b.of('sendMessage').length
+  const ask = async (text: string) => {
+    const n = sent()
+    b.message(text)
+    await until(() => sent() > n, `an answer to ${text}`)
+    return b.of('sendMessage').at(-1)!
+  }
+  const cardOf = async () => {
+    const n = sent()
+    b.message(`/talk ${ws.id}`)
+    return (await until(() => b.of('sendMessage').slice(n).find(c => c.body.reply_markup?.inline_keyboard), 'its card'))!
+  }
+  // at Answer: neither, and no buttons for them
+  assert.match((await ask(`/stop ${ws.id}`)).body.text, /needs the Control level/)
+  const card0 = await cardOf()
+  assert.ok(!JSON.stringify(card0.body.reply_markup).includes('Merge'), 'no Merge at Answer')
+  await rig.rpc('telegramSet', { level: 'control' })
+  // /stop: the turn under way gets Esc
+  await rig.rpc('input', { tab: tab.id, data: 'slow work\r' })
+  await until(async () => (await rig.tab(ws.id))?.status === 'running', 'it works')
+  assert.match((await ask(`/stop ${ws.id}`)).body.text, /^Stopped <b>claude<\/b>/)
+  await until(async () => (await rig.tab(ws.id))?.status !== 'running', 'stopped')
+  // the card: Merge #9, then its confirm, then merged
+  const card = await cardOf()
+  const keys = card.body.reply_markup.inline_keyboard.flat()
+  const m1 = keys.find((k: any) => k.text === '🔀 Merge #9')
+  assert.ok(m1, 'Merge on a green PR')
+  const merges = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('gh pr merge')).length
+  b.tap(m1.callback_data)
+  const confirm = (await until(() => b.of('editMessageText').find(c => /^Merge <b>#9<\/b> Fix the total into <code>main<\/code>\?/.test(c.body.text)), 'asked first'))!
+  assert.equal(merges(), 0, 'nothing merged on the first tap')
+  b.tap(confirm.body.reply_markup.inline_keyboard[0][0].callback_data)
+  await until(() => b.of('editMessageText').some(c => /^Merged <b>#9<\/b>/.test(c.body.text)), 'merged')
+  assert.equal(merges(), 1)
+  const log = () => readFileSync(join(rig.data, 'telegram-log.jsonl'), 'utf8')
+  assert.match(log(), /merged .*'s PR/)
+  // laki_ask: its question as buttons, a tap its answer; the next answer comes back
+  await rig.rpc('aiKey', { key: 'sk-or-v1-tg' })
+  or.answers.push(call('q1', 'laki_ask', { question: 'Which **one**?', options: ['Red', 'Blue'] }), reply({ content: 'Blue it is.' })) // its turn ends with the question: no model call after it
+  b.message('/ai pick a colour')
+  const q = (await until(() => b.of('sendMessage').find(c => /^🤖 Which <b>one<\/b>\?/.test(c.body.text)), 'the question with buttons'))!
+  assert.deepEqual(q.body.reply_markup.inline_keyboard.map((r: any) => r[0].text), ['Red', 'Blue'])
+  b.tap(q.body.reply_markup.inline_keyboard[1][0].callback_data)
+  await until(() => b.of('sendMessage').some(c => c.body.text === 'Blue it is.'), 'its next answer')
+  assert.ok(b.of('editMessageText').some(c => /Picked: Blue/.test(c.body.text)), 'the question says what was picked')
+  assert.match(JSON.stringify(or.hits.at(-1)!.body.messages), /Telegram, on their phone/, 'the pick keeps where you are')
 })
 
 test('Only when I ask (pushOff): nothing pushed on its own, commands still answer; the workspace you talk to still says its turn ended', async t => {

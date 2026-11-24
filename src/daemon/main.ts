@@ -1391,10 +1391,19 @@ for (const k of [...Object.keys(ANSWER), ...ANSWER_NO]) if (!Object.hasOwn(api, 
 // what a call says (an agent tab's whole message, never a ! line; no say), then as the user's own call
 for (const k of Object.keys(TELEGRAM_OK)) if (!Object.hasOwn(api, k)) throw new Error(`TELEGRAM_OK's ${k} isn't a method of api`)
 tgMod.tgHooks.ai = (p, rpc) => aiAsk(p, rpc) // Laki AI from the chat: its tools through rpc, telegram.ts' act (this gate)
+tgMod.tgHooks.aiPick = (p, rpc) => aiAnswer(p, rpc) as Promise<{ text?: string }> // a tap on its laki_ask's button: a plain question's pick, its next answer
+// its open laki_ask: the AI page's chat's last message, a plain question not answered yet (one Laki acts on: the Mac's)
+tgMod.tgHooks.aiAsked = () => (m => (m?.ask && m.ask.picked === undefined && !m.ask.act && !m.ask.perm ? { id: m.ask.id, text: m.text, options: m.ask.options } : undefined))(aiState({}).chat.at(-1))
+// what a Telegram call may say beyond its method: one tab's Stop, never every turn; prAct's merge, never another act or force
+const TG_SAYS: Record<string, (p: Params) => string> = {
+  stopAll: p => (typeof p?.tab === 'string' && p.tab ? '' : 'every turn at once'),
+  prAct: p => (p?.act === 'merge' && p.force !== true && p.deleteBranch === undefined ? '' : `${String(p?.act)}: only a merge`),
+  aiQuestion: p => (p?.act ? 'a question Laki acts on (archive, delete, run, an extension): ask it on the Mac' : ''),
+}
 tgMod.tgHooks.call = (method, p) => {
   const need = Object.hasOwn(TELEGRAM_OK, method) ? TELEGRAM_OK[method] : undefined
   if (!need || !tgMod.levelAtLeast(need)) return Promise.reject(new Error(`not from Telegram (${method}): do it on the Mac`))
-  const ok = Object.hasOwn(ANSWER, method) ? ANSWER[method] : true
+  const ok = Object.hasOwn(TG_SAYS, method) ? TG_SAYS[method] : Object.hasOwn(ANSWER, method) ? ANSWER[method] : true
   const why = ok === true ? '' : ok(p)
   if (why) return Promise.reject(new Error(`not from Telegram: ${why}`))
   return call(method, p)

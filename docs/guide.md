@@ -166,7 +166,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   workspace's in Recording mode gets a card saying *Open Laki to answer this one*, and nothing is sent. None waiting:
   *Nothing is waiting*.
 - **Confirm risky actions with Touch ID** (off until you turn it on: Settings › General, on a Mac with Touch ID): Laki
-  asks for your finger before it starts remote access, pairs a device or a Telegram chat, lets Telegram start workspaces (*Control*), turns a tab or a profile to Bypass permissions,
+  asks for your finger before it starts remote access, pairs a device or a Telegram chat, lets Telegram start workspaces, stop turns and merge (*Control*), turns a tab or a profile to Bypass permissions,
   starts a workspace or a tab whose agent never asks, shows a webhook's secret or resets the interface, and before this switch goes off. Then only Laki's window can do
   these: the `laki` command, a phone and agents are told to do it there.
 - **Show and tell** (off until you turn it on: Settings › General or Keys › Global hotkey, ⌃⌥⌘T suggested; the menu
@@ -2817,12 +2817,15 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   agents' Markdown comes as bold, code and links) or *Control* (also `/new <project> <task>` and a project's ➕ *New
   task*: the next message, typed or said, is the new workspace's task (a screenshot or a file with a caption: the
   caption and its path on this Mac), and you talk to it from then on; *Where should this go?* offers
-  ➕ *New in* a project too). 50 messages a minute and 10 new workspaces an hour at
+  ➕ *New in* a project too; `/stop` as a reply to a push, or with a workspace's name, ends its turn as Esc does, and a
+  workspace's card has ⏹ *Stop* and, when its PR's checks passed and GitHub would merge it, 🔀 *Merge #n*, which asks
+  again with what it merges before it does). Laki AI's questions (`laki_ask`) come with a button per answer; one Laki
+  would act on (a removal, a command, an extension) stays the Mac's. 50 messages a minute and 10 new workspaces an hour at
   most; with *Titles only* on, `/screen` and `/diff` send nothing; Recording mode keeps private workspaces out of all of
   it. *What Telegram did* lists each thing done or refused from the chat. *A topic per workspace* (off by default; first
   turn topics on for the bot in @BotFather's Bot Settings): each workspace's pushes in a topic of its own in your chat
   with the bot, what you write in a topic goes to that workspace's agent with no reply needed, `/screen` and `/diff`
-  there are that workspace's, and the topic goes when the workspace is deleted. Stop, Ship, merge, archive or delete, settings,
+  there are that workspace's, and the topic goes when the workspace is deleted. Ship, archive or delete, settings,
   secrets, terminals and commands, remote access and anything behind Touch ID are never Telegram's, at any level; an
   agent, remote access or a trusted client can't change this section. *What it sends*: *Only when I ask* (off: on,
   nothing goes on its own and you look with `/status`, `/screen` and `/menu`; the workspace you talk to there still

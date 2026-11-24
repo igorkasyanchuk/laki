@@ -124,7 +124,7 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
 const LEVELS: [TgLevel, string, string][] = [
   ['notify', 'Notify', 'Pushes only: who waits for you, who is done. Nothing comes back.'],
   ['answer', 'Answer', "Pushes; a tap on a push's button picks that choice, as a click here would; a reply to a push goes to its agent, a photo or a file too (a choice's number answers its question); /menu's buttons open any workspace, and its Talk here sends what you type or say to its agent; /ai talks to Laki AI, whose tools do only what this level allows; /status, /screen, /diff and /quiet."],
-  ['control', 'Control', 'Everything Answer does, and /new <project> <task> or a project\'s New task (its next message, typed or said, a screenshot or a file too) starts a workspace (10 an hour at most). Stop, Ship, merge and settings stay on the Mac at every level.'],
+  ['control', 'Control', 'Everything Answer does, and /new <project> <task> or a project\'s New task (its next message, typed or said, a screenshot or a file too) starts a workspace (10 an hour at most); /stop or a workspace\'s ⏹ Stop ends its turn; a green PR\'s 🔀 Merge, asked twice. Ship, archive and settings stay on the Mac at every level.'],
 ]
 export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call }) {
   const [token, setToken] = useState('')
@@ -277,7 +277,7 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
           <li>While Laki runs (its window may be closed), pushes go as agents wait or finish. While the Mac sleeps, nothing goes; a tap older than two minutes is dropped, not acted on in the morning.</li>
           <li>To talk to an agent, reply to its push (swipe it left, or long-press it › Reply): your words go to that agent, queued while it works; a 👍 on your message says it went. A photo or a file (20 MB at most) goes as its path on this Mac.</li>
           <li><code>/menu</code>: your projects as buttons, then a project&apos;s workspaces, then a workspace&apos;s card (its agents, what its agent said last, Screen, Diff, ⬆ ⬇ to the next one, ⬅ back). Its <b>Talk here</b> sends whatever you type next to that agent, no reply needed, until <code>/talk off</code>. A voice note works as typing: Settings › Voice&apos;s cloud writes it down and Laki shows you its words first.</li>
-          <li>Commands (Telegram's menu shows them): <code>/status</code> who needs you, who works, who is done; <code>/screen</code> and <code>/diff</code> as a reply to a push (or with a workspace's name); <code>/quiet 2h</code> Do not disturb; <code>/talk &lt;workspace&gt;</code>; at Control, <code>/new &lt;project&gt; &lt;task&gt;</code>. 50 messages a minute and 10 new workspaces an hour at most.</li>
+          <li>Commands (Telegram's menu shows them): <code>/status</code> who needs you, who works, who is done; <code>/screen</code> and <code>/diff</code> as a reply to a push (or with a workspace's name); <code>/quiet 2h</code> Do not disturb; <code>/talk &lt;workspace&gt;</code>; at Control, <code>/new &lt;project&gt; &lt;task&gt;</code> and <code>/stop</code> (a reply to a push, or with a workspace's name). Laki AI's questions come with a button per answer. 50 messages a minute and 10 new workspaces an hour at most.</li>
           <li>At Notify, Laki doesn't read the chat at all.</li>
         </ul>
       </Group>
@@ -286,7 +286,7 @@ export function TelegramSection({ tg, call }: { tg?: TelegramView; call: Call })
           <li><b>The token stays on this Mac</b>, in the Keychain (else a file only you can read): never in Laki's state, logs, backups or what agents see.</li>
           <li><b>Only you</b>: Laki answers one Telegram account, the one that sent the code, in its private chat with the bot. Anyone else who finds the bot gets no answer at all.</li>
           <li><b>The code</b> is 128 random bits, shown only in this window, good once for 10 minutes.</li>
-          <li><b>Never from Telegram</b>, at any level: Stop, Ship, merge, archive or delete, settings, secrets, terminals and commands, remote access, anything behind Touch ID. Agents, remote access and trusted clients can't change this section.</li>
+          <li><b>Never from Telegram</b>, at any level: Ship, archive or delete, settings, secrets, terminals and commands, remote access, anything behind Touch ID. At Control only: one turn's Stop, and a merge of a PR whose checks passed, asked twice. Agents, remote access and trusted clients can't change this section.</li>
           <li><b>Telegram sees what is sent</b> (bots aren't end-to-end encrypted): secrets' shapes are masked, Titles only sends who needs you and nothing more, Recording mode keeps private workspaces out.</li>
           <li><b>Lost your phone?</b> Unpair here: Telegram stops at once. Remove bot also deletes its token from this Mac (revoke it in @BotFather with <code>/revoke</code> too).</li>
         </ul>

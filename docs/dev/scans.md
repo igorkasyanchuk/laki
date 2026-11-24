@@ -504,7 +504,9 @@ its path after the caption. 🤖 Laki AI (`focus` `@ai`: `/ai [question]`, the p
 should this go?*'s `nav:ta`): `askAi`/`aiGo` hand the words (a photo as `images`) to main.ts' `tgHooks.ai`, aiAsk in the
 AI page's chat with `AI_WHERE` as its context and `act` as its rpc, so each tool call is the chat's (TELEGRAM_OK at its
 level, the limits, What Telegram did); `sendChatAction` typing every 4.5 s, the answer as `mdToTg` (3,500 characters,
-redacted); one ask at a time; refused with a claude or codex backend (`aiNo`: their tools call Laki as you, through laki
+redacted); one ask at a time; its `laki_ask` (`aiQuestion`, TELEGRAM_OK at answer, never one with an `act`: main.ts'
+`TG_SAYS`) as a button per answer (`tgHooks.aiAsked`: the chat's open plain question once its turn ends), a tap
+(`nav:q:<id>:<n>`) its pick through `tgHooks.aiPick` (`aiAnswer`, with `AI_WHERE`), the question edited to say it; refused with a claude or codex backend (`aiNo`: their tools call Laki as you, through laki
 mcp) and with Titles only. A message that replies to nothing and isn't in a topic: a pending ➕ New task's (`newIn`, 10
 minutes: `started`, `wsNew` then talked to), else the workspace you talk to (`state.telegram.focus`: a card's 💬 Talk
 here, `/talk <workspace>`; `/talk off`; gone with the workspace, Unpair or another bot), else *Where should this go?*
@@ -513,7 +515,10 @@ Control ➕ New in each project: `nav:to` sends and talks there, `nav:mk` starts
 (`/menu`, `/help`'s 📂 Projects; `nav:` callbacks, never an ask's `nonce:n`): `projectsView` › `projectView` (a page of
 `PAGE` 8, ◀ ▶) › `wsView` (its agents' state, a waiting one's ask, the last thing its agent said by `chatRead` as
 Markdown, unless titles only; 💬 Talk here, 📺 Screen, 📝 Diff (`screenOf`, `diffOf`, /screen's and /diff's too), ⬆ ⬇
-the workspace before or after, ⬅ its project), each edited in place (`editMessageText`; *not modified* ignored); a
+the workspace before or after, ⬅ its project; at Control ⏹ Stop while an agent's turn runs (`nav:x`, `stopIn`:
+`stopAll` with its tab, each one under way) and 🔀 Merge #n on a green PR (`greenPr`: open, no draft, checks passed,
+GitHub's `ready`, no conflict, not GitLab's nor a fork's): `nav:m1` edits the card into what it merges with ✅ Merge #n
+(`nav:m2:<key>:<n>`, refused once the PR isn't that one or isn't green) and Cancel, then `prAct` merge), each edited in place (`editMessageText`; *not modified* ignored); a
 button names a project or workspace by a short key (`kOf`, `nav:<kind>:<key>`, under Telegram's 64 bytes), one from
 before a restart says to open /menu again. A voice note or audio (`heard`): `getFile`, through `ffmpeg` to 16 kHz WAV
 when this Mac has it (`LAKI_FFMPEG`: tests' none), else as it came (`format` ogg), then `voiceText` (Settings › Voice's
@@ -521,7 +526,8 @@ cloud, OpenRouter's key), its words shown back (🎙) and routed as typed. An ag
 reply) go as Markdown (`shared/tgmd.ts` `mdToTg`: code, bold, italic, struck, links, headings, lists, quotes; the rest
 escaped; a body with code or a quote isn't folded, as a blockquote can't hold them); Telegram refusing the tags (*can't
 parse entities*) gets the same words plain (`out`'s `plainOf`). Every action goes through `tgHooks.call`
-(main.ts): only `gates.ts` `TELEGRAM_OK`'s methods at their level, with `ANSWER`'s checks of what they say (`sendOk`: an
+(main.ts): only `gates.ts` `TELEGRAM_OK`'s methods at their level, with `TG_SAYS`' checks (`stopAll` with a tab, never
+every turn; `prAct`'s merge only, no force; `aiQuestion` without an act), else `ANSWER`'s of what they say (`sendOk`: an
 agent tab's, the whole message, never a `!` line; `answer` without `say`), then as the user's call. A done push to
 Telegram carries the turn's last line and the workspace's diff (`files.ts` `stats`: `+add −del · n files`). P3: the
 commands (`COMMANDS`, `setMyCommands` with a `chat` scope as it pairs and as the level changes: the level's only):

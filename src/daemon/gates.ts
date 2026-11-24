@@ -105,9 +105,11 @@ widgetStore widgetReload widgetFiles widgetWrite widgetPush widgetEmit widgetEve
 flowHold flowGet flowForget'.split(' '))
 
 // Telegram (telegram.ts tgHooks: main.ts' gate): what a message from the paired chat may make Laki do, and the level each
-// needs. Anything else is refused, so a new method is never Telegram's by default. Never: Stop, Ship, merge, archive or
-// delete, settings, secrets, terminals and commands, remote access, anything behind Touch ID (test/telegram.test.ts)
-export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answer', send: 'answer', state: 'answer', screen: 'answer', diff: 'answer', chatRead: 'answer', voiceText: 'answer', dndSet: 'answer', wsNew: 'control' } // chatRead: a workspace card's last reply; voiceText: a voice note heard
+// needs. Anything else is refused, so a new method is never Telegram's by default. At Control: a new workspace, one
+// tab's Stop (stopAll with its tab: never every turn) and a green PR's merge (prAct's merge only, asked twice in the
+// chat). Never: Ship, archive or delete, settings, secrets, terminals and commands, remote access, anything behind Touch
+// ID (test/telegram.test.ts). aiQuestion: Laki AI's laki_ask, a plain question only (never one Laki acts on, on Yes)
+export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answer', send: 'answer', state: 'answer', screen: 'answer', diff: 'answer', chatRead: 'answer', voiceText: 'answer', dndSet: 'answer', aiQuestion: 'answer', wsNew: 'control', stopAll: 'control', prAct: 'control' } // chatRead: a workspace card's last reply; voiceText: a voice note heard
 
 // remote access at Full (a phone's page): REMOTE_NO is what outlives its session or opens Laki wider: its own set-up and
 // devices, secrets and keys, accounts, webhooks, extensions' files, what runs outside a workspace (a clone, the CLI's
