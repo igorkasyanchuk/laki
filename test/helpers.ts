@@ -147,6 +147,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     HOME: home,
+    XDG_CONFIG_HOME: join(home, '.config'), // never yours (OpenCode's skills go under it: skill.ts homeOf)
     LAKI_HOME: join(home, 'data'),
     // $HOME/bin: fakes a test installs (cloudflared); node for the fakes
     PATH: `${join(home, 'bin')}:${fakes}:${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`,

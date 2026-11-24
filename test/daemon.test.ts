@@ -1,7 +1,7 @@
 // The daemon end to end: real PTYs, git worktrees, hooks via the CLI, fake agents.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, sleep, until } from './helpers.ts'
@@ -172,6 +172,18 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
 // A1: a skill loads whole each time it triggers: SKILL.md keeps what every use needs, small, and names the reference
 // files written beside it; 'installed' still means every file matches. A2: the laki skill's description doesn't
 // trigger on $LAKI_PROGRESS (a claude tab with Progress on gets the instruction at its start instead)
+test("OpenCode's skills under $XDG_CONFIG_HOME when it's set, as OpenCode reads them", async t => {
+  const xdg = mkdtempSync('/tmp/laki-xdg-')
+  t.after(() => rmSync(xdg, { recursive: true, force: true }))
+  const rig = await fresh(t, { env: { XDG_CONFIG_HOME: xdg } })
+  const all = await rig.rpc('skillSet', { agent: 'opencode', on: true })
+  assert.ok(existsSync(join(xdg, 'opencode/skills/laki/SKILL.md')))
+  assert.ok(!existsSync(join(rig.home, '.config/opencode')), 'not ~/.config')
+  assert.equal(all.find((x: { agent: string; skill: string }) => x.agent === 'opencode' && x.skill === 'laki').mcpIn, join(xdg, 'opencode/opencode.json'))
+  await rig.rpc('skillSet', { agent: 'opencode', on: false })
+  assert.ok(!existsSync(join(xdg, 'opencode/skills/laki')))
+})
+
 test('A1, A2: each SKILL.md under 8 KB, its reference files beside it and named in it; no $LAKI_PROGRESS trigger', async t => {
   const rig = await fresh(t)
   const refs: Record<string, string[]> = { laki: ['commands.md', 'more.md', 'workflows.md', 'schedule.md', 'browser.md'], 'laki-widget': ['widget-json.md', 'ui-kit.md', 'widget-html.md'] }

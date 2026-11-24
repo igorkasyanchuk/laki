@@ -179,9 +179,10 @@ export function askScope(choice: string, agent?: string): Scope | null {
     : /^\*\.([\w-]+(\.[\w-]+)+)$/.exec(rule)?.[1].replace(/^/, 'every subdomain of ')
   return { label, rule, ...(broad && { broad: true as const }), ...(broad && plain && plain.length <= 80 && { plain }) }
 }
-// a choice that grants more than this one ask: a "don't ask again", "always", "for this session" one, its rule told
-// apart or not: never what one click for several (Allow all) or a global hotkey picks
-export const standing = (label: string) => !!askScope(label) || /don['’]t ask again|always allow|allow always|for this session|allow all\b/i.test(label)
+// a choice that holds past this one ask: a "don't ask again", "always", "for this session" one, its rule told apart
+// or not; agy's "… in this conversation", "always grant", "always deny … (Persist to …)" and "Use Auto mode until you
+// exit" too: never what one click for several (Allow all, Deny all) or a global hotkey picks
+export const standing = (label: string) => !!askScope(label) || /don['’]t ask again|always (allow|grant|deny)|allow always|for this session|in this conversation|\(persist to\b|until you exit|allow all\b/i.test(label)
 // what it wants to do, for a notification's title: "wants to run", "wants to edit"…
 export const permVerb = (tool: string) =>
   tool === 'Bash' ? 'wants to run'
@@ -214,8 +215,10 @@ const OUTSIDE = /(^|[\s'"=:(])(\/|~|\.\.(\/|$|[\s;&|)]))|\$\{?(HOME|TMPDIR)\b/ /
 const FILES = /^(Bash|Edit|Write|MultiEdit|NotebookEdit|Read)$/ // what a path in its text is written or read
 const YES = /^(yes|allow|approve|proceed|run)\b/i
 const NO = /^(no|deny|reject|cancel|don['’]t)\b/i
-// a plain yes … no menu: its first an allow of this one ask (never a standing permission: standing), its last a no
-const yesNo = (a: Ask) => a.options.length >= 2 && YES.test(a.options[0].label) && !standing(a.options[0].label) && NO.test(a.options.at(-1)!.label)
+// a plain yes … no menu: its first an allow of this one ask (never a standing permission: standing), its last a no,
+// and a no that holds for this ask only (plainNo: the last such; agy's last may be "No, and always deny …")
+const plainNo = (a: Ask) => a.options.findLast(o => NO.test(o.label) && !standing(o.label))
+const yesNo = (a: Ask) => a.options.length >= 2 && YES.test(a.options[0].label) && !standing(a.options[0].label) && NO.test(a.options.at(-1)!.label) && !!plainNo(a)
 // a permission ask (claude's PermissionRequest: its tool and what it touches, the exact text the confirm shows), its
 // first option an allow and its last a no (or no menu read: Allow / Deny), never a secret, one of several questions,
 // a risky command, or, unless the tab's sandbox is known on, one that touches a path outside the worktree
@@ -228,11 +231,11 @@ export function bulkOk(t: { status?: string; ask?: Ask; secret?: unknown }, sand
 // "No, and say why": the agent's own way to hear it (claude's "No, and tell Claude what to do differently (esc)",
 // codex's), else a no that's its menu's last (deny: the words go as the next message once it took the answer)
 export const TELL_WHY = /\btell \w+ what to do differently\b/i
-export const denyOf = (a: Ask) => a.options.find(o => TELL_WHY.test(o.label)) ?? (a.options.length >= 2 && NO.test(a.options.at(-1)!.label) ? a.options.at(-1) : undefined)
+export const denyOf = (a: Ask) => a.options.find(o => TELL_WHY.test(o.label)) ?? (a.options.length >= 2 && NO.test(a.options.at(-1)!.label) && !standing(a.options.at(-1)!.label) ? a.options.at(-1) : undefined)
 export const sayable = (label: string) => TELL_WHY.test(label) || NO.test(label)
 // what Allow all / Deny all and the global hotkeys send: the first option (a plain yes: never a standing permission) or
 // the last (a no); none when the menu isn't a plain yes … no (then nothing is sent)
-export const bulkPick = (a: Ask, allow: boolean) => (yesNo(a) ? (allow ? a.options[0] : a.options.at(-1)) : undefined)
+export const bulkPick = (a: Ask, allow: boolean) => (yesNo(a) ? (allow ? a.options[0] : plainNo(a)) : undefined)
 // the confirm's lines: the same tool and the same text in several workspaces, one line
 export function bulkGroups<T extends { ask?: Ask }>(list: T[], name: (x: T) => string) {
   const m = new Map<string, { tool: string; what: string; names: string[] }>()

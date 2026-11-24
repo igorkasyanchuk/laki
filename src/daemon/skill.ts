@@ -3,7 +3,7 @@
 // when the user asks (Settings), and again as a daemon starts when a Laki update changed one installed for it
 import { chmodSync, closeSync, type Dirent, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, sep } from 'node:path'
+import { isAbsolute, join, sep } from 'node:path'
 import { BRAINSTORM_METHOD, BRAINSTORM_OUTPUT } from '../shared/plans.ts'
 import { groupRule } from '../shared/tools.ts'
 import { USAGE } from '../shared/usage.ts'
@@ -19,7 +19,7 @@ const AGENTS = {
   codex: { name: 'Codex', home: '.codex', add: 'codex mcp add laki --' },
   gemini: { name: 'Antigravity', home: '.gemini/config', add: 'agy mcp add laki --' },
   grok: { name: 'Grok', home: '.grok', add: 'grok mcp add -s user laki --' },
-  opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // ponytail: ~/.config, not $XDG_CONFIG_HOME
+  opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // $XDG_CONFIG_HOME/opencode when it's set (homeOf)
   cursor: { name: 'Cursor', home: '.cursor', add: '' }, // C6: cursor-agent reads ~/.cursor/skills; its MCP servers are ~/.cursor/mcp.json's (no mcp add)
 }
 export type SkillAgent = keyof typeof AGENTS
@@ -33,7 +33,10 @@ export type SkillName = (typeof SKILLS)[number]
 // points it here
 export type SkillInfo = { agent: SkillAgent; skill: SkillName; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; foreign?: boolean; mcp: string; mcpIn?: string }
 
-const skillDir = (a: SkillAgent, k: SkillName) => join(homedir(), AGENTS[a].home, 'skills', k)
+// an agent's folder: in ~, OpenCode's under $XDG_CONFIG_HOME when it's set (an absolute path, as OpenCode reads it;
+// the daemon's from the app takes it from your login shell: core's adoptLoginPath)
+const homeOf = (a: SkillAgent) => (a === 'opencode' && isAbsolute(process.env.XDG_CONFIG_HOME ?? '') ? join(process.env.XDG_CONFIG_HOME!, 'opencode') : join(homedir(), AGENTS[a].home))
+const skillDir = (a: SkillAgent, k: SkillName) => join(homeOf(a), 'skills', k)
 const mcpArgv = () => ['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp']
 const mcpCmd = (a: SkillAgent) =>
   AGENTS[a].add ? `${AGENTS[a].add} ${mcpArgv().map(q).join(' ')}` : a === 'cursor' ? JSON.stringify({ mcpServers: { laki: { command: mcpArgv()[0], args: mcpArgv().slice(1) } } }, null, 2) : JSON.stringify({ mcp: { laki: { type: 'local', command: mcpArgv() } } }, null, 2)
@@ -572,7 +575,7 @@ function info(a: SkillAgent, k: SkillName): SkillInfo {
   const launcher = existsSync(join(at, 'laki')) ? readFileSync(join(at, 'laki'), 'utf8') : ''
   const foreign = state === 'outdated' && /\bLAKI_HOME=/.test(launcher) && !launcher.includes(` ${q(`LAKI_HOME=${dir}`)} `)
   const mcp = k === 'laki' ? mcpCmd(a) : ''
-  return { agent: a, skill: k, name: AGENTS[a].name, path: at, state, ...(foreign && { foreign }), mcp, ...(mcp && !AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, MCP_FILE[a] ?? 'opencode.json') }) }
+  return { agent: a, skill: k, name: AGENTS[a].name, path: at, state, ...(foreign && { foreign }), mcp, ...(mcp && !AGENTS[a].add && { mcpIn: (f => (f.startsWith(homedir() + sep) ? join('~', f.slice(homedir().length + 1)) : f))(join(homeOf(a), MCP_FILE[a] ?? 'opencode.json')) }) }
 }
 
 // laki's rows first, one per agent, then laki-widget's

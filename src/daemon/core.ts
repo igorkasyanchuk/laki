@@ -873,12 +873,14 @@ export const LakiPlugin = async ({ client }) => {
 }
 `
 
-// A Finder-launched app has a bare PATH: take the login shell's, so git/gh/claude are found.
+// A Finder-launched app has a bare PATH: take the login shell's, so git/gh/claude are found; its XDG_CONFIG_HOME too,
+// unless one is set (where OpenCode, run from that shell, reads its skills: skill.ts homeOf)
 export function adoptLoginPath() {
   try {
-    const out = execFileSync(shell, ['-lic', 'printf "__LAKI__%s__LAKI__" "$PATH"'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
-    const m = out.match(/__LAKI__(.*)__LAKI__/)
+    const out = execFileSync(shell, ['-lic', 'printf "__LAKI__%s__LAKI__%s__LAKI__" "$PATH" "$XDG_CONFIG_HOME"'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
+    const m = out.match(/__LAKI__(.*)__LAKI__(.*)__LAKI__/)
     if (m?.[1]) process.env.PATH = m[1]
+    if (m?.[2] && isAbsolute(m[2]) && !process.env.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = m[2]
   } catch {}
 }
 

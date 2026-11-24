@@ -2931,7 +2931,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   or the last project you talked to; only at the very start, the word not kept. The pill says *Goes to Notes › Voice*
   or *Backlog · Shop* first; *Undo* takes the line or the item out again.
 - *Agent skill*: installs a skill for Claude Code, Codex, Antigravity, Grok or OpenCode in your home folder
-  (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/config/…` (Antigravity's), `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
+  (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/config/…` (Antigravity's), `~/.grok/…`, `~/.config/opencode/…`, or `$XDG_CONFIG_HOME/opencode/…` when you set it), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   *Extension creator* (`skills/laki-widget`, installed on its own) teaches them to make extensions: the files, the
   template language, JS extensions, actions, and checking one with `laki widget`. *Orchestrator*

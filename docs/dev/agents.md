@@ -249,8 +249,10 @@ Reader, the ask bar (never cut there), the cards on screen and the island; `broa
 in the warning color with `plain`'s words where they're safe. claude's hook's rule (`permOf`'s `rule`) keeps its
 wildcard (`npm init *`, not `npm init`). A notification's action stays *Allow always* (`NotifyAction.scope` carries the
 choice to the card); its body names the rule, and the body must fit whole for any action to show. `standing` marks
-such a choice: `bulkPick` (Allow all, Deny all, the global hotkeys) never sends one, and `yesNo` refuses a menu whose
-first choice is one.
+such a choice (agy's too: *… in this conversation*, *always grant*, *always deny … (Persist to …)*, *Use Auto mode until
+you exit*, read from its binary's strings): `bulkPick` (Allow all, Deny all, the global hotkeys) never sends one, Deny
+all and `denyOf` take the last plain no (`plainNo`), and `yesNo` refuses a menu whose first choice is one or that has no
+plain no.
 
 ### Sessions
 

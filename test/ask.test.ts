@@ -187,7 +187,7 @@ test('Allow all and the global hotkeys never pick a standing permission: the pla
   assert.equal(standing(claude[1].label), true)
   assert.equal(standing(claude[0].label), false)
   // a menu whose first choice is itself a standing one: never answered by one click for several, nor by a hotkey
-  for (const first of ['Yes, allow always', 'Yes, and don’t ask again for: npm init *', 'Yes, allow all edits during this session', 'Allow for this session']) {
+  for (const first of ['Yes, allow always', 'Yes, and don’t ask again for: npm init *', 'Yes, allow all edits during this session', 'Allow for this session', "Yes, grant permission for Bash in this conversation", "Yes, and always grant permission for 'Bash' in this conversation", "Yes, and always allow 'npm init' (Persist to settings.json)", 'Yes, use Auto mode until you exit, and tell agy what to do next']) {
     const s = { status: 'waiting', ask: { options: [{ n: 1, label: first }, { n: 2, label: 'No (esc)' }], at: 1, tool: 'Bash', what: 'npm init -y' } }
     assert.equal(bulkOk(s), false, first)
     assert.equal(bulkPick(s.ask, true), undefined, first)
@@ -213,6 +213,17 @@ test('F15: always-ask globs and the rule a streak of allows would make', () => {
   assert.deepEqual(streakOf({ tool: 'Edit', what: 'src/ui/app.ts' }), { key: 'Edit src/ui/**', tool: 'Edit', pattern: 'src/ui/**' })
   for (const what of ['rm -rf build', 'git push --force', 'npm test && rm x', 'cat /etc/hosts', 'npm test db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Bash', what }, g), undefined, what)
   for (const what of ['README.md', '../x/a.ts', 'db/migrations/1.sql']) assert.equal(streakOf({ tool: 'Edit', what }, g), undefined, what)
+})
+
+test("agy's menu: Deny all and No, and say why never pick its standing no (\"always deny … (Persist to …)\", \"… in this conversation\")", () => {
+  const o = (...ls: string[]) => ({ options: ls.map((label, i) => ({ n: i + 1, label })), at: 1, tool: 'Bash', what: 'npm test' })
+  const agy = o('Yes, allow tool call', "Yes, and always allow tool 'Bash' in this conversation", "No, and always deny tool 'Bash' (Persist to settings.json)", 'No, and tell agy what to do differently')
+  assert.deepEqual([bulkPick(agy, true)?.n, bulkPick(agy, false)?.n, denyOf(agy)?.n], [1, 4, 4])
+  const onlyStanding = o('Yes, allow tool call', "No, and always deny tool 'Bash' in this conversation")
+  assert.deepEqual([bulkPick(onlyStanding, true), bulkPick(onlyStanding, false), denyOf(onlyStanding)], [undefined, undefined, undefined], 'its only no holds past this ask: none')
+  assert.equal(bulkOk({ status: 'waiting', ask: onlyStanding }), false)
+  for (const l of ["No, and always deny for commands that start with 'rm' (Persist to settings.json)", "No, and always deny permission for 'Bash' in this conversation"]) assert.equal(standing(l), true, l)
+  assert.equal(standing('Yes, allow tool call'), false)
 })
 
 test("No, and say why: the agent's tell-why choice, else a last No; nothing to say why on another menu", () => {
