@@ -116,12 +116,16 @@ const inboxSender = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => 
 export const inboxHide = () => ((inboxShow = false), inboxWin?.isDestroyed() || inboxWin?.hide())
 export const sendInbox = () => inboxWin && !inboxWin.isDestroyed() && inboxWin.webContents.send('ask-cards', inboxList, floats.colors)
 const str = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '')
-export function inboxCards(items: unknown): Card[] {
+// each item as a card; diff (an Edit's or Write's, cut), explain (a command's ?) and each choice's scope (the card warns on a
+// broad one) as the cards on screen have them. was: the list before, its explanations kept for the same ask
+export function inboxCards(items: unknown, was: Card[] = []): Card[] {
   return (Array.isArray(items) ? items : []).slice(0, 12).flatMap((i): Card[] => {
     if (!i || typeof i !== 'object' || typeof i.tab !== 'string') return []
     const ask = i.kind === 'ask'
-    const actions = ask && Array.isArray(i.options) ? i.options.slice(0, 9).filter((o: { n?: unknown; label?: unknown }) => Number.isInteger(o?.n) && typeof o.label === 'string').map((o: { n: number; label: string }) => ({ text: o.label.slice(0, 80), n: o.n, label: o.label.slice(0, 80) })) : []
-    return [{ key: `inbox:${i.tab}`, tab: i.tab.slice(0, 80), ask, tone: ask ? 'ask' : 'info', at: Date.now(), title: str(i.title, 90), body: str(i.body, 300), actions }]
+    const actions = ask && Array.isArray(i.options) ? i.options.slice(0, 9).filter((o: { n?: unknown; label?: unknown }) => Number.isInteger(o?.n) && typeof o.label === 'string').map((o: { n: number; label: string; scope?: unknown }) => ({ text: o.label.slice(0, 80), n: o.n, label: o.label, ...(typeof o.scope === 'string' && o.scope && { scope: o.scope.slice(0, 600) }) })) : []
+    const c: Card = { key: `inbox:${i.tab}`, tab: i.tab.slice(0, 80), ask, tone: ask ? 'ask' : 'info', at: Date.now(), title: str(i.title, 90), body: str(i.body, 300), actions, ...(ask && str(i.diff, 4000) && { diff: str(i.diff, 4000) }), ...(ask && i.explain === true && { explain: true }) }
+    const old = c.explain ? was.find(x => x.key === c.key && x.body === c.body && x.said && x.said !== 'loading') : undefined
+    return [old ? { ...c, said: old.said } : c]
   })
 }
 export function inboxOpen() {
@@ -142,7 +146,7 @@ export function inboxOpen() {
 // the app window's list for the Inbox, with each badge (inbox: none, an older page or Menu bar click isn't Inbox)
 export function inboxSet(inbox: unknown) {
   barInbox = mac && Array.isArray(inbox) // Menu bar click: Inbox (macOS: a tray's left and right clicks are its own)
-  inboxList = inboxCards(inbox)
+  inboxList = inboxCards(inbox, inboxList)
   if (inboxWin?.isVisible()) sendInbox()
   else if (!barInbox) inboxHide()
 }

@@ -170,3 +170,18 @@ test('inboxOf: the asks first, oldest first, with their choices; then 3 at work;
   assert.equal(many.length, INBOX_ASKS)
   assert.deepEqual(inboxOf(view([tab({ status: 'idle' })])), [])
 })
+
+test("inboxOf: an ask as the cards on screen have it: an Edit's diff, a command's ? (Laki AI on), each standing choice's scope", () => {
+  const ws = [{ id: 'w1', name: 'login' }]
+  const menu = [{ n: 1, label: 'Yes' }, { n: 2, label: "Yes, and don't ask again for: rm *" }, { n: 3, label: 'No' }]
+  const tabs = [
+    tab({ id: 'e', name: 'claude', preset: 'claude', status: 'waiting', needAt: 1, ask: { options: [{ n: 1, label: 'Yes' }, { n: 2, label: 'No' }], at: 1, tool: 'Edit', what: 'a.ts', diff: '-old\n+new' } }),
+    tab({ id: 'c', name: 'claude', preset: 'claude', status: 'waiting', needAt: 2, ask: { options: menu, at: 1, tool: 'Bash', what: 'rm -rf build' } }),
+  ]
+  const [edit, cmd] = inboxOf(view(tabs, ws), undefined, true)
+  assert.equal(edit.diff, '-old\n+new')
+  assert.equal(edit.explain, undefined, 'an Edit has no ? (a command has)')
+  assert.equal(cmd.explain, true)
+  assert.deepEqual(cmd.options!.map(o => o.scope), [undefined, "Yes, and don't ask again for: rm *", undefined], 'the standing one carries its words: the card shows its rule, broad in the warning color')
+  assert.equal(inboxOf(view(tabs, ws))[1].explain, undefined, 'Laki AI off: no ?')
+})

@@ -1,6 +1,7 @@
 // Q8: the menu bar icon's state, and its four pictures. Pure (no electron): main wraps a bitmap in a template image
 // (macOS tints it for a light or dark menu bar and for the highlight from its alpha alone: no color), test/tray.test.ts
 // draws all four to PNGs. The renderer works out the state from its view (stateOf) and sends it with the badge.
+import { askScope, optLabel } from './ask.ts'
 import { needsTab } from './nextStep.ts'
 import type { DigestRow, TabView, View } from './types.ts'
 
@@ -116,10 +117,12 @@ export function trayBitmap(state: TrayState, o: { quiet?: boolean; drop?: boolea
 // it lists, from the view as drawn (Recording mode's private workspaces already out). The agents waiting on you first,
 // the oldest first, each with its question and its menu's choices (9 at most: keys 1-9), then the ones at work, 3 at
 // most; muted and archived workspaces aside, as the Dock's count
-export type InboxItem = { tab: string; title: string; body: string; kind: 'ask' | 'working'; options?: { n: number; label: string }[] }
+// an ask's as the cards on screen have it: its Edit's or Write's diff, explain (a command's ?, Laki AI on), each standing
+// choice's scope (its words, whole: the card shows the rule and warns on a broad one)
+export type InboxItem = { tab: string; title: string; body: string; kind: 'ask' | 'working'; options?: { n: number; label: string; scope?: string }[]; diff?: string; explain?: boolean }
 export const INBOX_ASKS = 9
 export const INBOX_WORKING = 3
-export function inboxOf(view: Pick<View, 'tabs' | 'workspaces'>, said: (tab: string) => string | undefined = () => undefined): InboxItem[] {
+export function inboxOf(view: Pick<View, 'tabs' | 'workspaces'>, said: (tab: string) => string | undefined = () => undefined, explain = false): InboxItem[] {
   const ws = new Map(view.workspaces.map(w => [w.id, w]))
   const tabs = view.tabs.filter(t => t.kind === 'agent' && !t.muted && ws.has(t.workspace) && !ws.get(t.workspace)!.muted && !ws.get(t.workspace)!.archived)
   const title = (t: TabView) => (w => `${w.name || w.id} · ${t.name}`.slice(0, 90))(ws.get(t.workspace)!)
@@ -127,7 +130,7 @@ export function inboxOf(view: Pick<View, 'tabs' | 'workspaces'>, said: (tab: str
     .filter(t => t.status === 'waiting')
     .sort((a, b) => (a.needAt ?? 0) - (b.needAt ?? 0))
     .slice(0, INBOX_ASKS)
-    .map((t): InboxItem => ({ tab: t.id, title: title(t), body: (t.ask?.question || said(t.id) || 'Waiting for you').replace(/\s+/g, ' ').slice(0, 300), kind: 'ask', ...(t.ask?.options.length && { options: t.ask.options.slice(0, 9).map(o => ({ n: o.n, label: o.label.slice(0, 80) })) }) }))
+    .map((t): InboxItem => ({ tab: t.id, title: title(t), body: (t.ask?.question || said(t.id) || 'Waiting for you').replace(/\s+/g, ' ').slice(0, 300), kind: 'ask', ...(t.ask?.options.length && { options: t.ask.options.slice(0, 9).map(o => (s => ({ n: o.n, label: o.label.slice(0, 80), ...(s && { scope: optLabel(t.ask!, o) }) }))(askScope(optLabel(t.ask!, o), t.preset))) }), ...(t.ask?.diff && { diff: t.ask.diff }), ...(explain && t.ask?.tool === 'Bash' && { explain: true }) }))
   const working = tabs
     .filter(t => t.status === 'running')
     .slice(0, INBOX_WORKING)

@@ -642,7 +642,7 @@ export function App() {
     return () => clearTimeout(t)
   }, [resetAt])
   const dockBar = view ? dockProgress(view) : -1 // U15: a Ship or a workflow run at work: the Dock's progress bar
-  const inboxItems = view && view.settings.menuBarClick === 'inbox' ? inboxOf(view, id => waits.current.get(id)) : undefined // the menu bar's Inbox (tray.ts)
+  const inboxItems = view && view.settings.menuBarClick === 'inbox' ? inboxOf(view, id => waits.current.get(id), aiOn(view.settings) && hasCap(view, 'ask.explain')) : undefined // the menu bar's Inbox (tray.ts): a command's ? as the cards' (useDaemon)
   const trayKey = JSON.stringify([trayItems, view?.settings.menuBar, view?.settings.recording, trayInfo && [trayInfo.state, trayInfo.working, trayInfo.blocked], trayQuiet, dockBar, inboxItems])
   // Handoff: remote access's address while it runs, with Settings' switch on (main offers only a lasting https one)
   const rem = view?.remote

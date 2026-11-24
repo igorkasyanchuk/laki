@@ -1454,7 +1454,9 @@ those tabs (waiting first, with what they ask): a click opens one. Its *New Work
 small window of its own over the app you're in, as the bubbles' + does; *Open Laki* shows the global hotkey beside it,
 and *Screenshot to Laki AI* (on by default) has its item there with its keys.
 Settings › General › *Menu bar click* (macOS): *Menu* (the menu above) or *Inbox*: a click opens a panel under the icon
-with every agent waiting on you, oldest first, its question and its choices (1–9 picks one, *Open tab* goes there),
+with every agent waiting on you, oldest first, its question and its choices (1–9 picks one, *Open tab* goes there; an
+edit's diff, a *don't ask again* choice's rule, in the warning color when it's broad, and a command's *?* as on the
+cards on screen),
 then what's at work, and a *New task…* box (the quick bar with what you typed); it closes as you click elsewhere or
 press Esc. A right click still opens the menu. Private workspaces stay out of it in Recording mode.
 **Drop on the menu bar icon** (macOS): drag text, files or pictures onto Laki's mark (it gets a frame while you hold

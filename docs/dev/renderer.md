@@ -1516,9 +1516,12 @@ lock: the splash, as before.
 ## The menu bar's Inbox
 
 Settings › General › Menu bar click (`settings.menuBarClick`: `'inbox'`, unset the menu; macOS): App sends
-`shared/tray.ts` `inboxOf(view, said)` with the badge (the view as drawn: Recording mode's private workspaces already
+`shared/tray.ts` `inboxOf(view, said, explain)` with the badge (the view as drawn: Recording mode's private workspaces already
 out): the agents waiting on you, the oldest first, each with its question (else its last waiting turn's words) and its
-menu's choices (9 at most), then 3 at work; muted and archived workspaces aside. Main (`barInbox`) then sets no context
+menu's choices (9 at most; a standing one's `scope`, its words whole: the card draws its rule, broad in the warning
+color), its Edit's or Write's `diff`, `explain` for a command with Laki AI on and the `ask.explain` cap (main's
+`inboxCards` cuts the diff to 4,000 characters and keeps an explanation over the list's updates while its ask is the
+same; `ask-explain` takes the Inbox's sender as the cards'), then 3 at work; muted and archived workspaces aside. Main (`barInbox`) then sets no context
 menu on the tray: its `click` opens `inboxOpen`, its `right-click` pops the menu (`trayBuilt`). The panel is the cards'
 page, `ask.html?window=inbox` (`&solid` with Reduce transparency: a solid window, else the `popover` vibrancy), a
 non-activating panel under `tray.getBounds()`, hidden on blur and on Esc (a click on the icon that blurred it doesn't open

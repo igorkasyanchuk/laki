@@ -142,6 +142,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'Favorites', 'theme star starred favorite'],
   ['general', 'Storage', 'storage folder files artifacts LAKI_STORAGE_FOLDER keep deleted'],
   ['general', 'Open HTML and Markdown artifacts', 'artifacts viewer html markdown md browser embed inline modal open in laki default browser'],
+  ['extras', "The island's screen", 'notch island screen display external main monitor pointer built-in'],
   ['extras', 'Finished ones stand out', 'floating bubbles done finished green pulse attention'],
   ['extras', 'Hide bubbles and cards from screen recording', 'content protection screen share recording screenshot private hide floating bubbles cards'],
   ['presets', 'Tell it about Laki', 'note system prompt skill rename pr storage'],

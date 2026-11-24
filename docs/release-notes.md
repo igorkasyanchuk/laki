@@ -5,7 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
-- The notch island can sit on the main screen or the screen your pointer is on (Settings › Floating bubbles › Screen), not only the built-in one.
+- The menu bar's Inbox shows an edit's diff, a *don't ask again* choice's rule (in the warning color when broad) and a command's *?*, as the cards on screen do.
+- The notch island can sit on the main screen or the screen your pointer is on (Settings › Extras › Floating bubbles › Screen), not only the built-in one.
 - Telegram at Control: `/stop` and a workspace's ⏹ Stop end a turn, and 🔀 Merge on a green PR asks once more before it merges; Laki AI's questions come with a button per answer.
 - The Reader's message box has a mic, on your phone's page too: an Answer only device may dictate now.
 - Allow all, Deny all and the hotkeys never pick Antigravity's choices that hold for the whole conversation or persist ("always grant", "always deny … (Persist to …)", Auto mode), and OpenCode's skills go under `$XDG_CONFIG_HOME` when you set it.
