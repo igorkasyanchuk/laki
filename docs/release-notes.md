@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- `laki restore` refuses a backup with a link, a hard link or a special file in it before it unpacks anything, and a webhook delivery sent again is still refused after Laki restarts.
 - Extensions' secret settings (tokens, API keys) are kept in the macOS Keychain too, moved out of their file as Laki starts; a secret with a line break stays in its own file.
 - Recording mode keeps a private workspace's activity (its turns, asks and terminal output) off agents' and your phone's connections too, not only its rows.
 - A message sent to Laki AI from your phone (remote access) while it was answering you now runs with your phone's limits, not with the rights of the ask it waited behind.

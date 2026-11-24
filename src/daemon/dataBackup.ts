@@ -113,6 +113,10 @@ export async function dataRestore(p: { file?: unknown; dryRun?: boolean; force?:
     if (!n || parts.at(-1)?.startsWith('._')) continue
     if (isAbsolute(raw) || parts.includes('..') || !['manifest.json', ...KEEP].includes(parts[0])) throw new Error(`not a Laki backup: it has ${raw}`)
   }
+  // only plain files and folders, before anything is extracted (tar -tv's first letter): a link, soft or hard (one to a
+  // file of yours would be written through), a FIFO or a device is refused; drop() after the extract stays as a second line
+  for (const l of (await tar(['-tvzf', file])).split('\n').filter(Boolean))
+    if (!/^[-d]/.test(l)) throw new Error(`not a Laki backup: it has ${l[0] === 'l' ? 'a link' : l[0] === 'h' ? 'a hard link' : 'something not a file or folder'} (${l.trim()})`)
   const stage = mkdtempSync(join(dir, '.restore-'))
   try {
     await tar(['-xzf', file, '-C', stage, ...SKIP.flatMap(x => ['--exclude', x])])

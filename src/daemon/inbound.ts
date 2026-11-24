@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import type { InHook, Project } from '../shared/types.ts'
 import * as cs from './codespace.ts'
 import { changed, findProject, firstLine, ghCount, git, log, onGitHub, run, save, state } from './core.ts'
+import { readJson, writeAtomic } from '../shared/conn.ts'
 import { dir } from './dir.ts'
 import { quotaLow } from './pr.ts'
 import { hookPublish } from './remote.ts'
@@ -93,10 +94,12 @@ export function signed(kind: InHook['kind'], secret: string, raw: Buffer, h: Inc
 }
 
 // S11: a signed request sent again (one captured on its way) runs nothing: GitHub's X-GitHub-Delivery and Linear's
-// signature are remembered REPLAY_MS, and Linear's webhookTimestamp must be within it. ponytail: in memory (a restart
-// forgets), and an X-Laki-Key hook has no id to tell one request from its copy
+// signature are remembered REPLAY_MS, and Linear's webhookTimestamp must be within it; on disk too, so a restart forgets
+// none (<data>/hook-deliveries.json, 0600, as main.ts' e2e-salts.json). ponytail: an X-Laki-Key hook has no id to tell one
+// request from its copy
 const REPLAY_MS = 600_000
-const deliveries = new Map<string, number>()
+const DELIVERIES = join(dir, 'hook-deliveries.json')
+const deliveries = new Map<string, number>(Object.entries((readJson<Record<string, unknown>>(DELIVERIES) ?? {}) as Record<string, unknown>).filter((e): e is [string, number] => typeof e[1] === 'number' && Date.now() - e[1] <= REPLAY_MS))
 export function replayed(name: string, kind: InHook['kind'], h: IncomingMessage['headers'], body: unknown, now = Date.now()) {
   for (const [k, at] of deliveries) if (now - at > REPLAY_MS) deliveries.delete(k)
   let id = ''
@@ -110,6 +113,11 @@ export function replayed(name: string, kind: InHook['kind'], h: IncomingMessage[
   const key = `${name}\0${id}`
   if (deliveries.has(key)) return 'replayed: that delivery came already'
   deliveries.set(key, now)
+  try {
+    writeAtomic(DELIVERIES, JSON.stringify(Object.fromEntries(deliveries)), 0o600) // before it runs: a crash then can't let its copy in
+  } catch (e) {
+    log(`webhooks: deliveries not kept on disk (${(e as Error).message}): a restart forgets them`)
+  }
 }
 function answer(res: ServerResponse, code: number, body: object) {
   res.writeHead(code, { 'content-type': 'application/json' })

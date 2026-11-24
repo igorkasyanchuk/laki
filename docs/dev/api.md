@@ -163,7 +163,9 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   the AI chats and review-notes goes in (DATA_SECRETS is what an agent's Read never reads, not what a backup leaves out).
   Not `turns`: their refs (`refs/laki/turns/*`) live in each repo, so an index copied without them would offer rewinds
   that fail; the help, Settings and the restore sheet say they stay on this Mac. `dataRestore` (`file`, `dryRun`, `force`):
-  its names listed first (only the manifest and `BACKUP_KEEP`'s, none absolute or with `..`), extracted into
+  its names listed first (only the manifest and `BACKUP_KEEP`'s, none absolute or with `..`), then its entries' types
+  (`tar -tvzf`'s first letter: plain files and folders only, a link, a hard link, a FIFO or a device refused before any
+  extract; `drop` after it stays), extracted into
   `<data>/.restore-…`, links and other non-files dropped (`dropped`), a manifest with a higher `stateV` refused, refused
   while `agentsBusy` unless `force`; `{ dryRun?, manifest, rows: { what, now, backup }[], dropped, aside }`. Not a dry
   run: the daemon stops 200 ms after its answer and `shutdown` calls `apply` last (the daemon.lock kept till then): each

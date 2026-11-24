@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer, request } from 'node:http'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -608,4 +608,20 @@ test("laki backup and restore: a note and a workflow come back in another world;
   assert.match(r.err, /not a Laki backup: it has daemon.json/)
   r = await b.cli('restore', make('newer', { 'manifest.json': manifest(99), 'state.json': '{}' }), '--dry-run')
   assert.match(r.err, /from a newer Laki \(99.0.0, state v99/)
+  // a link (to a file of yours: written through as it's restored), a hard link: refused before anything is extracted
+  const odd = (name: string, add: (notes: string) => void) => {
+    const d = join(b.home, name)
+    mkdirSync(join(d, 'notes'), { recursive: true })
+    writeFileSync(join(d, 'manifest.json'), manifest(1))
+    writeFileSync(join(d, 'state.json'), '{}')
+    add(join(d, 'notes'))
+    execFileSync('tar', ['-czf', `${d}.tgz`, '-C', d, 'manifest.json', 'state.json', 'notes'], { env: { ...process.env, COPYFILE_DISABLE: '1' } })
+    return `${d}.tgz`
+  }
+  const stages = () => readdirSync(b.data).filter(n => n.startsWith('.restore-')).length
+  r = await b.cli('restore', odd('soft', n => symlinkSync(join(b.home, '.zshrc'), join(n, 'x.json'))), '--dry-run')
+  assert.match(r.err, /not a Laki backup: it has a link \(.*notes\/x\.json -> /)
+  r = await b.cli('restore', odd('hard', n => (writeFileSync(join(n, 'a.json'), '{}'), linkSync(join(n, 'a.json'), join(n, 'b.json')))), '--dry-run')
+  assert.match(r.err, /not a Laki backup: it has a hard link \(.*notes\/b\.json link to /)
+  assert.equal(stages(), 0, 'nothing was extracted')
 })

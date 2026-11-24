@@ -192,7 +192,8 @@ them all) (M4); S11: also `tunnelStart`, `scheduleSet`, `shareStart` with `hours
 script (`SCRIPT_KEYS`: setup, teardown, run, test, lint, format, deploy, ticket, check, actions, env; a config replaces the
 whole, so one left out counts as changed). A shell tab still opens from the phone: it's the user, signed in.
 Webhooks (inbound.ts, S11): a signed delivery sent again runs nothing (409): GitHub's `X-GitHub-Delivery` and Linear's
-signature remembered 10 minutes (`replayed`), Linear's `webhookTimestamp` within them. `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
+signature remembered 10 minutes (`replayed`), on disk too (`<data>/hook-deliveries.json`, 0600, written before the
+delivery runs: a restart forgets none), Linear's `webhookTimestamp` within them. `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
 `--allowed-mail`; a 6-digit `pin` (`randomInt`, shown in Settings): the link's token (`POST /pin`, `remotePin`, main.ts:
 from the tunnel's origin) then says `need`, and `{ token, pin }` gives `access` (and `used`: a right PIN, once); a wrong PIN counts `left` down from `settings.remoteTries` (1-10, `REMOTE_TRIES` 2), the
 last stops it and broadcasts `remote` (App: a toast and a notification). The page (`api.ts`) asks `/pin` before its

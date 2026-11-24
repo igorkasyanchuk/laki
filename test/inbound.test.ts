@@ -110,3 +110,23 @@ test('webhook: a good signature emits, a bad one 401, an unknown name or /rpc 40
   assert.ok(!existsSync(secretFile))
   assert.equal(await post('/hook/gh', body, { 'x-hub-signature-256': sig(g.secret, body) }), 404)
 })
+
+test('S11: a webhook delivery sent again after a restart is still refused: the replay cache is on disk (hook-deliveries.json, 0600)', async t => {
+  const rig = await fresh(t)
+  const g = await rig.rpc('hookAdd', { name: 'gh', kind: 'github' })
+  const l = await rig.rpc('hookAdd', { name: 'lin', kind: 'linear' })
+  const port = async () => (await until(async () => (x => x.port && x)(await rig.rpc('hookList')), 'its server')).port
+  const post = async (path: string, b: string, headers: Record<string, string>) => fetch(`http://127.0.0.1:${await port()}${path}`, { method: 'POST', body: b, headers }).then(r => r.status)
+  const body = JSON.stringify({ action: 'labeled', issue: { number: 7 } })
+  const gh = (id: string) => ({ 'x-hub-signature-256': `sha256=${createHmac('sha256', g.secret).update(body).digest('hex')}`, 'x-github-event': 'issues', 'x-github-delivery': id })
+  const lin = JSON.stringify({ type: 'Issue', webhookTimestamp: Date.now() })
+  const linH = { 'linear-signature': createHmac('sha256', l.secret).update(lin).digest('hex') }
+  assert.equal(await post('/hook/gh', body, gh('d-1')), 202)
+  assert.equal(await post('/hook/lin', lin, linH), 202)
+  assert.equal(statSync(join(rig.data, 'hook-deliveries.json')).mode & 0o777, 0o600)
+  await rig.stop()
+  await rig.start()
+  assert.equal(await post('/hook/gh', body, gh('d-1')), 409, 'a GitHub delivery replayed after a restart')
+  assert.equal(await post('/hook/lin', lin, linH), 409, 'a Linear one too')
+  assert.equal(await post('/hook/gh', body, gh('d-2')), 202, 'a new one goes')
+})
