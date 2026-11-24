@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The Review tab's head on the Default and Frosted designs: two capsules (which changes; the actions), as the window's top bar, the diff fading under it.
+- A file's head in the Review tab is quieter: pin, blame and its open buttons show as you point at it or reach it by keyboard (always for a pinned file and the one you're on); a touch screen gets one ⋯ instead.
 - A Review tab comment sent to an agent stays, with what its next turn did: *changed here* (What changed lights it) or *not changed* (Remind the agent sends those again); Accept puts it under Done.
 
 ## 0.63.0 · Nov 24, 2026

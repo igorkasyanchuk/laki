@@ -47,3 +47,28 @@ html[data-glide] .fr-cols { transition: grid-template-columns var(--t-spring-sof
 .fr-done > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-1); }
 .fr-note-done { display: flex; align-items: center; gap: var(--sp-2); color: var(--muted); padding: var(--sp-1) 0; }
 .fr-note-done .mono { flex: none; }
+/* the head's controls in two groups (scope; the actions): on the Default and Frosted designs (FullReview's caps:
+   .fr-head[data-caps]) each a capsule as the window's top bar's (styles.css V11, --cap-*), no fill or line under the
+   head, the files and the diff fading under it as they scroll (ScrollEdge); other designs: the groups add nothing */
+.fr-group { display: contents; }
+.fr-group.capsule { display: inline-flex; align-items: center; flex: none; gap: var(--sp-1); padding: var(--sp-1); }
+.fr-group.capsule :is(.ib, button.ghost) { border-radius: var(--r-in); }
+.fr-group.capsule button.ghost { border-color: transparent; background: none; }
+.fr-group.capsule button.ghost:hover { background: var(--hover); }
+.fr-group.capsule .seg { gap: var(--sp-1); }
+.fr-group.capsule .seg button { margin-left: 0; border: none; border-radius: var(--r-in); background: none; color: var(--muted); }
+.fr-group.capsule .seg button.on { background: var(--hover); color: var(--fg); }
+.fr-head[data-caps] { background: none; border-bottom-color: transparent; }
+.fr-head[data-caps] ~ .fr-cols .fr-diff[data-scrolled] { mask-image: linear-gradient(to bottom, transparent, #000 20px); }
+@media (prefers-reduced-transparency: reduce) { .fr-head[data-caps] ~ .fr-cols .fr-diff[data-scrolled] { mask-image: none; box-shadow: inset 0 1px 0 var(--line); } }
+/* a file's head: its secondary buttons (pin, blame, open…) quiet until its row is pointed at or has the keyboard's
+   focus, always shown for a pinned file and the file the keys are on (data-show); opacity, never display, so their
+   room stays and Tab reaches them. A touch screen: one ⋯ (.fr-file-more) with the same, as a menu */
+.fr-file-acts { display: inline-flex; align-items: center; flex: none; opacity: 0; pointer-events: none; transition: opacity var(--t-fast) var(--ease); }
+.fr-file > .sp-row:is(:hover, :focus-within) .fr-file-acts, .fr-file-acts[data-show] { opacity: 1; pointer-events: auto; }
+.fr-file-more { display: none; }
+@media (pointer: coarse) {
+  .fr-file-acts { display: none; }
+  .fr-file-more { display: inline-flex; }
+}
+html[data-motion='none'] .fr-file-acts { transition: none; }

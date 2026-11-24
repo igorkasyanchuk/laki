@@ -91,7 +91,7 @@ const REVIEW_KEYS: [string, string][] = [['j', 'Next file'], ['k', 'Previous fil
 // next: the workspace to review after this one (shared/nextStep.ts reviewQueue: App's), its bar once every file is viewed
 // (asked only then: the queue walks every workspace)
 type Next = { name: string; files?: number; pr: string; more: number; key?: string; go: () => void } // files: its diff's, once scanned
-export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, notesAt, onOpen, onTight, next }: { ws: string; notesAt?: number; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: () => Next | undefined }) {
+export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api: wsApi, stat, notesAt, caps, onOpen, onTight, next }: { ws: string; notesAt?: number; caps?: boolean; base: string; branch?: string; pr?: Pick<PR, 'number' | 'url' | 'title' | 'body' | 'author' | 'base' | 'head' | 'forge'>; linked?: boolean; empty?: boolean; worktree: boolean; api: ReviewApi; stat: string; onOpen: (url: string) => void; onTight?: () => void; next?: () => Next | undefined }) {
   const [scope, setScope] = useScope('laki.reviewScope', !!pr && pr.forge !== 'gitlab', !!linked, worktree, false, empty) // Diff.tsx: Branch, Uncommitted, PR #n
   const all = scope === 'pr'
   const unc = scope === 'uncommitted'
@@ -655,8 +655,11 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
   )
   return (
     <div className="full-review" ref={root} tabIndex={-1} data-find>
-      <div className="fr-head">
-        <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} branch={`All changes vs ${baseName}`} />
+      {/* caps (the Default and Frosted designs): two capsule groups, as the window's top bar has, no fill or line under */}
+      <div className="fr-head" data-caps={caps ? '' : undefined}>
+        <div className={`fr-group${caps ? ' capsule' : ''}`} role="group" aria-label="Which changes">
+          <ScopeSeg scope={scope} onScope={setScope} pr={pr} worktree={worktree} branch={`All changes vs ${baseName}`} />
+        </div>
         <span className="muted small grow">
           {d ? (
             <>
@@ -665,23 +668,25 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
             </>
           ) : err ? '' : 'Loading…'}
         </span>
-        {wsApi.walk && files.length > 0 && (
-          <button type="button" className={`ghost fr-walk-btn ${walk && stepsOn && !filesOff ? 'on' : ''}`} aria-disabled={walking || (!walk && !!walkWhy) || undefined} data-tip={walking ? 'Laki AI reads the changes' : walk ? 'The steps Laki AI put the changes in' : (walkWhy ?? 'Laki AI puts the changes in 3 to 7 steps to read in order')} onClick={() => (walking || (!walk && walkWhy) ? undefined : walk ? (setStepsOn(true), hideFiles(false)) : walkAsk())}>
-            <Icon name="map" size={12} /> {walking ? 'Reading…' : 'Walk through'}
+        <div className={`fr-group${caps ? ' capsule' : ''}`} role="group" aria-label="Review actions">
+          {wsApi.walk && files.length > 0 && (
+            <button type="button" className={`ghost fr-walk-btn ${walk && stepsOn && !filesOff ? 'on' : ''}`} aria-disabled={walking || (!walk && !!walkWhy) || undefined} data-tip={walking ? 'Laki AI reads the changes' : walk ? 'The steps Laki AI put the changes in' : (walkWhy ?? 'Laki AI puts the changes in 3 to 7 steps to read in order')} onClick={() => (walking || (!walk && walkWhy) ? undefined : walk ? (setStepsOn(true), hideFiles(false)) : walkAsk())}>
+              <Icon name="map" size={12} /> {walking ? 'Reading…' : 'Walk through'}
+            </button>
+          )}
+          {/* U2: the keys in a popover, each with what it does: no bare legend */}
+          <button type="button" className="ghost fr-keys-btn" aria-haspopup="menu" onClick={e => openMenu(e, [{ head: 'Keys in the review' }, ...REVIEW_KEYS.map(([k, what]) => ({ label: what, hint: k, run: () => {} }))])}>
+            Keys
           </button>
-        )}
-        {/* U2: the keys in a popover, each with what it does: no bare legend */}
-        <button type="button" className="ghost fr-keys-btn" aria-haspopup="menu" onClick={e => openMenu(e, [{ head: 'Keys in the review' }, ...REVIEW_KEYS.map(([k, what]) => ({ label: what, hint: k, run: () => {} }))])}>
-          Keys
-        </button>
-        {anyOpen ? (
-          <IconButton icon="collapse" title="Collapse all" onClick={() => setShown(listed.map(f => f.path), false)} />
-        ) : (
-          <IconButton icon="expand" title={unread.length && unread.length < listed.length ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setShown(unread.length ? unread : listed.map(f => f.path), true)} />
-        )}
-        <SplitToggle s={sp} />
-        {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
-        <IconButton icon="refresh" title="Refresh" onClick={reload} />
+          {anyOpen ? (
+            <IconButton icon="collapse" title="Collapse all" onClick={() => setShown(listed.map(f => f.path), false)} />
+          ) : (
+            <IconButton icon="expand" title={unread.length && unread.length < listed.length ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setShown(unread.length ? unread : listed.map(f => f.path), true)} />
+          )}
+          <SplitToggle s={sp} />
+          {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
+          <IconButton icon="refresh" title="Refresh" onClick={reload} />
+        </div>
       </div>
       <div className="fr-cols" style={{ gridTemplateColumns: `${left}px minmax(min(${DIFF_MIN}px, 100% - ${left + right}px), 1fr) ${right}px` }}>
         {filesOff ? (
@@ -821,6 +826,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
         )}
         {!filesOff && <Edge x={{ left: fw }} to={(x, box) => setFw(Math.round(Math.max(140, Math.min(x - box.left, 640, box.width - right - 320))))} done={() => store(FILES_W, fw)} reset={() => (setFw(FILES_INIT), store(FILES_W, FILES_INIT))} init={FILES_INIT} />}
         <div className="fr-diff" ref={el => void ((body.current = el), sp.room(el))} onScroll={() => (clearTimeout(spyAt.current), (spyAt.current = setTimeout(() => ((spyAt.current = undefined), spy()), 120)))}>
+          <ScrollEdge />
           <DiffFind
             at={root}
             within={body}
@@ -863,12 +869,24 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                       <span className="add">+{f.add}</span> <span className="del">−{f.del ?? 0}</span>
                     </span>
                   )}
-                  <IconButton icon="pin" title={pins.includes(f.path) ? 'Unpin (p)' : 'Pin to the top (p): first in both lists'} on={pins.includes(f.path)} onClick={e => (e.stopPropagation(), pinGo(f.path))} />
-                  {!all && !IMAGE.test(f.path) && <IconButton icon="history" title={blaming ? 'Hide blame (b)' : "Blame (b): who last changed each line, the base's for lines taken out, the branch's for the rest"} on={blaming} onClick={e => (e.stopPropagation(), blame(f.path))} />}
-                  {api.web && <IconButton icon="externalLink" title={`Open on remote: at ${baseName.replace(/^origin\//, '')} or at ${branch || 'the branch'}`} onClick={e => (e.stopPropagation(), openMenu(e, webSub(api, f.path, baseName, branch)))} />}
-                  {f.status[0] !== 'D' && !all && canPage(api, f.path) && <IconButton icon="globe" title="View as page: the file as it is in the worktree now" onClick={e => (e.stopPropagation(), api.page!(f.path))} />}
-                  {f.status[0] !== 'D' && !all && <IconButton icon="file" title="Show the file" onClick={e => (e.stopPropagation(), api.preview(f.path))} />}
-                  {f.status[0] !== 'D' && !all && <IconButton icon="code" title="Open in the editor" onClick={e => (e.stopPropagation(), api.openFile(f.path))} />}
+                  {/* the secondary buttons: shown on the row's hover and keyboard focus, always for a pinned file and the one
+                      the keys are on (here); hidden by opacity, so their room stays and Tab still reaches them. A touch
+                      screen: one ⋯ with the same, as a menu */}
+                  <span className="fr-file-acts" data-show={pins.includes(f.path) || f.path === here ? '' : undefined}>
+                    <IconButton icon="pin" title={pins.includes(f.path) ? 'Unpin (p)' : 'Pin to the top (p): first in both lists'} on={pins.includes(f.path)} onClick={e => (e.stopPropagation(), pinGo(f.path))} />
+                    {!all && !IMAGE.test(f.path) && <IconButton icon="history" title={blaming ? 'Hide blame (b)' : "Blame (b): who last changed each line, the base's for lines taken out, the branch's for the rest"} on={blaming} onClick={e => (e.stopPropagation(), blame(f.path))} />}
+                    {api.web && <IconButton icon="externalLink" title={`Open on remote: at ${baseName.replace(/^origin\//, '')} or at ${branch || 'the branch'}`} onClick={e => (e.stopPropagation(), openMenu(e, webSub(api, f.path, baseName, branch)))} />}
+                    {f.status[0] !== 'D' && !all && canPage(api, f.path) && <IconButton icon="globe" title="View as page: the file as it is in the worktree now" onClick={e => (e.stopPropagation(), api.page!(f.path))} />}
+                    {f.status[0] !== 'D' && !all && <IconButton icon="file" title="Show the file" onClick={e => (e.stopPropagation(), api.preview(f.path))} />}
+                    {f.status[0] !== 'D' && !all && <IconButton icon="code" title="Open in the editor" onClick={e => (e.stopPropagation(), api.openFile(f.path))} />}
+                  </span>
+                  <IconButton icon="more" className="fr-file-more" title="More for this file" onClick={e => (e.stopPropagation(), openMenu(e, [
+                    { label: pins.includes(f.path) ? 'Unpin' : 'Pin to the top', icon: 'pin', run: () => pinGo(f.path) },
+                    ...(!all && !IMAGE.test(f.path) ? [{ label: blaming ? 'Hide blame' : 'Blame', icon: 'history', run: () => blame(f.path) } as MenuItem] : []),
+                    ...(api.web ? [{ label: 'Open on remote', icon: 'externalLink', items: webSub(api, f.path, baseName, branch) } as MenuItem] : []),
+                    ...(f.status[0] !== 'D' && !all && canPage(api, f.path) ? [{ label: 'View as page', icon: 'globe', run: () => api.page!(f.path) } as MenuItem] : []),
+                    ...(f.status[0] !== 'D' && !all ? [{ label: 'Show the file', icon: 'file', run: () => api.preview(f.path) } as MenuItem, { label: 'Open in the editor', icon: 'code', run: () => api.openFile(f.path) } as MenuItem] : []),
+                  ]))} />
                   <label className="sp-viewed fr-viewed-box" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={viewed(f.path)} onChange={e => mark([f.path], e.target.checked)} /> Viewed
                   </label>

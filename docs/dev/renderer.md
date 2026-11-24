@@ -1186,6 +1186,14 @@ The Review tab's room (U6): FullReview watches its own width (a ResizeObserver o
 `onTight` has App hide the side panel while the Review tab shows (`reviewTight`, back as you leave the tab); under
 `HEAD_MIN` (720px) the head's count is `+a −d` without its "n files".
 
+The head's two groups (FullReview's `caps`, Body: the Default design, unset or classic, and Frosted): the scope
+segments and the actions, each a `.capsule` (V11's, `--cap-*`), the head's fill and line gone (`.fr-head[data-caps]`)
+and the diff fading under it as it scrolls (a ScrollEdge in `.fr-diff`, as `.fr-files`); other designs: the groups are
+`display: contents`, today's head. A file's head: its secondary buttons (pin, blame, open on remote, view as page,
+show, editor) in `.fr-file-acts`, opacity 0 until its row's `:hover` or `:focus-within` (Tab still reaches them), shown
+for a pinned file and the one the keys are on (`data-show`: `here`); `(pointer: coarse)`: one ⋯ (`.fr-file-more`) with
+the same as a menu. `test/css.test.ts` holds it to opacity.
+
 Sent comments (FullReview's `send`, `remind`): *Send to* sends only those with no `sentAt` and stamps them (`sentAt`,
 `tab`, `state: 'sent'`) instead of dropping them; the daemon sets `changed` or `unchanged` as that tab's next turn ends
 (docs/dev/api.md `reviewNotesSet`) and the workspace's `notesAt` makes the tab read them again (`notesAt` effect: what

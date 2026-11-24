@@ -160,3 +160,27 @@ test('the root rule keeps text at its size on a phone (text-size-adjust, both fo
   assert.match(root, /(^|\s)-webkit-text-size-adjust: 100%;/)
   assert.match(root, /(^|\s)text-size-adjust: 100%;/)
 })
+
+test("the Review tab's file head: its secondary buttons quiet by opacity, never display (their room stays, Tab reaches them)", () => {
+  const root = postcss.parse(readFileSync(new URL('../src/renderer/src/review.css', import.meta.url), 'utf8'))
+  const decls = (sel: string) => {
+    const out: Record<string, string> = {}
+    root.walkRules(r => {
+      if (r.parent?.type === 'atrule') return // the touch screen's swap (⋯) is its own
+      if (r.selectors.includes(sel)) r.walkDecls(d => void (out[d.prop] = d.value))
+    })
+    return out
+  }
+  const rest = decls('.fr-file-acts')
+  assert.equal(rest.opacity, '0')
+  assert.equal(rest['pointer-events'], 'none')
+  assert.notEqual(rest.display, 'none')
+  assert.match(rest.transition ?? '', /var\(--t-[a-z]+\)/, 'its fade on the motion tokens')
+  const shown = decls('.fr-file-acts[data-show]')
+  assert.equal(shown.opacity, '1')
+  assert.equal(shown.display, undefined)
+  // shown on the row's hover and keyboard focus
+  let lit = false
+  root.walkRules(r => void (r.selectors.some(s => /\.sp-row:is\(:hover, :focus-within\) \.fr-file-acts/.test(s)) && (lit = true)))
+  assert.ok(lit, 'on :hover and :focus-within')
+})
