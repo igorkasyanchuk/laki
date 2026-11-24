@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Counts roll digit by digit as they change (Needs you, the rail, the Review tab's +/−), and keep their width while they do.
 - Glass has a Strength, as macOS 26: Clear, Regular or Tinted, each with a sample (Settings › Layout › Glass). [Try it](laki://settings/layout?spot=Strength)
 - Glass reads over any wallpaper: the sidebar, the rail and the tab bar stay strong enough, and the hints a step lighter than the text, so a dark theme over a bright desktop (or a light one over a dark desktop) no longer fades out.
 - The Review tab's head on the Default and Frosted designs: two capsules (which changes; the actions), as the window's top bar, the diff fading under it.

@@ -22,7 +22,7 @@ import { SplitToggle, useSplit, type Annot, AnnotRows, annotClass, annotsOn, NO_
 import { ago, Avatar } from './Info'
 import { Folded, Markdown } from './MarkdownView'
 import type { PanelApi, Thread } from './SidePanel'
-import { Edge, Icon, IconButton, keep as store, load, type MenuItem, useMenu, act, ScrollEdge } from './ui'
+import { Edge, Icon, IconButton, keep as store, load, type MenuItem, Num, useMenu, act, ScrollEdge } from './ui'
 import { fileTree, hunkNext, prName, prNo, reviewList } from './text'
 import './review.css'
 
@@ -866,7 +866,7 @@ export function FullReview({ ws, base, branch, pr, linked, empty, worktree, api:
                   {blaming && blameWhy(f.path) && <span className="muted small fr-why">{blameWhy(f.path)}</span>}
                   {f.add !== undefined && !IMAGE.test(f.path) && (
                     <span className="mono small">
-                      <span className="add">+{f.add}</span> <span className="del">−{f.del ?? 0}</span>
+                      <span className="add">+<Num value={f.add} /></span> <span className="del">−<Num value={f.del ?? 0} /></span>
                     </span>
                   )}
                   {/* the secondary buttons: shown on the row's hover and keyboard focus, always for a pinned file and the one

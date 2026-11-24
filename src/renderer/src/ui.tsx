@@ -5,10 +5,10 @@ import { flipMoves } from './flip'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
-import { inAim, menuKeys, midCut, snap, stackOrder, tipDelay, tipParts } from './text'
+import { inAim, menuKeys, midCut, rollCols, snap, stackOrder, tipDelay, tipParts } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
-import { morphOk } from './motion'
+import { morphOk, moving } from './motion'
 
 // localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
 export function load<T>(key: string, or: T): T {
@@ -1257,31 +1257,46 @@ const tipText = (text: string) =>
     ),
   )
 
-// a number that slides to its new value: the old one out (up as it grows, down as it shrinks), the new one in, 250 ms
-// on --spring (styles.css .num). None as it first draws, more than 3 changes in a second (it just swaps), Motion: None
-// or the system's Reduce motion (styles.css). A string's first number tells which way ("3/7"); the moving copy is
-// aria-hidden, so a screen reader reads the value once
-const NUM_RATE = 3
-export function Num({ value }: { value: number | string }) {
-  const was = useRef(value)
-  const times = useRef<number[]>([])
-  const [out, setOut] = useState<{ text: number | string; dir: 'up' | 'down'; k: number } | null>(null)
+// a number that rolls to its new value, digit by digit: each position a column (tabular figures) whose old digit
+// slides out and new one in on --spring (up as it grows, down as it shrinks; text.ts rollCols: a dot, a sign or a
+// currency mark swaps in place), as wide as the wider of the two until it settles. None as it first draws, within a
+// second of its last change (it just swaps), with Motion: None, Reduce motion or the window away (motion.ts moving).
+// Its name is the plain value; the columns are aria-hidden
+export function Num({ value, format }: { value: number | string; format?: (v: number | string) => string }) {
+  const text = format ? format(value) : String(value)
+  const was = useRef(text)
+  const last = useRef(0)
+  const [roll, setRoll] = useState<{ from: string; dir: 'up' | 'down'; k: number } | null>(null)
   useEffect(() => {
     const old = was.current
-    if (old === value) return
-    was.current = value
+    if (old === text) return
+    was.current = text
     const now = Date.now()
-    times.current = [...times.current.filter(t => now - t < 1000), now]
-    if (times.current.length > NUM_RATE) return setOut(null)
-    const n = (v: number | string) => Number(String(v).match(/-?\d+(\.\d+)?/)?.[0] ?? NaN)
-    setOut({ text: old, dir: n(value) < n(old) ? 'down' : 'up', k: now })
-    const t = setTimeout(() => setOut(null), 300)
+    const quick = now - last.current < 1000
+    last.current = now
+    if (quick || !moving()) return setRoll(null)
+    const n = (v: string) => Number(v.match(/-?\d+(\.\d+)?/)?.[0] ?? NaN)
+    setRoll({ from: old, dir: n(text) < n(old) ? 'down' : 'up', k: now })
+    const t = setTimeout(() => setRoll(null), 650) // --t-spring and a frame
     return () => clearTimeout(t)
-  }, [value])
+  }, [text])
   return (
-    <span className={`num-roll${out ? ` num-${out.dir}` : ''}`}>
-      {out && <span key={`o${out.k}`} className="num-out" aria-hidden>{out.text}</span>}
-      <span key={`i${out?.k ?? 0}`} className="num-in">{value}</span>
+    <span className={`num-roll${roll ? ` num-${roll.dir}` : ''}`} aria-label={text}>
+      <span className="num-sr">{text}</span>
+      <span className="num-cols" aria-hidden>
+        {roll
+          ? rollCols(roll.from, text).map((c, i) =>
+              c.rolls ? (
+                <span key={`${roll.k}-${i}`} className="num-col">
+                  <span className="num-out">{c.from}</span>
+                  <span className="num-in">{c.to}</span>
+                </span>
+              ) : (
+                <span key={`${roll.k}-${i}`} className="num-col">{c.to}</span>
+              ),
+            )
+          : text}
+      </span>
     </span>
   )
 }

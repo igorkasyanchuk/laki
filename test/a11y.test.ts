@@ -68,3 +68,13 @@ test('every clicked element in the renderer is a control to the keyboard too', (
   const bad = readdirSync(dir).filter(f => f.endsWith('.tsx')).flatMap(f => mute(readFileSync(join(dir, f), 'utf8')).map(l => `${f}:${l}`))
   assert.deepEqual(bad, [])
 })
+
+// ui.tsx Num: a rolling number reads as its plain value (aria-label, and a visually hidden copy), its moving columns
+// hidden from a screen reader
+test('Num exposes its value as a name; its rolling columns are aria-hidden', () => {
+  const ui = readFileSync(join(dir, 'ui.tsx'), 'utf8')
+  const num = ui.slice(ui.indexOf('export function Num('), ui.indexOf('\n}\n', ui.indexOf('export function Num(')))
+  assert.match(num, /<span className=\{`num-roll[^>]*aria-label=\{text\}>/, 'its root named by the value')
+  assert.match(num, /<span className="num-sr">\{text\}<\/span>/, 'and the value as text')
+  assert.match(num, /<span className="num-cols" aria-hidden>/, 'the columns hidden')
+})

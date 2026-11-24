@@ -1603,3 +1603,15 @@ test('planLeft: the tighter of two windows; an error row nothing; a reset past n
   assert.equal(usageRow(rows, 'claude')?.account, 'home')
   assert.equal(usageRow(rows, 'codex'), undefined)
 })
+
+test('rollCols: which positions of a number roll (digits, one coming or going) and which swap (a dot, a sign)', async () => {
+  const { rollCols } = await import('../src/renderer/src/text.ts')
+  const rolls = (a: string, b: string) => rollCols(a, b).map(c => (c.rolls ? 'r' : c.from === c.to ? '=' : 's')).join('')
+  assert.equal(rolls('9', '10'), 'rr') // a 1 comes in on the left, 9 rolls to 0
+  assert.deepEqual(rollCols('9', '10').map(c => [c.from, c.to]), [[' ', '1'], ['9', '0']])
+  assert.equal(rolls('4.10', '4.36'), '==rr') // the dot stays
+  assert.equal(rolls('-3', '12'), 'sr') // the minus swaps to 1, 3 rolls to 2
+  assert.equal(rolls('10', '9'), 'rr') // shrinking: the 1 goes, its column kept while it does
+  assert.equal(rolls('$4.10', '$12.00'), 'ssr=r=') // right-aligned: a $ comes in and $→1 swap, 4→2 and 1→0 roll, the dot stays
+  assert.equal(rolls('42', '42'), '==')
+})

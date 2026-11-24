@@ -1156,3 +1156,13 @@ export function toolSummary(text: string) {
   const parts = [...by].map(([name, ws]) => (ws.length === 1 ? one(name, ws[0]) : `${name} ${ws.length} ${FILE_TOOLS.has(name) ? 'files' : 'times'}`))
   return parts.length > 3 ? `${parts.slice(0, 3).join(' · ')} · +${parts.length - 3} more` : parts.join(' · ')
 }
+
+// ui.tsx Num's columns: the old and the new string right-aligned (a number grows on its left), each position's old and
+// new character and whether it rolls: a digit to another, one coming or going; a dot, a sign or a currency mark (or a
+// digit becoming one) swaps in place
+export function rollCols(from: string, to: string) {
+  const n = Math.max(from.length, to.length)
+  const [a, b] = [from.padStart(n, ' '), to.padStart(n, ' ')]
+  const d = (c: string) => c >= '0' && c <= '9'
+  return [...b].map((c, i) => ({ from: a[i], to: c, rolls: a[i] !== c && (d(a[i]) || a[i] === ' ') && (d(c) || c === ' ') }))
+}

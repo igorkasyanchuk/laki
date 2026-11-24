@@ -67,6 +67,9 @@ export function away(on: boolean) {
   held.clear()
 }
 
+// whether something may move now (ui.tsx Num): not under Reduce motion or Motion: Off, nor with the window away
+export const moving = () => !still() && !document.documentElement.classList.contains('away')
+
 // whether a view transition may run (ui.tsx' morph, themes.ts' paintTheme): the API there, a window that draws, not
 // under Reduce motion, Motion: Off or ui-smoke. Here, not in themes.ts: its table stays out of ui.tsx' first load
 export const morphOk = () => typeof document.startViewTransition === 'function' && !document.hidden && document.hasFocus() && !('smoke' in document.documentElement.dataset) && !still()

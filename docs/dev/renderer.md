@@ -1425,10 +1425,16 @@ bitmap looks: the sheet goes), and not the accent when you picked one in Setting
 
 ## Numbers that slide
 
-ui.tsx `Num`: the old value slides out (up as it grows, down as it shrinks) and the new one in, 250 ms on `--spring`
-(styles.css `.num`, one grid cell, `1lh` tall, tabular figures). None as it first draws, past 3 changes a second, with
-Motion: None or the system's Reduce motion (CSS). The leaving copy is `aria-hidden`. Used for the rail's counts, Needs
-you's count, a row's plan n/m and +/−, and the status bar's context %.
+ui.tsx `Num { value, format? }`: digit by digit. text.ts `rollCols` lines the old and the new string up from the right
+(a number grows on its left) and says which positions roll: a digit to another, or one coming or going (a blank); a
+dot, a sign or a currency mark swaps in place. Each position is a column (`.num-col`: one grid cell, `1lh` tall,
+tabular figures), a rolling one with its old digit sliding out and its new one in (up as the value grows, down as it
+shrinks) on `--spring` over `--t-spring`; the columns are as wide as the wider string until it settles, then the plain
+text. None as it first draws, within a second of its last change, with Motion: None, Reduce motion or the window away
+(motion.ts `moving`; the CSS stops the animation too). Its name is the value (`aria-label`, and `.num-sr`, a visually
+hidden copy); the columns are `aria-hidden` (`test/a11y.test.ts`). Used for the rail's counts, Needs you's count, a
+row's plan n/m and +/−, the Review tab's +/− per file, and the status bar's context % (it shows no cost of its own: a
+chat's cost is in its context's tooltip).
 
 
 ## Folds
