@@ -667,7 +667,9 @@ limits, `labs`, `workflows`, `turnsKept`…); `test/settings-gates.test.ts` (no 
 neither, and `test/docs.test.ts` holds SECURITY.md's paragraph to them. The call's own keys (`from`, `caller`,
 `byClient`, `now`, `touchTicket`, `cid`: `CALL_KEYS`) are no setting. Recording mode (S7): `state` from an agent,
 Laki AI's (`aiRpc`) and the state a WebSocket of an agent's process or remote access's page gets go through types.ts'
-`recorded` (no private workspace, its tabs, nor a private project), and `turnList` and `turnDiff` refuse an agent a
+`recorded` (no private workspace, its tabs, nor a private project), the other events such a socket would get go
+through `isHiddenEvent` (one naming a private workspace by its `ws`, `tab`, `project` or a notice's `to`: not sent;
+main.ts `opened()`'s `send`), and `turnList` and `turnDiff` refuse an agent a
 private workspace that isn't its own (`turnsSeen`); `whoCalls` looks the caller of those three (`RECORDED`) up only
 while that mode hides something.
 

@@ -8,8 +8,8 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { AGENT_NO, AGENT_OK, AGENT_OWN } from '../src/daemon/gates.ts'
-import { recorded, type View } from '../src/shared/types.ts'
-import { connect, fresh, seen, sleep, until } from './helpers.ts'
+import { isHiddenEvent, recorded, type View } from '../src/shared/types.ts'
+import { connect, fresh, seen, sleep, tokenOf, until } from './helpers.ts'
 
 test("S2: an agent's rm asks the user; files and tabs are its own workspace's; no share, no file opened by its app; a sandboxed one: none of it", async t => {
   const rig = await fresh(t)
@@ -124,6 +124,40 @@ test('S7: Recording mode: an agent gets no private workspace, its tabs or a priv
   await assert.rejects(rig.rpc('diff', { ws: two.id.slice(0, -2), from }), /no workspace/)
   assert.deepEqual(await rig.rpc('turnList', { ws: one.id, from }), [])
   assert.deepEqual(await rig.rpc('turnList', { ws: two.id }), [])
+})
+
+test("S7: Recording mode: a private workspace's events (its turns, its output) reach your window, not an agent's or a phone's socket", async t => {
+  const v = { settings: { recording: true }, projects: [{ id: 'p' }, { id: 'q', private: true }], workspaces: [{ id: 'a', project: 'p' }, { id: 'b', project: 'p', private: true }, { id: 'c', project: 'q' }], tabs: [{ id: 't1', workspace: 'a' }, { id: 't2', workspace: 'b' }, { id: 't3', workspace: 'c' }] }
+  const hid = (m: object) => isHiddenEvent(m, v)
+  assert.deepEqual([hid({ ev: 'turn', ws: 'b', tab: 't2' }), hid({ ev: 'data', tab: 't3' }), hid({ ev: 'notice', tab: 't1', to: { ws: 'b' } }), hid({ ev: 'toolAsk', ws: 'c' }), hid({ ev: 'flow', project: 'q' })], [true, true, true, true, true])
+  assert.deepEqual([hid({ ev: 'turn', ws: 'a', tab: 't1' }), hid({ ev: 'remote', text: 'x' }), hid({ ev: 'state', ws: 'b' }), isHiddenEvent({ ev: 'turn', ws: 'b' }, { ...v, settings: {} })], [false, false, false, false], "a public one's, one of none, the state (recorded()'s), not recording")
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const one = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
+  const two = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'secret-client' })
+  await until(() => rig.tab(one.id))
+  const hidden = (await until(() => rig.tab(two.id))).id
+  await rig.rpc('wsSet', { id: two.id, private: true })
+  await rig.rpc('settingsSet', { recording: true, remoteMail: 'me@x.dev' })
+  // a phone (remote access's page): as an agent's socket in Recording mode; your window: all of it
+  const { port } = rig.info()
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  const on = await rig.rpc('remoteStart', { hours: 1 })
+  const url = `https://fake-${port}.trycloudflare.com`
+  const tok = (await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin: url }, body: JSON.stringify({ token: tokenOf(on.link) }) }).then(r => r.json())).token
+  const phone = await connect(rig, url, tok, true)
+  t.after(() => phone.ws.close())
+  const app = await connect(rig)
+  await rig.rpc('send', { target: two.id, text: 'the private task' })
+  await assert.rejects(rig.rpc('noticeShow', { text: 'Ready for review', to: two.id }), /Recording mode hides that workspace/) // a notice about it: none at all
+  await rig.rpc('send', { target: one.id, text: 'the public task' })
+  await rig.rpc('noticeShow', { text: 'One is ready', to: one.id })
+  const ofTwo = (e: any) => e.tab === hidden || e.ws === two.id || e.to?.ws === two.id
+  await until(() => app.events.some(e => e.ev === 'turn' && e.kind === 'done' && ofTwo(e)), "your window: the private one's turn")
+  await until(() => phone.events.some(e => e.ev === 'turn' && e.kind === 'done' && e.ws === one.id) && phone.events.some(e => e.ev === 'notice' && e.to?.ws === one.id), "the phone: the public one's")
+  assert.deepEqual(phone.events.filter(e => e.ev !== 'state' && ofTwo(e)), [], "the phone: none of the private one's events")
+  assert.doesNotMatch(JSON.stringify(phone.events.filter(e => e.ev === 'state')), /secret-client|the private task/, 'nor in its states')
 })
 
 test('U7: Clone a repository: a local repo or a URL into a folder, added as a project; no program-running transport; not an agent', async t => {

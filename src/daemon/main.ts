@@ -18,7 +18,7 @@ import { readCapped, readJson, rotateLog, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
 import * as clientLogMod from './clientLog.ts'
 import { HostPty, ptyClose, ptyEarly, ptyGone, ptyOn, ptySent } from './ptyHost.ts'
-import { aiTotals, API, HIDDEN, isAgent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
+import { aiTotals, API, HIDDEN, isAgent, isHiddenEvent, MASK, masked, maskSettings, neverAsks, onlyProjects, type Project, recorded, type Settings, type Tab, type Workspace, unmasked } from '../shared/types.ts'
 import { manifestOf } from '../shared/pwa.ts'
 import { CAPS, oldName } from '../shared/caps.ts'
 import { VERSION } from '../shared/version.ts'
@@ -2114,8 +2114,9 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and
         // re-attaches from a snapshot
         if (ws.bufferedAmount > 32 << 20) return ws.terminate()
-        // ponytail: the state only; a hidden workspace's events (its asks, its notices) still reach an agent that listens here
         const isState = typeof msg === 'string' ? msg.startsWith('{"ev":"state"') : (msg as any)?.ev === 'state'
+        // S7: in Recording mode a private workspace's events (its turns, asks, notices, output) as its state: none
+        if (!isState && agent && core.state.settings?.recording && isHiddenEvent(typeof msg === 'string' ? JSON.parse(msg) : msg, core.state)) return
         if (isState && !known) return
         const yours = isState && mineNow() // a state only: termOk per message would run on every byte of a screen
         if (isState && (!yours || (agent && core.state.settings?.recording)))

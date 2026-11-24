@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Recording mode keeps a private workspace's activity (its turns, asks and terminal output) off agents' and your phone's connections too, not only its rows.
 - A message sent to Laki AI from your phone (remote access) while it was answering you now runs with your phone's limits, not with the rights of the ask it waited behind.
 
 ## 0.62.0 · Nov 24, 2026
