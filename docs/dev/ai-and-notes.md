@@ -286,13 +286,17 @@ read the Keychain didn't answer is asked again after a minute.
 name (never a value). aiKey's API and the view are as before (the view only says whether there's a key).
 `test/fakes/keychain-security` fakes `security` (`test/ai.test.ts`, `test/env-keys.test.ts` link it as `$HOME/bin/security`).
 
-**Secret values out of state.json** (`envKeys.ts`, STATE_V 2): a secret-looking variable (env.ts `secretLooking`) in
+**Secret values out of state.json** (`envKeys.ts`, STATE_V 2): a secret-looking variable (env.ts `secretLooking`), or a
+value that is one whatever its name (env.ts `secretValue`: `URL_CREDS`, a URL with a password like `DATABASE_URL`, or
+secrets.ts' `secretsIn` shapes; a null already kept, or one the store has or couldn't give, stays its) in
 Settings' env, a profile's, a project's or one of its MCP servers', and the phone push's URL and reply topic, kept the
 same way (account `env:<NAME>`, `env:profile:<name>:<NAME>`, `env:project:<id>:<NAME>`,
 `env:project:<id>:mcp:<server>:<NAME>`, `push:url`, `push:replyTopic`; without the Keychain a 0600 file each in
 `<data>/env-keys`, named by the account's hash). state.json keeps the name with `null`. In memory the state is whole,
 so childEnv, scripts, ai.ts and the rest read it as before: `load()` fills each null from the store (`envRestore`; one
-the store didn't give: `''` in memory, still null on disk, never removed, until set again), `save()` stores what's new
+the store didn't give: `''` in memory, still null on disk, never removed, until set again or read: `envRetry`, core's
+`envAgain` as an app window connects or comes to the front, `LAKI_ENV_AGAIN_MS` apart (a minute), keychain.ts asking
+again past `LAKI_KEYCHAIN_RETRY_MS`; the view's `envUnread` counts the ones still missing), `save()` stores what's new
 or changed and removes what's gone (`envStash`: a `security` call only on a change), then writes the copy with them
 null (`envJson`). A value still in state.json (v1, a restored older backup) moves in as it loads, then state.json and
 its dated copies are saved without it at once (`scrubCopies`). `laki backup` writes the same copy; its manifest's

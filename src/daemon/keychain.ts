@@ -58,7 +58,7 @@ export function keyRead(name: string, path: string): string {
   else if (v) kcSet(name, v) ? (rmSync(path, { force: true }), where.set(name, 'Keychain')) : where.set(name, "file (the Keychain didn't take it)")
   else {
     const got = kcGet(name)
-    if (got === undefined) where.set(name, "file (the Keychain didn't answer)"), retry.set(name, Date.now() + 60_000)
+    if (got === undefined) where.set(name, "file (the Keychain didn't answer)"), retry.set(name, Date.now() + (Number(process.env.LAKI_KEYCHAIN_RETRY_MS) || 60_000))
     else (v = got), where.set(name, 'Keychain')
   }
   kept.set(name, v)

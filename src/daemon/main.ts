@@ -671,7 +671,7 @@ const api = {
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
   input: async (p, c) => (text(p.data, 'data'), await crossAsk(p, 'send', p.tab, p.data), typed(p, String(p.tab), p.data), core.input(p.tab, p.data, c)),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
-  view: (p, c) => c && (core.setView(c, p), alertsSeen(c)),
+  view: (p, c) => c && (core.setView(c, p), alertsSeen(c), !c.remote && p?.focused && core.envAgain()), // the Keychain unlocked meanwhile: what it didn't give at start
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
   scheduleSet: ({ from, ...p }: In<typeof scheduleMod.scheduleSet>) => scheduleMod.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
@@ -2167,6 +2167,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     } else first()
     const dk = device && ch ? remoteMod.deviceKeyNew(req.headers.cookie) : undefined // S14: a paired device's own key, given inside its sealed socket (its next visits have no link)
     if (dk) ws.send(ch!.seal(JSON.stringify({ ev: 'e2e-device', key: dk.toString('base64') }))) // past a locked page's filter: it can't come in again without it
+    if (!c.remote) core.envAgain()
     if (!c.locked) widgetAsks(c), noticesTo(c), termAsksTo(c) // an extension's asks still waiting: this window shows them too; and the notices up (D6: a locked page's once it unlocks)
     if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
     ws.on('message', async (raw, binary) => {

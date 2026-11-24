@@ -136,3 +136,31 @@ test("a value with a line break never goes to security -i (its next line would r
   rmSync(join(rig.home, 'security-fails'))
   assert.deepEqual(JSON.parse(readFileSync(join(rig.home, 'keychain', 'Laki AI__widget-secrets'), 'utf8')), { old: { token: 'fake-old-widget-secret' }, sec: { apiToken: 'fake-new-widget-secret' } }, 'every one kept')
 })
+
+test('a secret by its value (DATABASE_URL with a password) leaves state.json too; one the Keychain did not give at start is read again once it answers', async t => {
+  const rig = await fresh(t, { env: { LAKI_KEYCHAIN: '1', LAKI_KEYCHAIN_RETRY_MS: '1', LAKI_ENV_AGAIN_MS: '1' } })
+  writeFileSync(join(rig.home, 'bin', 'security'), SECURITY, { mode: 0o755 })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const db = 'postgres://app:fake_db_pass@db.example.com:5432/app'
+  await rig.rpc('settingsSet', { env: { DATABASE_URL: db, GH_TOKEN: SECRETS[0], HOME_URL: 'https://example.com/a@b', PLAIN_NAME: 'plain-value' } })
+  const disk = () => JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).settings.env
+  assert.deepEqual(disk(), { DATABASE_URL: null, GH_TOKEN: null, HOME_URL: 'https://example.com/a@b', PLAIN_NAME: 'plain-value' })
+  assert.ok(!onDisk(rig.data).includes('fake_db_pass'))
+  assert.equal(readFileSync(join(rig.home, 'keychain', 'Laki AI__env:DATABASE_URL'), 'utf8'), db)
+  // the Keychain doesn't answer as Laki starts (locked): the names kept, the values missing, said in the view
+  await rig.stop()
+  writeFileSync(join(rig.home, 'security-fails'), '')
+  await rig.start()
+  assert.equal((await rig.rpc('state')).envUnread, 2)
+  assert.deepEqual(disk(), { DATABASE_URL: null, GH_TOKEN: null, HOME_URL: 'https://example.com/a@b', PLAIN_NAME: 'plain-value' }, 'never wiped while unread')
+  assert.equal(readFileSync(join(rig.home, 'keychain', 'Laki AI__env:DATABASE_URL'), 'utf8'), db, 'nor removed from the store')
+  // it answers again: a window that connects gets them read back, and tabs have them
+  rmSync(join(rig.home, 'security-fails'))
+  await rig.connect()
+  await until(async () => (await rig.rpc('state')).envUnread === undefined, 'read again')
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const sh = await rig.rpc('tabNew', { ws: ws.id })
+  await rig.rpc('send', { target: sh.id, text: 'echo "[$GH_TOKEN|$DATABASE_URL]"' })
+  await until(async () => (await rig.screen(sh.id)).includes(`[${SECRETS[0]}|${db}]`), 'a tab with both')
+  assert.ok(!onDisk(rig.data).includes('fake_db_pass'), 'still not in state.json')
+})

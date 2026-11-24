@@ -266,8 +266,8 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   removed; Keychain trouble keeps the 0600 file, and Copy diagnostics says which. The item trusts `/usr/bin/security`,
   so a program running as you can read it with that tool, as it could the file: the Keychain keeps it off the disk's
   plain files, not from your own programs. An ad-hoc build, a custom `LAKI_HOME` and Linux keep the files.
-- Secret-looking environment values (a name like `*_TOKEN`, `*_KEY`, `*_SECRET`: Settings' env, a profile's, a
-  project's and its MCP servers') and the phone push's URL and reply topic are kept the same way (else a 0600 file each
+- Secret-looking environment values (a name like `*_TOKEN`, `*_KEY`, `*_SECRET`, or a value that is one: a URL with a
+  password such as `DATABASE_URL`, a token's shape; Settings' env, a profile's, a project's and its MCP servers') and the phone push's URL and reply topic are kept the same way (else a 0600 file each
   in `env-keys/`); `state.json`, its dated copies and `laki backup`'s archive keep only their names. A backup's manifest
   lists them: on another Mac they're set again. Tabs and scripts get them as before. Extensions' secret settings are
   one item too (`widget-secrets`; else `widget-secrets.json`, 0600). A name or value with a line break or a NUL never

@@ -1,14 +1,15 @@
 // Secret values out of state.json: a secret-looking variable (shared/env.ts secretLooking) in Settings' env, a
 // profile's, a project's or one of its MCP servers', and the phone push's URL and reply topic (a token in either), kept
 // by keychain.ts as Laki AI's keys are (the Keychain on a signed release with the default data folder, else a 0600 file
-// of its own in <data>/env-keys). state.json keeps the name, its value null. In memory the state is whole, so every
+// of its own in <data>/env-keys); a value that is a secret whatever its name too (shared/env.ts secretValue: a URL with
+// a password, a token's shape). state.json keeps the name, its value null. In memory the state is whole, so every
 // place that builds an env (childEnv, scripts, ai.ts…) reads it as before: load() restores (envRestore), save() stores
 // what's new or changed and drops what's gone (envStash), then writes the copy with them null (envJson). No core
 // import: tested through the daemon (test/env-keys.test.ts)
 import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { secretLooking } from '../shared/env.ts'
+import { secretLooking, secretValue } from '../shared/env.ts'
 import { dir } from './dir.ts'
 import { keyRead, keyWrite } from './keychain.ts'
 
@@ -19,8 +20,14 @@ type S = { settings?: { env?: Holder; presets?: { name: string; env?: Holder }[]
 // every place a secret can sit, by its key-store name; a value of any kind (null: kept, its value in the store)
 function spots(s: S): Spot[] {
   const out: Spot[] = []
+  // a secret's name, or its value (secretValue: a URL's password, a token's shape); null: one kept already; one the store
+  // has or couldn't give: still its, whatever it reads now (never back into state.json by a change of shape)
   const env = (key: string, at?: Holder) => {
-    if (at && typeof at === 'object') for (const k of Object.keys(at)) if (secretLooking(k)) out.push({ key: `${key}:${k}`, at, field: k })
+    if (at && typeof at === 'object')
+      for (const [k, v] of Object.entries(at)) {
+        const name = `${key}:${k}`
+        if (secretLooking(k) || v === null || stored.has(name) || unread.has(name) || (typeof v === 'string' && secretValue(v))) out.push({ key: name, at, field: k })
+      }
   }
   env('env', s.settings?.env)
   for (const p of s.settings?.presets ?? []) env(`env:profile:${p?.name}`, p?.env)
@@ -92,5 +99,22 @@ export function envScrub(text: string) {
   for (const p of spots(s)) if (typeof p.at[p.field] === 'string' && p.at[p.field]) (p.at[p.field] = null), (had = true)
   return had ? JSON.stringify(s, null, 2) : undefined
 }
+// the ones the store didn't give as Laki started (the Keychain locked or not answering), asked again (keychain.ts: a
+// minute after the last try): each one it gives now filled in. core's envAgain, as an app window connects or comes to
+// the front, throttled. left: still unread (the view's envUnread)
+export function envRetry(s: S): { got: number; left: number } {
+  let got = 0
+  for (const p of spots(s)) {
+    if (!unread.has(p.key)) continue
+    const v = keyRead(p.key, fileOf(p.key))
+    if (!v) continue
+    p.at[p.field] = v
+    stored.set(p.key, v)
+    unread.delete(p.key)
+    got++
+  }
+  return { got, left: unread.size }
+}
+export const envUnread = () => unread.size
 // laki backup's manifest: the names whose values aren't in its state.json
 export const envKept = () => [...stored.keys(), ...unread].sort()

@@ -43,7 +43,7 @@ import * as agentCliMod from './agentCli.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
 import { findSecrets, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
-import { envJson, envRestore, envScrub, envStash } from './envKeys.ts'
+import { envJson, envRestore, envRetry, envScrub, envStash, envUnread } from './envKeys.ts'
 import { keysWhere } from './keychain.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
@@ -355,6 +355,16 @@ export function load() {
 // works. Any other error is thrown as before. <data>/test-disk-full: a test's full disk (a rig's daemon only)
 let diskFull: { free: number } | undefined
 export const diskFullNow = () => diskFull
+// secret env values the Keychain didn't give as Laki started (envKeys.ts): asked again as an app window connects or
+// comes to the front (main.ts), a minute apart at most; the view's envUnread while any still waits
+let envTried = 0
+export function envAgain(now = Date.now()) {
+  if (!envUnread() || now - envTried < ENV_AGAIN) return
+  envTried = now
+  const r = envRetry(state)
+  if (r.got) log(`env: ${r.got} secret value${r.got > 1 ? 's' : ''} read from the Keychain now${r.left ? `, ${r.left} still not` : ''}`), changed()
+}
+const ENV_AGAIN = Number(process.env.LAKI_ENV_AGAIN_MS) || 60_000
 export const freeBytes = (at: string) => {
   try {
     while (!existsSync(at) && dirname(at) !== at) at = dirname(at) // a folder not made yet: its volume is its nearest one's
@@ -1121,6 +1131,7 @@ export function view(): View {
     ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at, flowHeard: flowFiles.heard }),
     api: API,
     ...(diskFull && { diskFull }),
+    ...(envUnread() && { envUnread: envUnread() }),
     ...(state.secretsKept?.length && { secretsKept: state.secretsKept }),
     ...(dndOn() && { dnd: { until: state.dnd!.until } }), // U8
     ...(state.digest && { digest: state.digest }),

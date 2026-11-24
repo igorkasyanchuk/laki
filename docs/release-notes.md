@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A secret under a plain name (a `DATABASE_URL` with a password, a token) is kept in the Keychain too, and values a locked Keychain held back at start are read as you come back to Laki.
 - The talk pill is glass on a Mac, as the quick bar and New workspace windows are (solid with Reduce transparency).
 - Glass with the Window slider at 0 keeps the blur on menus, ⌘K, capsules and page heads: only a see-through main area turns it off.
 - A spend cap for a workspace: past it Laki stops its agents and asks whether to add more, stay stopped or remove it.

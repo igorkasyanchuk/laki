@@ -2,6 +2,7 @@
 // environment (where Laki was started: a shell's exports, a launchd job's), never the values. Pure: test/units-more.test.ts.
 // Settings' env, the project's and the profile's always pass (the user put them there), and so does the agent's own
 // sign-in key (AGENT_KEY_ENV); a profile's envAllow lets more through by name.
+import { secretsIn } from './secrets.ts'
 
 // ponytail: names, not values: a secret under a plain name (DATABASE_URL with a password in it) passes
 export const SECRET_ENV: RegExp[] = [/_TOKEN$/i, /AUTH_?TOKEN/i, /_SECRET/i, /^SECRET_/i, /_PASSWORD$/i, /_PASSWD$/i, /_KEY$/i, /^AWS_(SECRET|SESSION)/i, /_CREDENTIALS?$/i, /^NPM_TOKEN$/, /^GH_TOKEN$/, /^GITHUB_TOKEN$/, /^GITLAB_TOKEN$/, /_API_KEY$/i, /_PAT$/i]
@@ -16,6 +17,10 @@ export const AGENT_KEY_ENV: Record<string, string[]> = {
   opencode: ['OPENCODE_API_KEY'],
 }
 export const secretLooking = (name: string) => SECRET_ENV.some(r => r.test(name)) && !HARMLESS.some(r => r.test(name))
+// a value that is a secret whatever its name: a URL with a password in it (DATABASE_URL=postgres://user:pass@host/db),
+// or one of secrets.ts' shapes (a token, a key)
+export const URL_CREDS = /[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i
+export const secretValue = (v: string) => URL_CREDS.test(v) || secretsIn(v).length > 0
 // pass: what goes on; held: the names kept back, sorted
 export function envSplit(env: Record<string, string | undefined>, allow: readonly string[] = []): { pass: Record<string, string>; held: string[] } {
   const pass: Record<string, string> = {}
