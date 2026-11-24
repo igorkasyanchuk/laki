@@ -1047,7 +1047,8 @@ and commit it. Folders and one-file extensions both work.
   2,000 files, can't be turned on. From the CLI: `laki widget what shop-web.deploys`, then
   `laki widget on shop-web.deploys --seen <hash>`.
 - **Its state.** What it writes in its own folder as it runs goes in widget.json's `"state"`, globs relative to its
-  folder (`["last.txt", "cache/"]`): those aren't what it's trusted as, so writing them keeps it on. `.DS_Store`,
+  folder (`["last.txt", "cache/"]`): those aren't what it's trusted as, so writing them keeps it on (an extension in
+  Laki's own folder too: any other file under it, a `lib/` its script imports included, asks again when it changes). `.DS_Store`,
   `__pycache__/`, `*.pyc` and `node_modules/` never count; a script it runs, an executable and widget.json always do.
   Better still, keep it in `$LAKI_WIDGET_FILE`, outside the repo.
 - **Off again when it changes.** Any change to its files in the repo (a pull, a branch switched in the project's

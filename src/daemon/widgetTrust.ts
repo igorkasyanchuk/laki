@@ -93,7 +93,7 @@ export const notOpened = (w: Entry) => (h => (guarded(w) ? repoShown(w).cut.filt
 // that lives outside them (the store's source; its manifest as read: actions, on, stream…; net), so an edit asks again, one made
 // while Laki was closed too (sh do.sh with do.sh changed). Laki AI's turn-on question, widgetSet's seen, a tool's ask and
 // an Always's key (grantKey) all compare it. fresh: read now (a check), else as long as their sizes and times are the
-// same (the view's). ponytail: its folder's top level and fixtures only, not a lib/ its script sources
+// same (the view's). Every file under its folder (dirHash: filesUnder, its lib/ too), a repo's as repoFiles has them
 export const hashes = new Map<string, { sig: string; hash: string }>()
 export function filesHash(w: Entry, fresh = false) {
   const cur = widgets.get(w.id) ?? w // its store as it is now: a source set meanwhile counts
@@ -122,16 +122,39 @@ export function runsOf(d: string) {
   return h.digest('hex')
 }
 // its own files' hash (cached by their times and sizes): a repo's extension's trust
-// every file under its folder, relative, a folder's files before its subfolders (a link as a file): none hidden, no
-// node_modules (a repo's: repoFiles). ponytail: max files at most, a change past them isn't seen
-const filesUnder = (d: string, max = 500, rel = '', out: string[] = []) => {
-  let es: Dirent[] = []
+// every file under its folder, relative, a folder's files before its subfolders: none hidden (.git neither), no
+// node_modules (a repo's: repoFiles), none of skip's (its state: stateHas' globs) but keep's. A link to a file as the
+// file; to a folder, walked while it stays inside (realpath, each folder once), else as a name. ponytail: max files at
+// most, a change past them isn't seen
+const filesUnder = (d: string, max = 500, skip: string[] = [], keep: string[] = []) => {
+  const out: string[] = []
+  let top = d
   try {
-    es = readdirSync(join(d, rel), { withFileTypes: true })
+    top = realpathSync(d)
   } catch {}
-  es = es.filter(x => !x.name.startsWith('.') && x.name !== 'node_modules')
-  for (const x of es) if (out.length < max && !x.isDirectory() && (x.isFile() || x.isSymbolicLink())) out.push(rel ? `${rel}/${x.name}` : x.name)
-  for (const x of es) if (out.length < max && x.isDirectory()) filesUnder(d, max, rel ? `${rel}/${x.name}` : x.name, out)
+  const walk = (rel: string, up: Set<string>) => {
+    let real = join(top, rel)
+    try {
+      real = realpathSync(join(d, rel))
+    } catch {}
+    if (up.has(real)) return
+    up = new Set(up).add(real)
+    let es: Dirent[] = []
+    try {
+      es = readdirSync(join(d, rel), { withFileTypes: true })
+    } catch {}
+    const subs: string[] = []
+    for (const x of es.filter(x => !x.name.startsWith('.') && x.name !== 'node_modules')) {
+      const n = rel ? `${rel}/${x.name}` : x.name
+      const to = x.isSymbolicLink() ? (() => { try { return realpathSync(join(d, n)) } catch { return undefined } })() : undefined
+      const dir = x.isDirectory() || (!!to && under(to, top) && !!statSync(to, { throwIfNoEntry: false })?.isDirectory())
+      if (stateHas(skip, n, dir) && !keep.includes(n)) continue
+      if (dir) subs.push(n)
+      else if (out.length < max && (x.isFile() || x.isSymbolicLink())) out.push(n)
+    }
+    for (const n of subs) if (out.length < max) walk(n, up)
+  }
+  walk('', new Set())
   return out
 }
 // a repo's extension, what trusting it covers (#4): every file under its folder, what git tracks, what it doesn't and
@@ -267,7 +290,7 @@ function repoNames(w: Entry, fresh: boolean) {
   return names
 }
 export function dirHash(w: Entry, fresh = false, known?: string[]) {
-  const names = (known ? [...known] : w.file ? [w.file] : guarded(w) ? repoNames(w, fresh) : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
+  const names = (known ? [...known] : w.file ? [w.file] : guarded(w) ? repoNames(w, fresh) : filesUnder(w.dir, 500, stateOf(w.m), ['widget.json', w.m.script ?? ''])).sort() // its subfolders too: a lib/ script a fetch runs; not what it writes (its state)
   // S8: ctime and inode too: an edit of the same size with its mtime put back (utimes) still changes its ctime, and a
   // file swapped in by a rename its inode
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size, st?.ctimeMs, st?.ino])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))

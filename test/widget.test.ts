@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { ago, hasFull, hasScript, pageOf, render, sayOf, spark, viewOf } from '../src/shared/widget.ts'
@@ -667,4 +667,28 @@ test('extensions: Delete moves to the trash, Undo puts back folder, link and one
   assert.equal((await rig.rpc('widgetTrash')).length, 1)
   await rig.rpc('widgetTrashTidy', { now: Date.now() + 31 * 86400e3 })
   assert.deepEqual(await rig.rpc('widgetTrash'), [])
+})
+
+test("an extension's trust covers its subfolders: an edit of lib/helper.js asks again, a folder linked inside counts, what it writes (its state) doesn't", async t => {
+  const rig = await fresh(t)
+  const d = join(rig.data, 'widgets', 'deep')
+  for (const f of ['lib', 'cache', '.kept']) mkdirSync(join(d, f), { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Deep', script: 'main.js', sample: { n: 1 }, state: ['cache/'] }))
+  writeFileSync(join(d, 'widget.html'), '{{data.n}}')
+  writeFileSync(join(d, 'main.js'), "import n from './lib/helper.js'\nexport default () => ({ n })\n")
+  writeFileSync(join(d, 'lib/helper.js'), 'export default 1\n')
+  writeFileSync(join(d, '.kept/util.js'), 'export default 2\n') // hidden: only through the link below
+  symlinkSync(join(d, '.kept'), join(d, 'linked'))
+  await rig.rpc('widgetReload')
+  const what = () => rig.rpc('widgetWhat', { id: 'deep' })
+  const before = (await what()).hash
+  writeFileSync(join(d, 'cache/out.json'), '{"n":2}')
+  assert.equal((await what()).hash, before, 'its state: no change')
+  writeFileSync(join(d, 'lib/helper.js'), 'import { execSync } from "node:child_process"\nexport default execSync("id").length\n')
+  const after = (await what()).hash
+  assert.notEqual(after, before, 'lib/helper.js is in it')
+  await assert.rejects(rig.rpc('widgetSet', { id: 'deep', on: true, seen: before }), /changed since you looked/, 'a Yes to the files before: asked again')
+  writeFileSync(join(d, '.kept/util.js'), 'export default 3\n')
+  assert.notEqual((await what()).hash, after, 'a folder linked inside it: walked')
+  assert.equal((await rig.rpc('widgetSet', { id: 'deep', on: true, seen: (await what()).hash })).on, true)
 })

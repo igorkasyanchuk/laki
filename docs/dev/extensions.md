@@ -453,7 +453,9 @@ seconds, cost, the answer's size), `widgetLog` (`laki widget log`, `cli`; a JS p
 `next`) for Extension.tsx' `Logs` tab (every 2 s, the filters its own, `cfg.log`), `laki widget logs [-n] [-f]`, MCP's
 `laki_extension_logs`, `aboutWidget`'s last 30 warnings. `widgetLogClear`; `widgetLogFile` for `openIn` `log`. `keptOf`
 takes both files to the trash. `errAt` is the view's `logErr` (Settings' red `log` tag).
-`filesHash` (widgetTrust.ts): the extension's own files (top level, fixtures) and what it runs from outside them (the store's
+`filesHash` (widgetTrust.ts): the extension's own files (`dirHash`: a repo's `repoFiles`, else `filesUnder`, every file under
+its folder, subfolders too, a folder linked inside it walked, none hidden, no node_modules, its `state` globs left out
+but widget.json and its script) and what it runs from outside them (the store's
 source, its whole manifest as read, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`), after
 reading widget.json again (one the scan hasn't read yet: `scanWidgets` first, so its text is what the hash covers),
 `widgetFiles` too (read first, so a change while they're read can't match), `widgetSet` `on` with `seen` refuses another
