@@ -189,7 +189,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   const hint = useSecretHint(text, setText, { ws: tab.workspace, send: () => send() })
   const imp = useImprove(box, text, setText, !!api.improve && { tab: tab.id })
   const why = useSayWhy(tab.status === 'waiting' ? tab.ask : undefined, (n, label, say) => api.answer(tab.id, n, label, say)) // No, and say why
-  const explain = useExplain(tab.id, tab.status === 'waiting' ? tab.ask : undefined, api.explain && (() => api.explain!(tab.id))) // ? or E: what its command will do
+  const explain = useExplain(tab.id, tab.status === 'waiting' ? tab.ask : undefined, api.explain && (() => api.explain!(tab.id)), tab.preset) // ? or E: what its command will do
   const send = () => {
     const t = text.trim()
     if (!t) return

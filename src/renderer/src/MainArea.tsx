@@ -121,7 +121,7 @@ export function mainOf(app: AppCtx) {
         {bodyOf(app)}
         {tab?.ask && !tab.planAsk /* its plan card has them */ && !(inReader(tab.id) && !reviewOn && !(narrow && (panelOpen || previewed))) /* the Reader's own card has them, unless the review or a phone's panel is over it */ && !(app.needsShown && sideOpen && !video && !listOff) /* the sidebar's Needs you card has them */ && (
           // the waiting agent's menu as buttons (a phone's thumb, or no reaching for arrows): the daemon moves and presses ⏎
-          <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff} tab={tab.id} ask={tab.ask} explain={aiOn(settings) && hasCap(view, 'ask.explain') ? () => call('askExplain', { tab: tab.id }) : undefined}>{(chip, explain) => (
+          <AskWrap key={`${tab.id}:${tab.ask.what}`} diff={tab.ask.diff} tab={tab.id} agent={tab.preset} ask={tab.ask} explain={aiOn(settings) && hasCap(view, 'ask.explain') ? () => call('askExplain', { tab: tab.id }) : undefined}>{(chip, explain) => (
           <div className="ask-bar" data-dock="bottom">
             {tab.ask!.tool ? (
               // claude's permission ask (PermissionRequest): the tool and what it touches, the change it makes (chip)

@@ -241,7 +241,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
   const allow = waiting && !opts.length && api.permission(t)
   const stop = (e: MouseEvent) => (e.target as HTMLElement).closest('button') && e.stopPropagation() // a button's own click; the row's room around it opens the tab
   const why = useSayWhy(waiting ? t.ask : undefined, (n, label, say) => api.answer(t, n, label, say)) // ⌥-click, a long press or N: No, and say why
-  const x = useExplain(t.id, waiting ? t.ask : undefined, api.explain && (() => api.explain!(t))) // ? or E: what its command will do
+  const x = useExplain(t.id, waiting ? t.ask : undefined, api.explain && (() => api.explain!(t)), t.preset) // ? or E: what its command will do
   const key = (e: KeyboardEvent) => {
     if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return // a button of its own has the key
     if (why.key(e) || x.key(e)) return

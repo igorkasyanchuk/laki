@@ -289,7 +289,7 @@ test('cardPick: the talk key on an ask card: a number, the exact words, yes, no 
   // yes, allow, ok: the first plain allow; a question has none
   for (const w of ['yes', 'Allow.', 'OK', 'um, yes']) assert.deepEqual(cardPick(w, claude), { n: 1, label: 'Yes' }, w)
   assert.equal(cardPick('yes', question), undefined)
-  assert.equal(cardPick('yes', { ...question, ask: { at: 1, options: opts('Run the migration first', 'Skip it') } }), undefined, "a question's Run… isn't a yes")
+  assert.equal(cardPick('yes', { ...question, ask: { options: opts('Run the migration first', 'Skip it') } }), undefined, "a question's Run… isn't a yes")
   // no, and its words as the reason (only with a no that takes them)
   assert.deepEqual(cardPick('no', claude), { n: 3, label: 'No, and tell Claude what to do differently (esc)' })
   assert.deepEqual(cardPick('No, because the tests are slow. Use vitest', claude), { n: 3, label: 'No, and tell Claude what to do differently (esc)', say: 'because the tests are slow. Use vitest' })
@@ -314,4 +314,12 @@ test('cardPick: the talk key on an ask card: a number, the exact words, yes, no 
   // a language: its own words only; another's table left out
   assert.deepEqual(cardPick('так', claude, 'uk-UA'), { n: 1, label: 'Yes' })
   assert.equal(cardPick('так', claude, 'en'), undefined)
+})
+
+test("explainWhat: a command, another agent's menu, a bigger change; never claude's question", async () => {
+  const { explainWhat } = await import('../src/shared/ask.ts')
+  assert.deepEqual(explainWhat({ tool: 'Bash', what: 'npm test' }), { kind: 'command', text: 'npm test' })
+  assert.deepEqual(explainWhat({}, 'approve npm test?', 'codex'), { kind: 'command', text: 'approve npm test?' })
+  assert.match(explainWhat({}, 'Which database?', 'claude') as string, /asks a question/)
+  assert.match(explainWhat({ tool: 'Edit', what: 'a.ts', diff: '+a\n-b' }) as string, /its diff shows the change/)
 })

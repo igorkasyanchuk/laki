@@ -965,7 +965,7 @@ function talkPage() {
     const heard = cardsOn ? await bridge?.talkCard?.(text) : undefined
     if (heard?.card) {
       phase = 'card'
-      if (heard.pick) return void (say(`${heard.card}: ${heard.pick} in 2 s · any key stops it`), (cardT = setTimeout(() => ((cardT = undefined), close()), 2300)))
+      if (heard.pick) return void (say(`${heard.card}: ${heard.pick} in 2 s · any key stops it`), (cardT = setTimeout(() => ((cardT = undefined), close()), 1800))) // main answers at 2 s (HEARD_MS): a key after it can't stop it, so the pill's gone by then
       return void (say(`${heard.card}: ${heard.refuse ? `click to answer (${heard.refuse})` : `“${text}” isn't one of its choices`}`, true), setTimeout(close, 3500))
     }
     // a spoken yes or no with an ask waiting (the pill's target's, else the newest): that ask's answer, not a message

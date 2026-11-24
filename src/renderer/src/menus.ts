@@ -48,7 +48,7 @@ export function menusOf(app: AppBase) {
   // its spend cap (the daemon's cap.ts): $5, 2M tokens; empty: none
   const capAsk = async (w: WorkspaceView) => {
     const now = w.spend ? capText(w.spend.cap) : ''
-    const v = await askText(`Spend cap · ${w.name || w.id}`, { text: `Past it, Laki stops its agents and asks; at 80% it tells you.${w.spend ? ` Spent: ${capSpent(w.spend)}.` : ''} Dollars ($5) or tokens (2M tokens); empty: none.`, value: now === 'none' ? '' : now.split(' or ')[0], placeholder: '$5', ok: 'Set' })
+    const v = await askText(`Spend cap · ${w.name || w.id}`, { text: `Past it, Laki stops its agents and asks; at 80% it tells you.${w.spend ? ` Spent: ${capSpent(w.spend)}.` : ''} Dollars ($5) or tokens (2M tokens); empty: none.${w.spend?.cap.usd && w.spend.cap.tokens ? ` It holds both now (${now}): what you set here takes their place.` : ''}`, value: now === 'none' ? '' : now.split(' or ')[0], placeholder: '$5', ok: 'Set' })
     if (v === null) return
     call('wsSet', { id: w.id, cap: v.trim() || null }).then(() => done(v.trim() ? `Spend cap: ${v.trim()}` : 'No spend cap'), fail)
   }

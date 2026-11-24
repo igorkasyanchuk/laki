@@ -1022,7 +1022,7 @@ export async function askExplain(p: { tab?: unknown }): Promise<AskExplained> {
   const r = rt.get(tab.id)
   const s = sessions.get(tab.id)
   if (r?.status !== 'waiting' || (!r.perm && !s?.ask())) throw new Error(`${tab.name} isn't asking`)
-  const w = r.perm ? explainWhat(r.perm) : explainWhat({}, s!.screenText(16)) // another agent's: its screen as it asks
+  const w = r.perm ? explainWhat(r.perm) : explainWhat({}, s!.screenText(16), tab.preset) // another agent's: its screen as it asks
   if (typeof w === 'string') throw new Error(w)
   // secrets' shapes masked before it leaves the Mac (share.ts redact); the command's full text when claude's hook gave it
   const full = w.kind === 'command' && r.perm?.tool === 'Bash' ? (r.permCmd ?? r.perm.what) : w.text

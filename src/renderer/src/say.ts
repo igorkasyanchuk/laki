@@ -15,14 +15,15 @@ export function utter(text: string) {
 
 const waiting: string[] = []
 let talking = false
+let now: SpeechSynthesisUtterance | undefined
 const next = () => {
   const t = waiting.shift()
   if (!(talking = !!t)) return
-  const u = utter(t!)
-  u.onend = u.onerror = next
+  const u = (now = utter(t!))
+  u.onend = u.onerror = () => now === u && next() // a cancelled one's late end doesn't start the next over a new one
   speechSynthesis.speak(u)
 }
-export const hush = () => ((waiting.length = 0), (talking = false), speechSynthesis.cancel())
+export const hush = () => ((waiting.length = 0), (talking = false), (now = undefined), speechSynthesis.cancel())
 export function sayQueued(text: string) {
   if (!text) return hush()
   waiting.push(text)

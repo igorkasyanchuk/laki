@@ -540,9 +540,9 @@ export function AskDiff({ diff }: { diff: string }) {
 
 // the bar under the terminal (App's ask-bar): a +N −M chip in it opens AskDiff over it (its terminal shows one too)
 // explain (a command ask's ?: useExplain) gives the bar its button, and its line over the bar
-export function AskWrap({ diff, tab, ask, explain, children }: { diff?: string; tab?: string; ask?: Ask; explain?: () => Promise<AskExplained>; children: (chip: ReactNode, why: ReactNode) => ReactNode }) {
+export function AskWrap({ diff, tab, agent, ask, explain, children }: { diff?: string; tab?: string; agent?: string; ask?: Ask; explain?: () => Promise<AskExplained>; children: (chip: ReactNode, why: ReactNode) => ReactNode }) {
   const [open, setOpen] = useState(false)
-  const x = useExplain(tab ?? '', ask, explain)
+  const x = useExplain(tab ?? '', ask, explain, agent)
   if (!diff && !x.button) return <>{children(null, null)}</>
   const { add, del } = diff ? diffCounts(diff) : { add: 0, del: 0 }
   const chip = diff && (
@@ -564,7 +564,7 @@ export function AskWrap({ diff, tab, ask, explain, children }: { diff?: string; 
 // own, answers nothing and moves no choice or focus. explain: none (Laki AI off, an older daemon): no button. Kept here
 // per tab and ask, so the ask bar, the Reader and Needs you show the same line
 const explained = new Map<string, AskExplained | { err: string } | 'loading'>()
-export function useExplain(tab: string, ask: Ask | undefined, explain?: () => Promise<AskExplained>) {
+export function useExplain(tab: string, ask: Ask | undefined, explain?: () => Promise<AskExplained>, agent?: string) {
   const [, redo] = useState(0)
   useEffect(() => {
     const f = () => redo(n => n + 1)
@@ -572,7 +572,7 @@ export function useExplain(tab: string, ask: Ask | undefined, explain?: () => Pr
     return () => removeEventListener('laki-explained', f)
   }, [])
   const k = `${tab}\n${ask?.what ?? ''}`
-  const can = !!explain && !!ask && typeof explainWhat(ask) !== 'string' // a command, another agent's menu, a bigger change
+  const can = !!explain && !!ask && typeof explainWhat(ask, ' ', agent) !== 'string' // a command, another agent's menu, a bigger change; never claude's question
   const got = can ? explained.get(k) : undefined
   const go = () => {
     if (!can || (got && !(typeof got === 'object' && 'err' in got))) return // asked once: its line stays; a failure asks again
