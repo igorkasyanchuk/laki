@@ -294,6 +294,23 @@ function html(bs: Block[]): string {
 }
 
 export const markdownHtml = (src: string) => html(markdown(src))
+// Copy a table (MarkdownView's MdTable): a cell's words (a link's, code's text, a picture's alt), then the whole table
+// as Markdown (| escaped), CSV (a cell with a comma, a quote or a line break quoted, its quotes doubled) or HTML (one
+// table, its cells escaped as inl does, aligned inline: what Mail, Docs or Word paste as a table). test/markdown.test.ts
+export type Table = Extract<Block, { t: 'table' }>
+export const cellText = (c: Inline[]): string => c.map(x => (typeof x === 'string' ? x : x.t === 'code' ? x.text : x.t === 'img' ? x.alt : x.t === 'br' ? ' ' : cellText(x.kids))).join('').replace(/\s+/g, ' ').trim()
+export function tableAs(b: Table, as: 'md' | 'csv' | 'html'): string {
+  const rows = [b.head, ...b.rows].map(r => b.head.map((_, i) => r[i] ?? []))
+  if (as === 'csv') return rows.map(r => r.map(c => (t => (/[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t))(cellText(c))).join(',')).join('\n')
+  if (as === 'md') {
+    const line = (r: string[]) => `| ${r.join(' | ')} |`
+    const rule = b.head.map((_, i) => ({ left: ':---', center: ':---:', right: '---:' })[b.align[i] as string] ?? '---')
+    const [head, ...body] = rows.map(r => r.map(c => cellText(c).replace(/\|/g, '\\|')))
+    return [line(head), line(rule), ...body.map(line)].join('\n')
+  }
+  const st = (i: number) => (b.align[i] ? ` style="text-align:${b.align[i]}"` : '')
+  return `<table><thead><tr>${rows[0].map((c, i) => `<th${st(i)}>${inl(c)}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map(r => `<tr>${r.map((c, i) => `<td${st(i)}>${inl(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+}
 // a line break kept as one (chat-like: a card's words as written): a <br> at a line's end (inline's own; a backslash
 // would end up in a link the line ends with), not in a fence, on a heading or table row, nor before a line that starts
 // a block (a list item, a quote…)

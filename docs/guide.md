@@ -2062,6 +2062,8 @@ marked *Proposal*: what it suggests, not applied.
 A code block in an answer has *Copy* on hover, and a shell's (`sh`, `bash`, `zsh`, `shell`, `console`) *▷ Run*: a new
 shell tab opens in the workspace with the command typed, several lines as one paste, a `$ ` prompt at a line's
 start left out (and, in a block with `$ ` lines, what the commands printed); nothing runs until you press ⏎ there.
+A table (in Reader, an answer or any rendered Markdown) has a copy button on hover: *Copy as Markdown*, *Copy as CSV*
+(straight into Numbers or a sheet) or *Copy as HTML* (pastes as a real table in Mail, Docs, Notion or Word).
 ⌥-click types it into the workspace's last shell tab at its prompt instead. A block with a hidden character in it (a bidi mark, a zero-width space, a control) has Copy only.
 
 Settings › Layout › *Tool calls in the Reader*: *Show all*, *Hide successful* (a run of steps that all worked folds

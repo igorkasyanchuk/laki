@@ -2052,7 +2052,11 @@ input.color-pick { width: 44px; height: 31px; padding: var(--sp-1) var(--sp-2); 
 .md a { color: var(--accent-ink); text-decoration: none; cursor: pointer; }
 .md a:hover { text-decoration: underline; }
 .md a:not([href]) { cursor: default; }
-.md-table { overflow-x: auto; }
+.md-table { overflow-x: auto; position: relative; }
+.md-table-copy { position: absolute; top: var(--sp-1); right: var(--sp-1); opacity: 0; display: inline-flex; padding: var(--sp-1); border-radius: var(--r-xs); background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
+.md-table:hover .md-table-copy, .md-table-copy:focus-visible { opacity: 1; }
+@media (hover: none) { .md-table-copy { opacity: 1; } }
+.md-table-copy:hover { color: var(--fg); }
 .md table { border-collapse: collapse; font-size: 0.94em; }
 .md :is(th, td) { border: 1px solid var(--line); padding: var(--sp-2) var(--sp-4); }
 .md th { background: var(--panel); font-weight: 600; }

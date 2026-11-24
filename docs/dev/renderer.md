@@ -876,7 +876,9 @@ are tested in `test/units-more.test.ts`.
   screen, one at a time with a yield between (`turn`), kept by theme and text (`pics`, 200). `useNear` also holds back
   diagram.tsx' `DiagramView` (a React Flow each) until scrolled to; a prototype's frame is `loading="lazy"`.
 - **`shared/markdown.ts`**: `markdown` (blocks) and `inline` (shared: a shared tab's page renders it too): a Markdown file as a tree (GitHub's common subset; `html`: GitHub's text and a repo's files, `fromHtml` reads its tags into the same tree, `<details>` a `details` block, unknown tags and code left as text; never for what people and agents say), which
-  `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
+  `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (a table as `MdTable`: its hover
+  button's menu copies shared/markdown.ts `tableAs` as Markdown, CSV or HTML, the HTML with the Markdown as its plain text;
+  code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
   line opens Raw); its *Outline* (⌘⇧O on `.preview`) is `outlineItems`: the rendered page's `h1`…`h6` as a `useMenu` menu under its filter box, a pick `scrollIntoView`s it (the artifacts' big view's and `ArtifactView`'s too). Tested in `test/markdown.test.ts`.
 - **Quick Look** (U14): Space on a focused file row (Changes, the full review's list, Files, Artifacts: ui.tsx `act`'s

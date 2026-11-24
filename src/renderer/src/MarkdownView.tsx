@@ -5,8 +5,8 @@ import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, 
 import { openExternal } from './api'
 import { highlight } from './highlight'
 import { canRun, proposalOf, runText } from './text'
-import { Icon, type MenuItem, useNear } from './ui'
-import { type Block, type Inline, markdown } from '../../shared/markdown'
+import { Icon, type MenuItem, useMenu, useNear } from './ui'
+import { type Block, type Inline, markdown, type Table, tableAs } from '../../shared/markdown'
 
 // a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
 // open in the browser, images show as links (a preview fetches nothing)
@@ -326,33 +326,50 @@ function mdBlock(b: Block, k: number): React.ReactNode {
       )
     }
     case 'table':
-      return (
-        <div key={k} className="md-table">
-          <table>
-            <thead>
-              <tr>
-                {b.head.map((c, i) => (
-                  <th key={i} style={{ textAlign: b.align[i] || undefined }}>
-                    {c.map(mdInline)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {b.rows.map((r, i) => (
-                <tr key={i}>
-                  {b.head.map((_, j) => (
-                    <td key={j} style={{ textAlign: b.align[j] || undefined }}>
-                      {(r[j] ?? []).map(mdInline)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )
+      return <MdTable key={k} b={b} />
   }
+}
+// a table, with a copy menu on hover (shared/markdown.ts tableAs): Markdown, CSV (Numbers, a sheet), HTML (a real table
+// in Mail, Docs, Notion or Word; its words as plain text beside it)
+function MdTable({ b }: { b: Table }) {
+  const [menu, openMenu] = useMenu()
+  const [copied, setCopied] = useState('')
+  const copy = (as: 'md' | 'csv' | 'html') => {
+    const done = () => (setCopied(as), setTimeout(() => setCopied(''), 1500))
+    const text = tableAs(b, as === 'html' ? 'md' : as)
+    const put = as === 'html' ? navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([tableAs(b, 'html')], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]) : navigator.clipboard.writeText(text)
+    void put.then(done, () => {})
+  }
+  return (
+    <div className="md-table">
+      <button type="button" className="md-table-copy" aria-label={copied ? 'Copied' : 'Copy the table'} data-tip="Copy the table: Markdown, CSV or HTML" onClick={e => openMenu(e, [{ label: 'Copy as Markdown', icon: 'copy', run: () => copy('md') }, { label: 'Copy as CSV', icon: 'copy', tip: 'For Numbers or a spreadsheet', run: () => copy('csv') }, { label: 'Copy as HTML', icon: 'copy', tip: 'Pastes as a table in Mail, Docs, Notion or Word', run: () => copy('html') }], 'right')}>
+        <Icon name={copied ? 'check' : 'copy'} size={12} />
+      </button>
+      <table>
+        <thead>
+          <tr>
+            {b.head.map((c, i) => (
+              <th key={i} style={{ textAlign: b.align[i] || undefined }}>
+                {c.map(mdInline)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {b.rows.map((r, i) => (
+            <tr key={i}>
+              {b.head.map((_, j) => (
+                <td key={j} style={{ textAlign: b.align[j] || undefined }}>
+                  {(r[j] ?? []).map(mdInline)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {menu}
+    </div>
+  )
 }
 function mdInline(x: Inline, k: number): React.ReactNode {
   if (typeof x === 'string') return x

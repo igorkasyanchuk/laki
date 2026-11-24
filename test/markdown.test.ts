@@ -131,3 +131,16 @@ test('lineBreaks: a card\'s line breaks kept (a link at a line\'s end too), not 
   assert.match(h, /<pre><code>c1\nc2<\/code><\/pre>/)
   assert.doesNotMatch(markdownHtml(lineBreaks('one\\\ntwo  \nthree')), /&lt;br|<br><br>/) // a break already: not another
 })
+
+test('tableAs: Copy a table as Markdown, CSV or HTML', async () => {
+  const { markdown, tableAs } = await import('../src/shared/markdown.ts')
+  const b = markdown('| Endpoint | p95 | Errors |\n|:--|--:|:-:|\n| `/login` | 120 | 0.1% |\n| [search](https://x.dev) | 4,80 | a "b" \\| c |')[0] as any
+  assert.equal(b.t, 'table')
+  assert.equal(tableAs(b, 'md'), '| Endpoint | p95 | Errors |\n| :--- | ---: | :---: |\n| /login | 120 | 0.1% |\n| search | 4,80 | a "b" \\| c |')
+  assert.equal(tableAs(b, 'csv'), 'Endpoint,p95,Errors\n/login,120,0.1%\nsearch,"4,80","a ""b"" | c"')
+  const h = tableAs(b, 'html')
+  assert.match(h, /^<table><thead><tr><th style="text-align:left">Endpoint<\/th><th style="text-align:right">p95<\/th><th style="text-align:center">Errors<\/th><\/tr><\/thead><tbody>/)
+  assert.match(h, /<td style="text-align:left"><code>\/login<\/code><\/td>/)
+  assert.match(h, /a &#34;b&#34; \| c/)
+  assert.doesNotMatch(tableAs(markdown('| a |\n|---|\n| <script>x</script> |')[0] as any, 'html'), /<script>/, 'escaped')
+})
