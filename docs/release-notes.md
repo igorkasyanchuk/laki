@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Fewer tooltips in the sidebar: none on projects, groups, Show more and a workspace being made, where the row says it already.
 - Secrets in the Keychain are stored encrypted with Laki's own key while its window is open, so a plain `security` call from an agent's tab can't read them.
 - A file path the terminal wrapped over two or more rows opens from any of them, not only the row with its extension.
 - One MCP server list for every project's agents (Settings › Agents & profiles), with Import from Claude Code, Codex, Antigravity and OpenCode's own configs; OpenCode gets them too, and a Claude Code profile can take only Laki's.

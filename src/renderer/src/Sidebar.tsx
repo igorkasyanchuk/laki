@@ -549,7 +549,6 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         tabIndex={-1}
         data-group={p.id}
         data-head=""
-        data-tip={`${s.name}: ${n} ${n === 1 ? 'workspace' : 'workspaces'}${s.template ? ` · new ones start with the template ${s.template}` : ''}${s.preset ? ` · new ones start ${s.preset}` : ''} · click to ${shut ? 'expand' : 'collapse'} · drag to move · drop a workspace on it to put it here · double click to rename`}
         onPointerDown={e => rows.start(e, 'ws', s.id, p.id, true)}
         onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(s.id)}
         onDoubleClick={() => setDialog({ sep: p.id, id: s.id })}
@@ -573,7 +572,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     making
       .filter(m => m.project === p.id && (p.seps?.some(s => s.id === m.place) ? m.place : '') === at)
       .map(m => (
-        <div key={`making-${m.key}`} className="ws making" aria-busy="true" data-tip="being made: the worktree, then its agent">
+        <div key={`making-${m.key}`} className="ws making" aria-busy="true">
           <Glyph s="running" />
           <span className="ws-name">{m.name}</span>
           <span className="ws-going">creating…</span>
@@ -604,7 +603,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
       ...rows.flatMap(x => ('path' in x ? [wsRow(x)] : [sepRow(p, x, count.get(x.id) ?? 0, hidden.get(x.id)), ...makingRows(p, x.id)])),
       ...(more || long
         ? [
-            <div key={`more-${p.id}`} className="ws ws-new ws-fold" role="treeitem" aria-level={2} tabIndex={-1} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), fold(`more:${p.id}`))} data-tip={more ? 'The rest of its workspaces (the filter and ⌘K find them too)' : `Only its first ${cap} again, and any working, waiting on you or open`} onClick={() => fold(`more:${p.id}`)}>
+            <div key={`more-${p.id}`} className="ws ws-new ws-fold" role="treeitem" aria-level={2} tabIndex={-1} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), fold(`more:${p.id}`))} onClick={() => fold(`more:${p.id}`)}>
               <Icon name={more ? 'chevron' : 'chevronUp'} size={12} />
               <span className="ws-name">{more ? `Show ${more} more` : 'Show less'}</span>
             </div>,
@@ -787,7 +786,6 @@ export function Sidebar({ app }: { app: AppCtx }) {
               aria-label={p.name}
               tabIndex={-1}
               style={colorVar(p.color)}
-              data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · ${p.kind ? `click to ${shut ? 'expand' : 'collapse'}` : `click for its page (notes, tasks, memory, settings) · the arrow ${shut ? 'expands' : 'collapses'} it`} · drag to move`}
               onPointerDown={e => rows.start(e, 'project', p.id)}
               onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && (p.kind || (e.target as Element).closest('.project-chev') ? (stuckFold(e.currentTarget), fold(p.id)) : setDialog({ project: p.id }))}
               onContextMenu={e => openMenu(e, projectActions(p))}
