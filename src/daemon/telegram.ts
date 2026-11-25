@@ -457,7 +457,7 @@ async function fileIn(f: TgFile, name: string | false | undefined) {
 // ---------- navigation by buttons (/menu): Projects › a project's workspaces › a workspace's card, each in the same
 // message (edited), ◀ ▶ a page of PAGE, ⬆ ⬇ the workspace before or after, ⬅ back up. A card: its agents' state and the
 // last thing its agent said (Markdown as Telegram's tags), 💬 Talk here (plain words go to its agent from then on),
-// 📺 Screen, 📝 Diff, ➕ New task (Control: the next message, typed or said, is its task). A button's data names a
+// 📺 Screen, 📝 Diff (each in the card's place, ⬅ Back to it, 🔄 Again), ➕ New task (Control: the next message, typed or said, is its task). A button's data names a
 // project or workspace by a short key this daemon gave (Telegram takes 64 bytes): one from before a restart says to open
 // /menu again. Archived workspaces and Recording mode's private ones are never listed (shownWs)
 const PAGE = 8
@@ -619,7 +619,8 @@ async function nav(q: Tap, gap: boolean) {
     const t = w && shownWs(w) ? agentsOf(w)[0] : undefined
     if (!t) return old()
     ans()
-    return void say(kind === 's' ? await screenOf(t) : await diffOf(t))
+    // in the card's place, with ⬅ Back to it (a menu never starts over from Projects) and 🔄 Again
+    return void edit(kind === 's' ? await screenOf(t) : await diffOf(t), [[btn('⬅ Back', `nav:w:${a}`), btn('🔄 Again', `nav:${kind}:${a}`)]])
   }
   if (kind === 'n') {
     if (!levelAtLeast('control')) return ans('Starting a workspace needs the Control level: Settings › Telegram')

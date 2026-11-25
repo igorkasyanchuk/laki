@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Telegram: 📺 Screen and 📝 Diff open in the card's place with ⬅ Back to the workspace and 🔄 Again, so the menu never starts over.
 - Hide secret-looking variables from agents also catches secrets by their value: a password in a URL or a key's shape under any name; Settings says why for each.
 - Out loud can speak only on headphones (Settings › Voice): never out of the Mac's speakers or a display's.
 - Voice knows your project's words: workspace, branch and file names go to the model as a hint and are put back in the text (“checkout flow” becomes checkout-flow); a click on an underlined one undoes it.

@@ -372,6 +372,19 @@ test("Control: /stop a turn; a green PR's Merge asked twice on its card; the gat
   assert.equal(merges(), 1)
   const log = () => readFileSync(join(rig.data, 'telegram-log.jsonl'), 'utf8')
   assert.match(log(), /merged .*'s PR/)
+  // 📺 Screen: in the card's place, ⬅ Back to the card (not to Projects), 🔄 Again
+  const card2 = await cardOf()
+  const scr = card2.body.reply_markup.inline_keyboard.flat().find((k: any) => k.text === '📺 Screen')
+  const before = b.of('editMessageText').length
+  b.tap(scr.callback_data) // the fake's taps are on message 1: its edit's text says which
+  const shown = (await until(() => b.of('editMessageText').slice(before).find(c => c.body.text.includes('<pre>')), 'its screen in the card'))!
+  const [back, again] = shown.body.reply_markup.inline_keyboard[0]
+  assert.deepEqual([back.text, again.text, again.callback_data], ['⬅ Back', '🔄 Again', scr.callback_data])
+  const edits = b.of('editMessageText').length
+  b.tap(back.callback_data)
+  const card3 = (await until(() => b.of('editMessageText').slice(edits).find(c => c.body.reply_markup?.inline_keyboard?.flat().some((k: any) => k.text === '📺 Screen')), 'the card again'))!
+  assert.ok(!card3.body.text.includes('<pre>'))
+  assert.equal(b.of('sendMessage').filter(c => c.body.text.includes('<pre>')).length, 0, 'no new message for the screen')
   // laki_ask: its question as buttons, a tap its answer; the next answer comes back
   await rig.rpc('aiKey', { key: 'sk-or-v1-tg' })
   or.answers.push(call('q1', 'laki_ask', { question: 'Which **one**?', options: ['Red', 'Blue'] }), reply({ content: 'Blue it is.' })) // its turn ends with the question: no model call after it

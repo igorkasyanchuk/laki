@@ -2885,8 +2885,8 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   agent's tab; and commands, in Telegram's menu: `/status` who needs you, who works, who is done; `/screen` and `/diff`
   as a reply to a push or with a workspace's name; `/quiet 2h`, `/quiet 30m`, `/quiet off` for Do not disturb; `/menu`:
   your projects as buttons, a project's workspaces (🟡 needs you, 🔵 working, 🟢 done; ◀ ▶ a page at a time), a
-  workspace's card with its agents, the last thing its agent said and 📺 Screen, 📝 Diff, ⬆ ⬇ the one before or after and ⬅
-  back, with no typing; its 💬 *Talk here* sends whatever you type (or say: a voice note is written down by Settings ›
+  workspace's card with its agents, the last thing its agent said and 📺 Screen, 📝 Diff (each in the card's place, with
+  ⬅ Back to the card and 🔄 Again), ⬆ ⬇ the one before or after and ⬅ back, with no typing; its 💬 *Talk here* sends whatever you type (or say: a voice note is written down by Settings ›
   Voice's cloud and shown back as 🎙 first) to that workspace's agent, no reply needed, until `/talk off` (`/talk
   <workspace>` picks one by name); 🤖 *Laki AI* (in `/menu`, or `/ai [question]`) sends your messages, voice notes and
   photos to Laki AI (the AI page's chat, on the Mac too), whose tools do only what the chat may (read, message an agent, at
