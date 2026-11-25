@@ -1929,7 +1929,7 @@ export function SettingsPage(p: {
                       {(['yellow', 'red'] as const).map((k, i) => (
                         <span key={k} className="nt-when">
                           {i > 0 && ', then $'}
-                          <input type="number" min={0.01} step={1} style={{ width: 64 }} aria-label={`Cost warning: ${k}`} disabled={s.costWarn?.on !== true} value={s.costWarn?.[k] ?? COST_WARN[k]} onChange={e => Number(e.target.value) > 0 && set({ costWarn: { ...COST_WARN, ...s.costWarn, [k]: Number(e.target.value) } })} />
+                          <input type="number" min={0.01} step={1} style={{ width: 64 }} aria-label={`Cost warning: ${k}`} disabled={s.costWarn?.on !== true} defaultValue={s.costWarn?.[k] ?? COST_WARN[k]} onChange={e => Number(e.target.value) > 0 && set({ costWarn: { ...COST_WARN, ...s.costWarn, [k]: Number(e.target.value) } })} />
                         </span>
                       ))}
                     </span>,

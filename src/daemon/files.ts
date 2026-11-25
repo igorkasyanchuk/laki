@@ -756,7 +756,13 @@ export function dbOf(path: string, q: DbAsk) {
         const file = [join(here, 'dbWorker.js'), join(here, '../dbWorker.js'), join(here, 'dbWorker.ts')].find(f => existsSync(f))
         if (!file) return rej(new Error('database worker not found'))
         const tmp = mkdtempSync(join(tmpdir(), 'laki-db-')) // its clone's: gone as the worker ends, a stalled one too
-        const w = new Worker(file, { workerData: { path, q, tmp }, resourceLimits: { maxOldGenerationSizeMb: 256 } })
+        let w: Worker
+        try {
+          w = new Worker(file, { workerData: { path, q, tmp }, resourceLimits: { maxOldGenerationSizeMb: 256 } })
+        } catch (e) {
+          rmSync(tmp, { recursive: true, force: true })
+          return rej(e)
+        }
         const slow = () => rej(new Error(`it took over ${DB_MS / 1000} s: a narrower query, or open it in its app`))
         const t = setTimeout(() => (slow(), void w.terminate()), DB_MS)
         w.once('message', (m: { r?: unknown; err?: string }) => (m.err === undefined ? res(m.r) : rej(new Error(m.err))))

@@ -1534,7 +1534,7 @@ function CsvTable({ path, text, edit, onText, grid }: { path: string; text: stri
 // #1: a SQLite database (the daemon's db.ts, read-only): its tables with their rows; a table's first rows (a column's
 // head sorts them, the filter finds words in any column) or its schema; Query, a SELECT of yours (⌘⏎), with Copy as CSV
 export type DbTable = { name: string; kind: 'table' | 'view'; rows?: number; sql: string }
-type DbRows = { cols: string[]; rows: string[][]; cut?: boolean }
+type DbRows = { cols: string[]; rows: string[][]; cut?: boolean; nulls?: [number, number][] } // nulls: the cells that are NULL
 function DbView({ tables, read, onCopy }: { tables: DbTable[]; read: (q: object) => Promise<DbRows>; onCopy: (text: string) => void }) {
   const [pick, setPick] = useState(tables[0]?.name ?? '')
   const [tab, setTab] = useState<'rows' | 'schema' | 'query'>(tables.length ? 'rows' : 'query')
@@ -1581,7 +1581,7 @@ function DbView({ tables, read, onCopy }: { tables: DbTable[]; read: (q: object)
             <tr key={i}>
               <td className="csv-n">{i + 1}</td>
               {r.map((v, j) => (
-                <td key={j} className={v === 'NULL' ? 'muted' : undefined}>
+                <td key={j} className={got.nulls?.some(([a, b]) => a === i && b === j) ? 'muted' : undefined}>
                   {v}
                 </td>
               ))}
@@ -1623,7 +1623,7 @@ function DbView({ tables, read, onCopy }: { tables: DbTable[]; read: (q: object)
           <span className="grow" />
           {busy && <span className="muted small">reading…</span>}
           {got && got.rows.length > 0 && tab !== 'schema' && (
-            <button className="small" data-tip="These rows, with the column names first" onClick={() => onCopy(toCsv([got.cols, ...got.rows]))}>
+            <button className="small" data-tip="These rows, with the column names first" onClick={() => onCopy(toCsv([got.cols, ...got.rows.map((r, i) => r.map((v, j) => (got.nulls?.some(([a, b]) => a === i && b === j) ? '' : v)))]))}>
               <Icon name="copy" size={12} /> Copy as CSV
             </button>
           )}

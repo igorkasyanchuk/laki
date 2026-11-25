@@ -400,7 +400,7 @@ function CostWarnField({ value, onSave }: { value?: CostWarn; onSave: (v: CostWa
               (['yellow', 'red'] as const).map(k => (
                 <span key={k} className="nt-when">
                   {k} $
-                  <input type="number" min={0.01} step={1} style={{ width: 64 }} aria-label={`Cost warning: ${k}`} value={own[k]} onChange={e => Number(e.target.value) > 0 && onSave({ ...own, [k]: Number(e.target.value) })} />
+                  <input type="number" min={0.01} step={1} style={{ width: 64 }} aria-label={`Cost warning: ${k}`} defaultValue={own[k]} onChange={e => Number(e.target.value) > 0 && onSave({ ...own, [k]: Number(e.target.value) })} />
                 </span>
               ))}
           </span>

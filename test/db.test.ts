@@ -38,6 +38,8 @@ test('db: tables with their rows and schema; a table sorted and filtered; SELECT
   assert.throws(() => dbRead(file, { op: 'rows', table: 'nope' }), /no table nope/)
   r = dbRead(file, { op: 'query', sql: 'SELECT count(*) AS n, max(id) AS top FROM users WHERE note IS NULL;' }) as any
   assert.deepEqual([r.cols, r.rows], [['n', 'top'], [['5', '250']]])
+  r = dbRead(file, { op: 'query', sql: "SELECT note, 'NULL' AS t FROM users WHERE id IN (49, 50) ORDER BY id" }) as any
+  assert.deepEqual([r.rows, r.nulls], [[['note 49', 'NULL'], ['NULL', 'NULL']], [[1, 0]]], "a NULL apart from the text 'NULL'")
   assert.throws(() => dbRead(file, { op: 'query', sql: 'DELETE FROM users' }), /a SELECT/)
   assert.throws(() => dbRead(file, { op: 'query', sql: 'SELECT 1; DELETE FROM users' }), /one statement/)
   assert.deepEqual((dbRead(file, { op: 'query', sql: "SELECT 'a;b' AS x;" }) as any).rows, [['a;b']], 'a ; in a string is one statement')

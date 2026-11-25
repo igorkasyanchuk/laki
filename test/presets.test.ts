@@ -607,7 +607,7 @@ test("#6: Settings' MCP servers go to every project's agents (a project's of the
   const shown = (await rig.rpc('state')).settings.mcp
   assert.notEqual(shown[1].env.SEARCH_TOKEN, 'fake-secret', 'masked in the view')
   await rig.rpc('settingsSet', { mcp: shown }) // Settings sends it back masked: the value stays
-  await rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'docs', command: 'project-docs' }] } })
+  await rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'docs', command: 'project-docs' }], env: { OPENCODE_CONFIG_CONTENT: '{"share":"disabled"}' } } })
   await rig.rpc('presetSave', { name: 'claude-only', add: true, set: { agent: 'claude', mcpOnly: true } })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
   const c = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find(l => l.bin === 'claude'), 'claude')
@@ -615,6 +615,7 @@ test("#6: Settings' MCP servers go to every project's agents (a project's of the
   assert.ok(!c.args.includes('--strict-mcp-config'))
   await rig.rpc('tabNew', { ws: ws.id, kind: 'agent', preset: 'opencode' })
   const oc = await until(() => rig.fakeLog().find(l => l.bin === 'opencode'), 'opencode')
+  assert.equal(JSON.parse(oc.config).share, 'disabled', "the project's own inline config kept")
   assert.deepEqual(JSON.parse(oc.config).mcp, { search: { type: 'local', command: ['npx', 'search-mcp'], environment: { SEARCH_TOKEN: 'fake-secret' } }, docs: { type: 'local', command: ['project-docs'] } })
   // Only Laki's MCP servers: none of claude's own config's, Laki's own kept
   await rig.rpc('tabNew', { ws: ws.id, preset: 'claude-only' })

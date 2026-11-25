@@ -54,7 +54,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
   laki send <ws>[/<tab>]|@name [--queue|--steer|--interrupt] <text>
                                               type text into an agent: after its turn (--queue, --when-idle), into it, or stopping it
-  laki suggest <title> --prompt <task> [--why <why>] | --withdraw <id>
+  laki suggest <title> --prompt <task> [--why <why>] [--ws <ws>] | --withdraw <id>
                                               a task you noticed outside yours: a card the user starts, edits or dismisses
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
   laki bell <ws|tab> [--off]                  told once when it next finishes, asks, fails or hits a limit

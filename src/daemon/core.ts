@@ -2189,14 +2189,15 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const model = tab.model || pr?.model?.trim()
   const effort = tab.effort || (EFFORTS[tab.preset as Agent]?.includes(pr?.effort ?? '') ? pr!.effort : undefined)
   // opencode's model goes in its inline config: some versions' TUI refuses -m ("Unrecognized flag"), every one reads
-  // OPENCODE_CONFIG_CONTENT, over a preset's own of it. ponytail: one in settings' or the project's env is replaced
+  // OPENCODE_CONFIG_CONTENT, over the one the tab's env has (its profile's, else its project's, else Settings')
   // its instructions too: Laki's note in a 0600 file of the tab's (<data>/opencode/notes), named in the config's
   // instructions with a preset's own (OpenCode reads them as rules, every start)
   const ocNote = tab.preset === 'opencode' && told && h === localHooks ? memoryFile(tab, told) : undefined
   if ((model || ocNote || mcp.length) && tab.preset === 'opencode') {
     let own: unknown = {}
     try {
-      own = JSON.parse(pr?.env?.OPENCODE_CONFIG_CONTENT ?? '{}')
+      const ws = state.workspaces.find(w => w.id === tab.workspace)
+      own = JSON.parse(pr?.env?.OPENCODE_CONFIG_CONTENT ?? (ws && projectConfig(ws).env?.OPENCODE_CONFIG_CONTENT) ?? state.settings?.env?.OPENCODE_CONFIG_CONTENT ?? '{}') // the tab's env's (tabEnv's order): this one replaces it
     } catch {}
     const o = (own && typeof own === 'object' && !Array.isArray(own) ? own : {}) as Record<string, unknown>
     const ownMcp = o.mcp && typeof o.mcp === 'object' && !Array.isArray(o.mcp) ? o.mcp : {}

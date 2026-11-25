@@ -11,7 +11,7 @@ import { constants, copyFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type DbTable = { name: string; kind: 'table' | 'view'; rows?: number; sql: string }
-export type DbRows = { cols: string[]; rows: string[][]; cut?: boolean }
+export type DbRows = { cols: string[]; rows: string[][]; cut?: boolean; nulls?: [number, number][] } // nulls: the cells that are NULL (row, column), not the text
 export type DbAsk = { op: 'tables' } | { op: 'rows'; table: string; sort?: string; desc?: boolean; filter?: string } | { op: 'query'; sql: string }
 export const DB_ROWS = 200
 export const DB_QUERY_ROWS = 1000
@@ -23,6 +23,7 @@ const name = (s: string) => `"${s.replace(/"/g, '""')}"`
 const cellOf = (v: unknown) => (v === null || v === undefined ? 'NULL' : v instanceof Uint8Array ? `(blob, ${v.length} bytes)` : String(v))
 const rowsOf = (it: Iterable<unknown>, max: number): DbRows & { cols: string[] } => {
   const rows: string[][] = []
+  const nulls: [number, number][] = []
   let cols: string[] = []
   let cut = false
   for (const r of it as Iterable<Record<string, unknown>>) {
@@ -31,9 +32,10 @@ const rowsOf = (it: Iterable<unknown>, max: number): DbRows & { cols: string[] }
       break
     }
     if (!rows.length) cols = Object.keys(r)
+    cols.forEach((c, j) => (r[c] === null || r[c] === undefined) && nulls.push([rows.length, j]))
     rows.push(cols.map(c => cellOf(r[c])))
   }
-  return { cols, rows, ...(cut && { cut }) }
+  return { cols, rows, ...(cut && { cut }), ...(nulls.length && { nulls }) }
 }
 
 export function dbRead(path: string, q: DbAsk, tmp?: string): { tables: DbTable[] } | DbRows {

@@ -753,6 +753,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
             <div className="project-ws" role="group">{pins.map(w => wsRow(w, true))}</div>
           </div>
         )}
+        {recent && listed.flatMap(p => [...makingRows(p, ''), ...(p.seps ?? []).flatMap(s => makingRows(p, s.id))]) /* being made: on top until it's a row */}
         {recent &&
           recentGroups(live.filter(w => !w.pinned && inRecent(w)), lastAt, w => !!w.setup || view.tabs.some(t => t.workspace === w.id && spins(t))).map(g => {
             const shut = folded.includes(`recent:${g.id}`)

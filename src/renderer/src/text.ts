@@ -216,7 +216,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array',
   widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number',
   prQuiet: 'number', prTries: 'number', prBots: 'array', archivedDays: 'number', archiveIdle: 'number', longTurn: 'number', cmdKeys: 'object',
-  sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', updateDelay: 'number', modelEfforts: 'object', background: 'object',
+  mcp: 'array', costWarn: 'object', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usageAt: 'number', updateDelay: 'number', modelEfforts: 'object', background: 'object',
   usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', rowMarks: 'object', planTemplates: 'array', railPlans: 'array',
   railOrder: 'array', railHide: 'array', railColors: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number',
   scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', iconWidth: 'number', iconSize: 'number',
