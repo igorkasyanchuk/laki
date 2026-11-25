@@ -534,8 +534,9 @@ test("T13: a bound client's call through Laki's own CLI (laki mcp) is the progra
   copyFileSync(process.execPath, host, constants.COPYFILE_FICLONE)
   writeFileSync(join(dir, 'cli.js'), 'setTimeout(() => {}, 20000)') // stands in for Laki's cli.js (laki mcp)
   const own = realpathSync(process.execPath)
-  // the host starts laki mcp (own executable, cli.js); its pid is the child's, written out
-  const parent = spawn(host, ['-e', `const c = require('child_process').spawn(${JSON.stringify(process.execPath)}, [${JSON.stringify(join(dir, 'cli.js'))}], { stdio: 'ignore' }); console.log(c.pid); setTimeout(() => {}, 20000)`], { stdio: ['ignore', 'pipe', 'ignore'] })
+  // the host starts laki mcp (own executable, cli.js); its pid is the child's, written out (stdout.write: console.log
+  // colors a number under FORCE_COLOR, which node --test sets on a terminal: a release's run)
+  const parent = spawn(host, ['-e', `const c = require('child_process').spawn(${JSON.stringify(process.execPath)}, [${JSON.stringify(join(dir, 'cli.js'))}], { stdio: 'ignore' }); process.stdout.write(c.pid + '\\n'); setTimeout(() => {}, 20000)`], { stdio: ['ignore', 'pipe', 'ignore'] })
   t.after(() => parent.kill())
   const pid = Number(await new Promise<string>(ok => parent.stdout!.once('data', d => ok(String(d).trim()))))
   t.after(() => { try { process.kill(pid) } catch {} })
