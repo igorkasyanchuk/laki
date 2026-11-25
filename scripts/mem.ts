@@ -143,8 +143,9 @@ async function main() {
     const ptyPid = () =>
       existsSync(ptyLog)
         ? [
-            ...readFileSync(ptyLog, 'utf8')
-              .slice(ptyFrom)
+            ...readFileSync(ptyLog)
+              .subarray(ptyFrom)
+              .toString('utf8')
               .matchAll(/\(protocol \d+, pid (\d+)\)/g),
           ]
             .map(m => Number(m[1]))

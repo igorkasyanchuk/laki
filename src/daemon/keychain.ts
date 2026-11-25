@@ -138,5 +138,5 @@ export function keyWrite(name: string, path: string, key: string) {
   retry.delete(name)
 }
 // the diagnostics' line: where each key read or written so far is kept
-export const keysWhere = () => (keychainOn() ? `the Keychain${wrapper ? ' (wrapped by the app)' : ' (not wrapped: no app window)'}${where.size ? `: ${[...where].map(([k, w]) => `${k} in ${w}`).join(', ')}` : ''}` : 'files (0600)')
+export const keysWhere = () => (keychainOn() ? `the Keychain${wrapper ? ' (wrapped by the app)' : " (not wrapped: no Laki window that can, a Developer ID build's)"}${where.size ? `: ${[...where].map(([k, w]) => `${k} in ${w}`).join(', ')}` : ''}` : 'files (0600)')
 const RETRY = () => Number(process.env.LAKI_KEYCHAIN_RETRY_MS) || 60_000

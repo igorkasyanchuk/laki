@@ -164,6 +164,20 @@ export async function progOf(pid: number, proc = process.platform === 'linux' ? 
   const team = teams.get(key)
   return { path, ...(team && { team }) }
 }
+// the program behind a call: one through Laki's own CLI (laki mcp, laki …: own, the daemon's executable, running its cli
+// script) is its starter's (an MCP host, a script), up to 4 steps; so a program that read the token and runs laki with
+// it is itself, not Laki's helper
+export async function progBehind(pid: number, own: string, proc?: string): Promise<Prog | undefined> {
+  for (let i = 0; i < 4 && pid > 1; i++) {
+    const p = await progOf(pid, proc)
+    if (!p) return undefined
+    const ps = (await run('/bin/ps', ['-o', 'ppid=,args=', '-p', String(pid)]).catch(() => ({ stdout: '' }))).stdout.trim()
+    const m = /^(\d+)\s+([\s\S]*)$/.exec(ps)
+    if (!(p.path === own && m && /(^|\/)(cli\.js|cli\/main\.ts)(\s|$)/.test(m[2]))) return p
+    pid = Number(m[1])
+  }
+  return undefined
+}
 // what Settings and the notice call it: an app's name (its .app), else the file's
 export const progName = (path: string) => /\/([^/]+)\.app\//.exec(path)?.[1] ?? basename(path)
 // '' : this program may use it (its first one: bound to it now); else why not

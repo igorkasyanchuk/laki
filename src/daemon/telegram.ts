@@ -14,7 +14,7 @@ import { type Tab, type Telegram, type TelegramView, type TgLevel, tgBackend, ty
 import { LIMITS, limitsOf } from './clients.ts'
 import { changed, fileSave, imageSave, log, prs, resolveTarget, rtOf, save, sessions, state, tracked } from './core.ts'
 import { dir } from './dir.ts'
-import { keyRead, keyWrite } from './keychain.ts'
+import { keyRead, keyUnread, keyWrite } from './keychain.ts'
 import { askOfMsg, hidden, pickedFor, takeTap, tgDrop } from './phone.ts'
 import { activity, activityList, clip80 } from './remoteLog.ts'
 import { type Push, pushText, tapOf } from './push.ts'
@@ -320,7 +320,7 @@ async function loop() {
       const err = e as TgError
       if (err.code === 409) return stop('Another program reads this bot (or it has a webhook): use a bot made only for Laki. Laki stopped listening; nothing of the other one was changed')
       if (err.code === 401) return stop("Telegram refused the bot's token (revoked, or the bot deleted): paste a new one", true)
-      if (!token()) return stop("Laki has no bot token now (the Keychain didn't give it, or a backup from another Mac): Try again, else Remove bot and paste its token again")
+      if (!token() && !keyUnread(KEY)) return stop("Laki has no bot token now (the Keychain didn't give it, or a backup from another Mac): Try again, else Remove bot and paste its token again") // unread (wrapped, Laki's window not open yet; the Keychain didn't answer): tried again below
       if (err.code === 429 && err.retry) await sleep(Math.min(err.retry, 300) * 1000, c.signal)
       else {
         if (err.message !== failed) log(`telegram: ${(failed = err.message)}`)

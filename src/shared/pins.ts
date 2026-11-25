@@ -7,7 +7,9 @@
 // stays and the page is told (a blocking warning, reported to the Mac). pinDecide is that choice: pure, and put into
 // the worker as it is (its source), so it uses nothing from outside itself
 export type Pins = { v: string; files: Record<string, string> } // v: the list's own hash
-export function pinDecide(want: Record<string, string>, got: Record<string, string | undefined>): { swap: boolean; bad: string[] } {
-  const bad = Object.keys(want).filter(p => got[p] !== want[p])
-  return { swap: bad.length === 0, bad }
+// bad: came and differ (reported); missing: didn't come (a network blip, a sign-in's redirect: kept, not reported)
+export function pinDecide(want: Record<string, string>, got: Record<string, string | undefined>): { swap: boolean; bad: string[]; missing: string[] } {
+  const bad = Object.keys(want).filter(p => got[p] !== undefined && got[p] !== want[p])
+  const missing = Object.keys(want).filter(p => got[p] === undefined)
+  return { swap: bad.length === 0 && missing.length === 0, bad, missing }
 }

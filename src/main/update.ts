@@ -109,8 +109,10 @@ export function updater(send: (s: UpdateState) => void) {
   }
 
   // the app quits (its windows close for good: main's before-quit-for-update) and opens again as the new version
+  let installing = false
   async function install() {
-    if (s.status !== 'ready') return s
+    if (s.status !== 'ready' || installing) return s
+    installing = true // a second click while the copy finishes: nothing more
     await keepWait() // #G1: the copy of this version, a few seconds at most
     autoUpdater.quitAndInstall()
     return s

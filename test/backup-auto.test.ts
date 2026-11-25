@@ -2,7 +2,7 @@
 // week old (LAKI_BACKUP_MS: the tick and the week, a test's), the newest four of its own kept, nothing else in the
 // folder touched; a folder that isn't there: one notice, not one a tick; offered once after your first backup
 import assert from 'node:assert/strict'
-import { mkdirSync, readdirSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, seen, until } from './helpers.ts'
@@ -56,4 +56,12 @@ test("#B2: off unless you turn it on, offered once after your first backup; an a
   await rig.rpc('dataBackup', { file: join(folder, 'second.tgz') })
   await new Promise(ok => setTimeout(ok, 300))
   assert.equal(app.events.filter((e: any) => e.ev === 'notice' && e.title === 'Back up every week?').length, 1, 'offered once')
+})
+
+test('#B2: the default folder (~/Documents/Laki backups) is made the first time, when ~/Documents is there', async t => {
+  const rig = await fresh(t, { env: { LAKI_BACKUP_MS: '1000' } })
+  mkdirSync(join(rig.home, 'Documents'))
+  await rig.rpc('settingsSet', { backupEvery: 'weekly', backupDir: '~/Documents/Laki backups' })
+  const folder = join(rig.home, 'Documents', 'Laki backups')
+  await until(() => existsSync(folder) && readdirSync(folder).some(n => /^laki-weekly-.*\.tgz$/.test(n)), 'a backup in the folder it made', 20000)
 })

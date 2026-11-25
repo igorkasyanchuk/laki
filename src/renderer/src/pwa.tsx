@@ -54,7 +54,8 @@ let warned = false
 function pinWarn(bad: string[]) {
   if (warned) return
   warned = true
-  api.send('pinBad', { bad: bad.slice(0, 5) })
+  const report = (n = 0) => (api.connected ? api.send('pinBad', { bad: bad.slice(0, 5) }) : n < 120 && setTimeout(() => report(n + 1), 1000)) // once the socket is up (2 minutes at most)
+  report()
   const box = document.createElement('div')
   box.className = 'pin-warn'
   box.setAttribute('role', 'alertdialog')

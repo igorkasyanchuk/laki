@@ -433,14 +433,18 @@ keeps the last one, `onPins`) hands it to `pwa.tsx pinsGot`, which posts it to t
 The worker (`swJs`): `pinsTake` keeps the list and the name of the cache that holds its files in `laki-pins`
 (`/.laki-pins`, the one switch point); a list it has (`v`) is nothing to do; else what it had cached, and `/`, are
 fetched (`no-store`; a file whose hash didn't change is taken from its old cache) and hashed with WebCrypto, and
-`pinDecide` (its source put into the worker) says swap (all match: a new `laki-pin-<time>` cache, the list, the old
-cache deleted; `replaced`: the page reloads as the new build) or keep (`bad`: the old cache and list stay). `pinned`
-answers a listed path: its cached copy, else the network's once its hash matches (then cached), else `Response.error()`
-and `{ pinBad }` to every page. A navigation goes to the network first (a sign-in's redirect, a 5xx's offline page,
-4xx as they are), and a 200 is answered with the pinned index.html. `activate` keeps `laki-pin*` caches. A mismatch:
-`pinWarn` puts `.pin-warn` over the page (no way past it) and sends `pinBad` on the socket, which main.ts takes from a
-paired device's sealed socket only (not an api method): a line in daemon.log and, once an hour, a notice with *Stop
-remote access*. Tests: test/pins.test.ts (`pinDecide`, as the worker gets it), test/api-remote.test.ts (the list only
+`pinDecide` (its source put into the worker) says swap (all came and match: a new `laki-pin-<time>` cache, the list,
+the old cache deleted; `replaced`: the page reloads as the new build) or keep: `bad` (came and differ: reported) or
+`missing` (didn't come: a network blip, a sign-in's redirect; kept quietly, tried at the next connection). Takes run one
+after another (`pinsTakeOne`). `pinned` answers a listed path: its cached copy, else the network's once its hash
+matches (then cached), else `Response.error()` (no network: never the old unpinned cache) and `{ pinBad }` to every page.
+A navigation goes to the network first (a sign-in's redirect, a 5xx's offline page, 4xx as they are); one to `/`
+that answers 200 gets the pinned index.html (`pinnedPage`: the answer checked against the list when none is kept yet;
+changed: `CHANGED`, a page that says so, 409); any other address (an artifact's page in a tab of its own) as it came.
+`activate` keeps `laki-pin*` caches. A mismatch: `pinWarn` puts `.pin-warn` over the page (no way past it) and sends
+`pinBad` on the socket once it's up (2 minutes at most), which main.ts takes from a paired device's sealed socket only
+(not an api method), ahead of the D6 lock (a locked page can't unlock past the warning): a line in daemon.log and,
+once an hour, a notice with *Stop remote access*. Tests: test/pins.test.ts (`pinDecide`, as the worker gets it), test/api-remote.test.ts (the list only
 inside the sealed socket, never in a clear frame or response; the worker parses). The worker itself was walked once in
 headless Chrome over CDP (pin, a changed file served from the cache, a changed index.html, a mismatched update kept, a
 matching one swapped); the in-app browser pane registers no service workers.

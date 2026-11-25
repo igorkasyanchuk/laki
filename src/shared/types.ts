@@ -665,6 +665,7 @@ export const WHEN_DONE_WAIT = 60_000 // the countdown before it acts, which Canc
 // a webhook from outside (inbound.ts): its name (/hook/<name>), how a request proves it's the sender's (GitHub's or
 // Linear's signature, else X-Laki-Key), the project its event is for
 export type InHook = { name: string; kind: 'github' | 'linear' | 'key'; project?: string }
+export const BACKUP_DIR = '~/Documents/Laki backups' // #B2: the weekly backup's folder unless you pick one (made the first time, when ~/Documents is there)
 export type Settings = {
   gitTidy?: boolean // B8: each project's git tidied weekly (daemon/gitTidy.ts; unset: on)
   diskLow?: number // GB: a worktree's volume under it says so once (resources.ts diskLowTick; unset: DISK_LOW; 0: never)
@@ -851,7 +852,7 @@ export type Settings = {
   longTurn?: number // minutes: a turn working that long notifies, once (unset, 0: off)
   costWarn?: CostWarn // #3: a workspace's agents past yellow or red dollars: its cost colored, told once each (unset: off)
   backupEvery?: 'off' | 'weekly' // #B2: a backup into backupDir each week (dataBackup.ts backupTick; unset: off, offered once after your first)
-  backupDir?: string // its folder (~ is home)
+  backupDir?: string // its folder (~ is home); BACKUP_DIR when you turn it on without one
   backupOffered?: boolean // the offer after the first backup made (once)
   mcp?: McpServer[] // #6: MCP servers for every project's agents (shared/mcp.ts), a project's own added to them
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)

@@ -104,7 +104,7 @@ export async function agentVersions(p: { fresh?: boolean } = {}): Promise<AgentC
     const nv = newest.v[f.c.id]
     const pinned = !!f.pkg // npm, bun, pnpm: the exact version; else its own updater's (no delay)
     const offer = nv && pinned ? offerAt(nv) : 0
-    const cmd = pinned && nv ? howOf(realpathSync(f.path!), f.c.self, nv.version).cmd : f.cmd
+    const cmd = pinned && nv ? (() => { try { return howOf(realpathSync(f.path!), f.c.self, nv.version).cmd } catch { return f.cmd } })() : f.cmd // gone since the scan: the scan's
     return { id: f.c.id, name: f.c.name, ...(f.path && { path: f.path, version: f.version, how: f.how, cmd }), ...(nv && { newest: nv.version, ...(nv.at !== undefined && { newestAt: nv.at }) }), ...(offer > Date.now() && { offerAt: offer === Infinity ? -1 : offer }), ...(f.path && !pinned && delayDays() > 0 && { noDelay: true }), ...(running && { running }), ...(update && { update }) } as AgentCli
   })
   const was = outdated.join()

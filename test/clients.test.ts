@@ -518,3 +518,24 @@ test("T13: a bound client's token works from the first program that uses it only
   assert.equal(await call(b, free.file), 'ok')
   assert.equal((await rig.rpc('clientList')).find((c: any) => c.id === free.id).bound, undefined)
 })
+
+test("T13: a bound client's call through Laki's own CLI (laki mcp) is the program's that started it, not Laki's helper", async t => {
+  const { progBehind } = await import('../src/daemon/clients.ts')
+  const { realpathSync } = await import('node:fs')
+  const dir = mkdtempSync(join(tmpdir(), 'laki-behind-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const host = join(dir, 'host') // an MCP host: another program (node's binary at another path)
+  copyFileSync(process.execPath, host, constants.COPYFILE_FICLONE)
+  writeFileSync(join(dir, 'cli.js'), 'setTimeout(() => {}, 20000)') // stands in for Laki's cli.js (laki mcp)
+  const own = realpathSync(process.execPath)
+  // the host starts laki mcp (own executable, cli.js); its pid is the child's, written out
+  const parent = spawn(host, ['-e', `const c = require('child_process').spawn(${JSON.stringify(process.execPath)}, [${JSON.stringify(join(dir, 'cli.js'))}], { stdio: 'ignore' }); console.log(c.pid); setTimeout(() => {}, 20000)`], { stdio: ['ignore', 'pipe', 'ignore'] })
+  t.after(() => parent.kill())
+  const pid = Number(await new Promise<string>(ok => parent.stdout!.once('data', d => ok(String(d).trim()))))
+  t.after(() => { try { process.kill(pid) } catch {} })
+  await until(async () => (await progBehind(pid, own))?.path === realpathSync(host), 'the host, not laki mcp')
+  // a program that isn't Laki's CLI: itself
+  assert.equal((await progBehind(parent.pid!, own))?.path, realpathSync(host))
+  // own's binary running something else (not cli.js): itself
+  assert.equal((await progBehind(process.pid, own))?.path, own)
+})

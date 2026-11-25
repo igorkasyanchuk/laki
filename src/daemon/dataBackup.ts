@@ -13,6 +13,7 @@ import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, rea
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { VERSION } from '../shared/version.ts'
+import { BACKUP_DIR } from '../shared/types.ts'
 import { agentsBusy, changed, log, save, settingsSet, state, STATE_V, view } from './core.ts'
 import { alertShow } from './alerts.ts'
 import { BACKUP_KEEP as KEEP, dir } from './dir.ts'
@@ -117,6 +118,7 @@ export async function backupTick(now = Date.now()) {
   backing = true
   const folder = folderOf(st.backupDir)
   try {
+    if (!existsSync(folder) && st.backupDir === BACKUP_DIR && existsSync(dirname(folder))) mkdirSync(folder) // the default one, made the first time
     if (!existsSync(folder) || !statSync(folder).isDirectory()) throw new Error(`${folder} isn't there`)
     const newest = Math.max(-Infinity, ...readdirSync(folder).filter(n => n.endsWith('.tgz')).map(n => (s => (s?.isFile() ? s.mtimeMs : -Infinity))(statSync(join(folder, n), { throwIfNoEntry: false }))))
     if (now - newest < every()) return

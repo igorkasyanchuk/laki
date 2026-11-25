@@ -5,7 +5,7 @@ import './starterEnv.ts' // first: the starter's git and npm variables gone befo
 import { earlyHost } from './ptyEarly.ts' // second: the pty host starting beside the daemon's other modules as they load
 import { execFileSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { chmodSync, closeSync, existsSync, fstatSync, linkSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, fstatSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
@@ -217,9 +217,12 @@ const MANIFEST = JSON.stringify(manifestOf()) // shared/pwa.ts: with its shortcu
 // network (or a tunnel's 5xx: the Mac unreachable) gets the offline page. A push sets the icon's badge (its badge: nextStep.ts badgeOf) as it shows; a notification's action posts its tap to /tap; a click elsewhere opens the app.
 // Versioned by the page's build, so an update's assets replace the old ones
 const OFFLINE = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Laki: offline</title><style>html{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#171412;color:#ece6df;font:16px -apple-system,system-ui,sans-serif;text-align:center}p{color:#a39a90;max-width:20em;margin:8px auto 20px}button{font:inherit;padding:10px 18px;border-radius:10px;border:0;background:#ff7a45;color:#1a0f08}</style><main><h1>Offline: your Mac is not reachable</h1><p>Laki runs on your Mac. Wake it, check its connection and that remote access is on, then try again.</p><button onclick="location.reload()">Try again</button></main>`
+// #P1: the page itself came changed on the way (pinned, its hash differs): this instead, nothing of it run
+const CHANGED = OFFLINE.replace(/<title>.*<\/title>/, '<title>Laki: changed on the way</title>').replace(/<main>.*<\/main>/, "<main><h1>Stop: this page was changed on the way</h1><p>It isn't what your Mac serves: something between them (the tunnel's provider) changed it. Close this page, and use remote access again only once you know why.</p></main>")
 const swJs = () => `const CACHE = 'laki-shell-${(() => { try { return statSync(join(pageDir ?? '', 'index.html')).mtimeMs } catch { return 0 } })()}'
 const SHELL = ['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png']
 const OFFLINE = ${JSON.stringify(OFFLINE)}
+const CHANGED = ${JSON.stringify(CHANGED)}
 // #P1 (shared/pins.ts): the daemon's list of the page's files, given in its sealed socket; LIST holds it and the cache
 // that has its files (laki-pin-<n>), the one switch point of a swap
 const META = 'laki-pins'
@@ -229,6 +232,8 @@ let pins
 const pinsRead = () => (pins !== undefined ? Promise.resolve(pins) : caches.open(META).then(c => c.match(LIST)).then(r => (r ? r.json() : null)).then(p => (pins = p), () => (pins = null)))
 const hashOf = buf => crypto.subtle.digest('SHA-256', buf).then(d => btoa(String.fromCharCode(...new Uint8Array(d))))
 const tell = m => self.clients.matchAll({ includeUncontrolled: true }).then(cs => cs.forEach(c => c.postMessage(m)))
+let taking = Promise.resolve() // one take at a time: two pages' at once would leave a cache behind
+const pinsTakeOne = next => (taking = taking.then(() => pinsTake(next), () => pinsTake(next)))
 async function pinsTake(next) {
   const old = await pinsRead()
   if (old && old.v === next.v) return { swap: true, bad: [], same: true }
@@ -266,17 +271,32 @@ async function pinned(r, path) {
   const hit = await c.match(path)
   if (hit) return hit
   const res = await fetch(r, path === '/' ? { cache: 'no-store' } : {}).catch(() => undefined)
-  if (!res || !res.ok) return res
+  if (!res) return Response.error() // a listed one is never served unchecked
+  if (!res.ok) return res
   const buf = await res.clone().arrayBuffer()
   if ((await hashOf(buf)) !== p.files[path]) return tell({ pinBad: [path] }), Response.error()
   await c.put(path, res.clone())
   return res
 }
+// the page (/ only): what the network answered checked against the list, then the kept copy in its place
+async function pinnedPage(res) {
+  const p = await pinsRead()
+  if (!p || !p.files['/']) return res
+  const c = await caches.open(p.cache)
+  let kept = await c.match('/')
+  if (!kept) {
+    const buf = await res.arrayBuffer()
+    if ((await hashOf(buf)) !== p.files['/']) return tell({ pinBad: ['/'] }), new Response(CHANGED, { status: 409, headers: { 'content-type': 'text/html; charset=utf-8' } })
+    kept = new Response(buf, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+    await c.put('/', kept.clone())
+  }
+  return new Response(kept.body, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } })
+}
 self.addEventListener('message', e => {
   const next = e.data && e.data.pins
   if (!next || typeof next.v !== 'string' || !next.files || typeof next.files !== 'object') return
   const port = e.ports && e.ports[0]
-  e.waitUntil(pinsTake(next).then(d => port && port.postMessage(d), x => port && port.postMessage({ swap: false, bad: [], error: String(x) })))
+  e.waitUntil(pinsTakeOne(next).then(d => port && port.postMessage(d), x => port && port.postMessage({ swap: false, bad: [], error: String(x) })))
 })
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && !k.startsWith('laki-pin')).map(k => caches.delete(k)))).then(() => self.clients.claim())))
@@ -285,16 +305,9 @@ self.addEventListener('fetch', e => {
   const u = new URL(r.url)
   if (r.method !== 'GET' || u.origin !== location.origin) return
   const off = () => new Response(OFFLINE, { headers: { 'content-type': 'text/html; charset=utf-8' } })
-  // the page: the network's answer first (a sign-in's redirect, the tunnel's 5xx: the Mac unreachable), then, pinned,
-  // the kept index.html in place of what came
-  if (r.mode === 'navigate')
-    return e.respondWith(fetch(r).then(async res => {
-      if (res.status >= 500) return off()
-      if (!res.ok || res.type !== 'basic') return res
-      const p = await pinsRead()
-      const kept = p && p.files['/'] ? await pinned(r, '/') : undefined
-      return kept && kept.ok ? new Response(kept.body, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } }) : kept || res
-    }, off))
+  // a navigation: the network's answer first (a sign-in's redirect, the tunnel's 5xx: the Mac unreachable); the page
+  // itself (/), pinned: the kept index.html in place of what came. Any other address (an artifact's page) as it came
+  if (r.mode === 'navigate') return e.respondWith(fetch(r).then(res => (res.status >= 500 ? off() : u.pathname === '/' && res.ok && res.type === 'basic' ? pinnedPage(res) : res), off))
   if (!u.pathname.startsWith('/assets/') && !SHELL.includes(u.pathname)) return
   e.respondWith(pinned(r, u.pathname).then(x => x || fetch(r).then(res => {
     if (res.ok && res.type === 'basic' && !res.redirected) { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)) }
@@ -1159,8 +1172,9 @@ async function clientCalls(sock: Socket, method: string, p: unknown, c: clientsM
 const clientProgs = new WeakMap<Socket, Promise<clientsMod.Prog | undefined>>()
 const boundTold = new Set<string>() // client id and program: its notice sent
 const BOUND_PICKS = ['Revoke', 'Allow this program']
+const ownExe = (() => { try { return realpathSync(process.execPath) } catch { return process.execPath } })() // Laki's helper (or node): its CLI's calls are their starter's
 async function clientBound(sock: Socket, method: string, p: unknown, c: clientsMod.Client) {
-  if (!clientProgs.has(sock)) clientProgs.set(sock, core.peerPid(sock.remotePort ?? 0).then(pid => clientsMod.progOf(pid)).catch(() => undefined))
+  if (!clientProgs.has(sock)) clientProgs.set(sock, core.peerPid(sock.remotePort ?? 0).then(pid => clientsMod.progBehind(pid, ownExe)).catch(() => undefined)) // through laki mcp: the program that started it
   const prog = await clientProgs.get(sock)!
   const why = prog ? clientsMod.bindCheck(c, prog) : `${c.label}'s token is bound to its program, and Laki can't tell which program this call came from: refused`
   if (!why) return
@@ -2365,6 +2379,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         if (ch) ws.close(4400, (e as Error).message.slice(0, 100))
         return
       }
+      if (m.method === 'pinBad') return void (c.device && ch && pinBad(c.device, m.params?.bad)) // #P1: its worker's report, a paired device's sealed socket only (no api method: nothing else may say it); a locked page's too (it can't unlock past the warning)
       // D6: a paired device's page: its last call kept; a passkey one's locked again after its idle minutes, and while
       // locked only the unlock calls (even with remote access stopped meanwhile); one whose lock is gone for good opens
       if (c.device) {
@@ -2375,7 +2390,6 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         if (c.locked && !UNLOCK.has(m.method)) return m.id !== undefined && c.send({ id: m.id, error: 'locked: unlock with Face ID, Touch ID or the PIN' })
         c.at = now
       }
-      if (m.method === 'pinBad') return void (c.device && ch && pinBad(c.device, m.params?.bad)) // #P1: its worker's report, a paired device's sealed socket only (no api method: nothing else may say it)
       if (m.method === 'attach') {
         const sock = local.get(c)
         try {

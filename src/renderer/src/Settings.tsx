@@ -9,7 +9,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -689,7 +689,7 @@ function GoBack({ back, now }: { back: NonNullable<UpdateState['back']>; now: st
   const [err, setErr] = useState('')
   const data = back.newerData ? ` Your data is in a newer format than Laki ${back.version} knows: it keeps a copy as state.json.v${STATE_V} in Laki's data folder and may not keep what ${now} added.` : ''
   const go = async () => {
-    if (!(await ask(`Go back to Laki ${back.version}?`, { text: `Laki restarts as ${back.version}, and ${now} is skipped until you offer it again. Your agents keep running.${data}`, ok: 'Go back' }))) return
+    if (!(await ask(`Go back to Laki ${back.version}?`, { text: `Laki restarts as ${back.version}, and ${now} is skipped until you offer it again. Then its bar restarts Laki's daemon to match: your agents stop and resume.${data}`, ok: 'Go back' }))) return
     setErr('')
     setErr(await bridge!.updateBack!().catch((e: Error) => e.message))
   }
@@ -1827,12 +1827,12 @@ export function SettingsPage(p: {
               {p.backup && (
                 <Group title="Backup" hint="Carry your Laki to another Mac, or back to how it was">
                   <BackupField api={p.backup} />
-                  <Switch className="switch-row" on={s.backupEvery === 'weekly'} onChange={on => set({ backupEvery: on ? 'weekly' : 'off', ...(on && !s.backupDir && { backupDir: '~/Documents/Laki backups' }) })}>
+                  <Switch className="switch-row" on={s.backupEvery === 'weekly'} onChange={on => set({ backupEvery: on ? 'weekly' : 'off', ...(on && !s.backupDir && { backupDir: BACKUP_DIR }) })}>
                     <Says title="Back up every week" hint="A backup into the folder below once the newest there is a week old; the newest 4 kept, nothing else in it touched" />
                   </Switch>
                   {s.backupEvery === 'weekly' && (
                     <>
-                      <FolderField value={s.backupDir} placeholder="~/Documents/Laki backups" label="Weekly backups' folder" onChange={backupDir => set({ backupDir })} />
+                      <FolderField value={s.backupDir} placeholder={BACKUP_DIR} label="Weekly backups' folder" onChange={backupDir => set({ backupDir })} />
                       <p className="muted small">{p.backupLast ? `Last: ${new Date(p.backupLast.at).toLocaleString()}, ${(p.backupLast.bytes / 1e6).toFixed(1)} MB, ${p.backupLast.file}` : 'None yet: the first one runs within the hour'}</p>
                     </>
                   )}

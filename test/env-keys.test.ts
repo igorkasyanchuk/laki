@@ -174,7 +174,7 @@ test("the app's window wraps the Keychain's values (keychain.ts): the item holds
   // no window wraps: plain, as before
   await rig.rpc('settingsSet', { env: { GH_TOKEN: SECRETS[0] } })
   assert.equal(readFileSync(item, 'utf8'), SECRETS[0])
-  assert.match(await rig.rpc('diagnostics'), /not wrapped: no app window/)
+  assert.match(await rig.rpc('diagnostics'), /not wrapped: no Laki window that can/)
   // a window that wraps (a fake of main's safeStorage: the text reversed, in base64)
   const fake = (op: string, v: string) => (op === 'wrap' ? Buffer.from([...v].reverse().join('')).toString('base64') : [...Buffer.from(v, 'base64').toString()].reverse().join(''))
   const wrapper = async () => {
