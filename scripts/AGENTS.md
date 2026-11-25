@@ -11,4 +11,4 @@ What this folder's files are. Read the root [AGENTS.md](../AGENTS.md) first: the
 
 | file | what |
 |---|---|
-| `scripts/` | `dmg.sh` (npm run dmg), `audit.ts` and `audit-allow.json` (npm run audit:deps), `demo.ts`, `ui-smoke.ts`, `cov.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts`, `icon-packs.ts` |
+| `scripts/` | `dmg.sh` (npm run dmg), `audit.ts` and `audit-allow.json` (npm run audit:deps), `demo.ts`, `ai-evals.ts` and `ai-evals.json` (npm run eval:ai: Laki AI's tool choice against a real model, in a demo world; CONTRIBUTING.md), `ui-smoke.ts`, `cov.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift`, `widget-schema.ts`, `icon-packs.ts` |

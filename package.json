@@ -33,6 +33,7 @@
     "size": "node --experimental-strip-types --no-warnings scripts/size.ts",
     "audit:deps": "node --experimental-strip-types --no-warnings scripts/audit.ts",
     "test:changed": "node --experimental-strip-types --no-warnings scripts/test-changed.ts",
+    "eval:ai": "node --experimental-strip-types --no-warnings scripts/ai-evals.ts",
     "test:fast": "node --experimental-strip-types --no-warnings --test $(grep -L 'fresh(' test/*.test.ts)",
     "test:release": "node --experimental-strip-types --no-warnings scripts/test-rerun.ts",
     "test:one": "f() { case \" $* \" in *.ts\\ *) node --experimental-strip-types --no-warnings --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/test-history.ts --test-reporter-destination=stdout \"$@\";; *) echo 'which files? npm run test:one -- test/pr.test.ts' >&2; exit 1;; esac; }; f",

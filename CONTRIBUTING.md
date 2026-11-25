@@ -35,6 +35,17 @@ npm run dev:web                          # then open that URL
 LAKI_HOME=/tmp/laki-x/data node bin/laki.js stop        # afterwards (and stop vite)
 ```
 
+Laki AI's tool choice against a real model (not in `npm test`: it needs the network and costs money):
+
+```bash
+OPENROUTER_API_KEY=… npm run eval:ai -- --model anthropic/claude-sonnet-5.5   # [--only id,id]
+```
+
+Each ask in `scripts/ai-evals.json` goes through the AI page's own method to a demo world of its own, and the first
+tool the model calls (after any lookups) is compared with what the ask expects: a pass or fail each, the total, the
+last run's and the money spent; `dist/ai-evals/<date>.json` keeps them. The key stays in the script's memory (a proxy
+on 127.0.0.1 adds it), and a removal Laki AI asks about is answered No.
+
 ## The rules
 
 - **No new dependencies.** Node's stdlib and what's in `package.json` already.
