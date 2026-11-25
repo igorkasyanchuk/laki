@@ -223,6 +223,7 @@ export function bodyOf(app: AppCtx) {
               path={previewed.path}
               line={previewed.line}
               load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path, storage: previewed.storage, media: true })}
+              db={hasCap(view, 'file.db') ? q => api.call('dbRead', { ws: ws.id, path: previewed.path, storage: previewed.storage, ...q }) : undefined}
               onOpen={() => (previewed.storage ? panelApi(ws).artifacts?.open(previewed.path) : panelApi(ws).openFile(previewed.path))}
               onDefault={() => openIn('default', { ws: ws.id, file: previewed.path, storage: previewed.storage })}
               onEditor={previewed.storage ? () => openIn('editor', { ws: ws.id, file: previewed.path, storage: true }) : undefined}

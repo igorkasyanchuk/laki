@@ -586,6 +586,7 @@ const api = {
   files: p => filesMod.files(p.ws, p.project),
   fileNew: p => filesMod.fileNew(p),
   fileRead: p => filesMod.fileRead(p),
+  dbRead: p => filesMod.dbRead(p), // #1: a SQLite database's tables, a table's rows, a read-only query (db.ts)
   sourceGuess: p => filesMod.sourceGuess(p), // F5: the Preview's picked element's likely files
   imageRead: p => filesMod.imageRead(p), // a terminal link's picture anywhere on this Mac (its hover card)
   artifactList: p => artifactsMod.artifactList(p.ws),
@@ -913,7 +914,7 @@ const OPEN = new Set(['keptList', 'agentVersions', 'clientWho', 'voiceModels', '
   'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'failDismiss',
   'hookList', 'storageInfo', 'apps', 'termShells', 'reorder', 'uiDo', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress',
   'turnDiff', 'turnList', 'prList', 'prRefresh', 'meme', 'aiHelp', 'aiQuestion', 'aiPermission', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files',
-  'fileRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame',
+  'fileRead', 'dbRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame',
   'fileWeb', 'prDiff', 'prFile', 'prFiles', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'resources', 'shareStop', 'tabWake', 'tunnelStop', 'tunnelCheck',
   'resize', 'view', 'detach', 'remoteCheck', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash',
   'widgetRemix', 'widgetSlug', 'widgetReload', 'widgetFiles', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetAnnotations',
@@ -1368,7 +1369,7 @@ const ANSWER: Record<string, true | ((p: Params) => string)> = {
   reviewNotesGet: true, // R10: the Review tab's comments, read and kept from the phone too
   reviewNotesSet: true,
   voiceText: true, // the mic on the phone's prompt boxes (Reader's too): your words written down, nothing sent; Telegram's Answer has it
-  ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen tabSnooze showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead sourceGuess \
+  ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen tabSnooze showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead dbRead sourceGuess \
 artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet planFile noteList noteGet noteFile todoListGet \
 chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin imageSave failDismiss answer aiAnswer widgetToolAnswer flowAnswer secretGive aiAsk aiNew aiStop aiUnqueue aiOpen aiContinue timer reminderAdd reminderSet reminderRm tabDraft'.split(' ').map(k => [k, true] as const)),
   send: sendOk,
@@ -1680,7 +1681,7 @@ const TEST_CLOCK = inRig() && process.env.LAKI_TEST_CLOCK !== '0' // 0: a test's
 // ANSWER is a change. A line names the workspace and tab and what was done: a message's or prompt's first 80
 // characters, never a secret's value; a terminal's keys once a minute per tab ('input')
 const READS = new Set('flowTrustDiff aiCredits wsSpend agentLog diskUsage voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList \
-diff baseBranches files fileRead sourceGuess artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet \
+diff baseBranches files fileRead dbRead sourceGuess artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet \
 planFile noteList noteGet noteFile todoListGet chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin failDismiss'.split(' '))
 for (const k of READS) if (!Object.hasOwn(ANSWER, k)) throw new Error(`READS' ${k} isn't one of ANSWER's (D7): D9 logs what it doesn't call a read`)
 const tabWords = (id: unknown) => {

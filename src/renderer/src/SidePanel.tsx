@@ -20,7 +20,7 @@ export type Commits = { base?: string; commits: Commit[]; more?: boolean } // ba
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
 export type Thread = { path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
-export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string; sheets?: { name: string; rows: string[][]; cut?: boolean }[]; why?: string } // lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true); sheets: an Excel workbook's (the daemon's sheet.ts)
+export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string; sheets?: { name: string; rows: string[][]; cut?: boolean }[]; why?: string; db?: { tables: DbTable[] } } // db: a SQLite database's tables (#1: the daemon's db.ts); lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true); sheets: an Excel workbook's (the daemon's sheet.ts)
 // an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
 // keeps it: a workspace switch doesn't lose it)
 export type Edit = { text: string; was: string }
@@ -1531,6 +1531,121 @@ function CsvTable({ path, text, edit, onText, grid }: { path: string; text: stri
 }
 
 
+// #1: a SQLite database (the daemon's db.ts, read-only): its tables with their rows; a table's first rows (a column's
+// head sorts them, the filter finds words in any column) or its schema; Query, a SELECT of yours (⌘⏎), with Copy as CSV
+export type DbTable = { name: string; kind: 'table' | 'view'; rows?: number; sql: string }
+type DbRows = { cols: string[]; rows: string[][]; cut?: boolean }
+function DbView({ tables, read, onCopy }: { tables: DbTable[]; read: (q: object) => Promise<DbRows>; onCopy: (text: string) => void }) {
+  const [pick, setPick] = useState(tables[0]?.name ?? '')
+  const [tab, setTab] = useState<'rows' | 'schema' | 'query'>(tables.length ? 'rows' : 'query')
+  const [sort, setSort] = useState<{ col: string; desc: boolean } | null>(null)
+  const [filter, setFilter] = useState('')
+  const [sql, setSql] = useState('')
+  const [got, setGot] = useState<DbRows | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const n = useRef(0) // the last ask's: an older answer that comes later is dropped
+  const t = tables.find(x => x.name === pick)
+  const ask = (q: object) => {
+    const k = ++n.current
+    setBusy(true)
+    setErr('')
+    read(q).then(
+      r => k === n.current && setGot(r),
+      e => k === n.current && (setGot(null), setErr(String((e as Error)?.message ?? e))),
+    ).finally(() => k === n.current && setBusy(false))
+  }
+  useEffect(() => {
+    if (tab !== 'rows' || !pick) return
+    const h = setTimeout(() => ask({ op: 'rows', table: pick, sort: sort?.col, desc: sort?.desc, filter }), filter ? 250 : 0)
+    return () => clearTimeout(h)
+  }, [pick, tab, sort?.col, sort?.desc, filter])
+  const run = () => sql.trim() && ask({ op: 'query', sql })
+  const go = (to: typeof tab) => (setTab(to), setGot(null), setErr(''))
+  const grid = got && (
+    <div className="csv db-grid">
+      <table>
+        <thead>
+          <tr>
+            <th className="csv-n" />
+            {got.cols.map(c => (
+              <th key={c} className={tab === 'rows' ? 'db-sort' : ''} aria-sort={sort?.col === c ? (sort.desc ? 'descending' : 'ascending') : undefined} data-tip={tab === 'rows' ? 'Sort by it (again: the other way)' : undefined} onClick={() => tab === 'rows' && setSort(s => (s?.col === c ? (s.desc ? null : { col: c, desc: true }) : { col: c, desc: false }))}>
+                {c}
+                {sort?.col === c && tab === 'rows' && <Icon name={sort.desc ? 'chevron' : 'chevronUp'} size={10} />}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {got.rows.map((r, i) => (
+            <tr key={i}>
+              <td className="csv-n">{i + 1}</td>
+              {r.map((v, j) => (
+                <td key={j} className={v === 'NULL' ? 'muted' : undefined}>
+                  {v}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+  return (
+    <div className="db-view">
+      <div className="db-tables" role="tablist" aria-label="Tables" aria-orientation="vertical">
+        <div className="muted small db-head">Tables</div>
+        {tables.map(x => (
+          <button key={x.name} type="button" role="tab" aria-selected={x.name === pick && tab !== 'query'} className={x.name === pick && tab !== 'query' ? 'on' : ''} onClick={() => (setPick(x.name), setSort(null), setFilter(''), tab === 'query' && go('rows'))}>
+            <span className="db-name">{x.name}</span>
+            <span className="muted small">{x.kind === 'view' ? 'view' : (x.rows ?? 0).toLocaleString('en-US')}</span>
+          </button>
+        ))}
+        {!tables.length && <div className="muted small db-head">No tables yet.</div>}
+        <button type="button" role="tab" aria-selected={tab === 'query'} className={`db-query-btn ${tab === 'query' ? 'on' : ''}`} onClick={() => go('query')}>
+          <Icon name="search" size={12} /> Query
+        </button>
+      </div>
+      <div className="db-main">
+        <div className="db-bar">
+          {tab !== 'query' && t && (
+            <>
+              <b>{t.name}</b>
+              <span className="muted small">{t.kind === 'view' ? 'view' : `${(t.rows ?? 0).toLocaleString('en-US')} rows`}</span>
+              <span className="seg small">
+                <button className={tab === 'rows' ? 'on' : ''} onClick={() => go('rows')}>Rows</button>
+                <button className={tab === 'schema' ? 'on' : ''} onClick={() => go('schema')}>Schema</button>
+              </span>
+              {tab === 'rows' && <input className="db-filter" value={filter} placeholder="Filter: words in any column" aria-label="Filter rows" spellCheck={false} onChange={e => setFilter(e.target.value)} />}
+            </>
+          )}
+          {tab === 'query' && <span className="muted small">Read-only: a SELECT (or WITH … SELECT), {1000} rows at most · ⌘⏎ runs it</span>}
+          <span className="grow" />
+          {busy && <span className="muted small">reading…</span>}
+          {got && got.rows.length > 0 && tab !== 'schema' && (
+            <button className="small" data-tip="These rows, with the column names first" onClick={() => onCopy(toCsv([got.cols, ...got.rows]))}>
+              <Icon name="copy" size={12} /> Copy as CSV
+            </button>
+          )}
+        </div>
+        {tab === 'query' && (
+          <div className="db-sql">
+            <textarea className="mono" rows={3} value={sql} spellCheck={false} placeholder={`SELECT * FROM ${tables[0]?.name ?? 'users'} WHERE …`} aria-label="SQL" onChange={e => setSql(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), run())} />
+            <button className="primary small" disabled={!sql.trim() || busy} onClick={run}>
+              Run
+            </button>
+          </div>
+        )}
+        {err && <div className="warn small pad">{err}</div>}
+        {tab === 'schema' && t && <pre className="db-schema mono">{t.sql}</pre>}
+        {tab !== 'schema' && grid}
+        {tab !== 'schema' && got && !got.rows.length && <div className="muted small pad">{filter && tab === 'rows' ? 'No row has those words.' : 'No rows.'}</div>}
+        {tab !== 'schema' && got?.cut && <div className="muted small pad">{tab === 'rows' ? `The first ${got.rows.length} rows${filter ? ' that match' : ''}: sort, filter or Query for others.` : `The first ${got.rows.length} rows: add a LIMIT or a WHERE for the rest.`}</div>}
+      </div>
+    </div>
+  )
+}
+
 // a file in the app, next to the panel: text with line numbers, an image, or what it is
 // Comment on code in Files (FilePreview's comment): the file, its lines and the exact words picked
 export type FileNote = { path: string; line: number; startLine?: number; quote: string; body: string }
@@ -1552,6 +1667,7 @@ export function FilePreview(p: {
   // Comment on code (a file of the workspace's, not a kept one): a line number's click or a selection's Comment opens a
   // box under it; add: into the Review tab's Yours (reviewNotes), send: to the workspace's agent, as a diff comment goes
   comment?: { agent?: string; add: (c: FileNote) => Promise<unknown>; send: (c: FileNote) => Promise<unknown> }
+  db?: (q: object) => Promise<DbRows> // #1: a SQLite database's rows and queries (dbRead)
 }) {
   const [f, setF] = useState<FileContent | null>(null)
   const [at, setAt] = useState<{ from: number; to: number; quote: string; box?: boolean } | null>(null) // the lines a comment is on, its text
@@ -1744,6 +1860,7 @@ export function FilePreview(p: {
         )}
         {rendered && (table ? <CsvTable path={p.path} text={f.text!} edit={false} onText={() => {}} /> : <Markdown src={f.text!} html />)}
         {page && (page.rows.length ? <CsvTable path={p.path} text="" grid={page.rows} edit={false} onText={() => {}} /> : <div className="muted small pad">{page.name} is empty.</div>)}
+        {f?.db && p.db && <DbView key={p.path} tables={f.db.tables} read={p.db} onCopy={t => void navigator.clipboard.writeText(t)} />}
         {page?.cut && <div className="muted small pad">Showing the start of this sheet ({page.rows.length - 1} rows). Open it in its app for the rest.</div>}
         {f?.text !== undefined &&
           lines.map((l, i) => (
@@ -1781,7 +1898,7 @@ export function FilePreview(p: {
             </Fragment>
           ))}
         {f?.cut && <div className="muted small pad">Showing the start of the file. Open it in the editor for the rest.</div>}
-        {f && f.text === undefined && !f.image && !book && (
+        {f && f.text === undefined && !f.image && !book && !(f.db && p.db) && (
           <FileCard
             path={p.path}
             meta={f.why ? `${sizeText(f.size)} · ${f.why}` : sizeText(f.size)}

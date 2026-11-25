@@ -14,6 +14,8 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/daemon/pr.ts` | branches followed, PR scans, `autoPR` and the PR switches' messages, merge when green, the side panel's PR calls |
 | `src/daemon/gitlab.ts` | GitLab through glab: `forgeOf` (a project's origin), its MR as a `PR` (`forge: 'gitlab'`), pipeline jobs as checks, the MR actions, issues, Ship's `shipMr` |
 | `src/daemon/files.ts` | the diff against the base and its size, Changes' revert and redo, the side panel's files |
+| `src/daemon/db.ts` | #1: a SQLite database for Files (fileRead's `db`, `dbRead`): its tables with their counts and schema, a table's first 200 rows sorted and filtered, a SELECT-only query; read-only `node:sqlite`; pure; run in a worker (`dbWorker.ts`, files.ts' `dbOf`: 5 s, 256 MB) |
+| `src/daemon/dbWorker.ts` | `dbRead` off the daemon's main thread (`out/main/dbWorker.js`) |
 | `src/daemon/sheet.ts` | an Excel workbook's sheets as tables (fileRead's `sheets`): the zip through node's zlib, values, dates by their style, each part once and 96 MB in all; pure; run in a worker (`sheetWorker.ts`, files.ts' `sheetsOf`: 3 s, 256 MB) |
 | `src/daemon/remote.ts` | tunnels (cloudflared, tailscale), shared tabs, remote access |
 | `src/daemon/agentLog.ts` | what agents did through Laki's API, per workspace (main.ts call's `agentLine`): kept and capped, `agentLog` reads it |

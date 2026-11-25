@@ -17,6 +17,7 @@ import { dir } from './dir.ts'
 import { away, broken, hostUp, live, sshIn } from './hosts.ts'
 import { diffFiles } from './pr.ts'
 import { type Sheet, SHEET_MAX, TOO_BIG } from './sheet.ts'
+import { type DbAsk, DB_MAX, isDb } from './db.ts'
 
 // ---------- the worktree as a tree
 
@@ -743,6 +744,49 @@ function sheetRead(path: string) {
   })
 }
 
+// #1: a SQLite database's tables, rows or a query (db.ts), read in a worker (dbWorker.ts) as a workbook is: 256 MB of
+// heap and DB_MS at most, one at a time
+const DB_MS = 5000
+let dbLine: Promise<unknown> = Promise.resolve()
+export function dbOf(path: string, q: DbAsk) {
+  const p = dbLine.then(
+    () =>
+      new Promise<unknown>((res, rej) => {
+        const here = dirname(fileURLToPath(import.meta.url))
+        const file = [join(here, 'dbWorker.js'), join(here, '../dbWorker.js'), join(here, 'dbWorker.ts')].find(f => existsSync(f))
+        if (!file) return rej(new Error('database worker not found'))
+        const w = new Worker(file, { workerData: { path, q }, resourceLimits: { maxOldGenerationSizeMb: 256 } })
+        const slow = () => rej(new Error(`it took over ${DB_MS / 1000} s: a narrower query, or open it in its app`))
+        const t = setTimeout(() => (slow(), void w.terminate()), DB_MS)
+        w.once('message', (m: { r?: unknown; err?: string }) => (m.err === undefined ? res(m.r) : rej(new Error(m.err))))
+        w.once('error', (e: NodeJS.ErrnoException) => (e.code === 'ERR_WORKER_OUT_OF_MEMORY' ? rej(new Error('too big to show')) : rej(e)))
+        w.once('exit', () => (clearTimeout(t), slow())) // a settled promise ignores it
+      }),
+  )
+  dbLine = p.catch(() => {})
+  return p
+}
+// the RPC's: a database of the workspace's (or its storage folder's), never on a host; what to read (DbAsk)
+export async function dbRead(o: { ws: string; path: string; storage?: boolean; op?: unknown; table?: unknown; sort?: unknown; desc?: unknown; filter?: unknown; sql?: unknown }) {
+  const ws = findWs(o.ws)
+  if (ws.host) throw new Error('a database on an SSH host opens in its app there')
+  const base = o.storage ? ws.storage : ws.path
+  if (!base) throw new Error('no storage folder')
+  if (o.storage && String(o.path ?? '').split(/[\\/]+/).includes('.laki-secrets')) throw new Error("a secret's file isn't read here")
+  const abs = inside({ ...ws, path: base }, o.path)
+  const head = Buffer.alloc(16)
+  const fd = openSync(abs, 'r')
+  try {
+    readSync(fd, head, 0, 16, 0)
+  } finally {
+    closeSync(fd)
+  }
+  if (!isDb(head)) throw new Error(`${o.path} isn't a SQLite database`)
+  const s = (v: unknown) => (typeof v === 'string' ? v : '')
+  const q: DbAsk = o.op === 'rows' ? { op: 'rows', table: s(o.table), sort: s(o.sort) || undefined, desc: o.desc === true, filter: s(o.filter).slice(0, 200) || undefined } : o.op === 'query' ? { op: 'query', sql: s(o.sql).slice(0, 20000) } : { op: 'tables' }
+  return dbOf(abs, q)
+}
+
 // fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), audio or video (`media`, its
 // kind; `src`, its data URL, only asked for: media true, MEDIA_MAX), or only its size. base: an image as it was where
 // the workspace's changes start (diff's base, through git show), for Changes' before and after
@@ -820,6 +864,23 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean; st
   if (mime) return st.size > 10 << 20 ? { size: st.size } : { size: st.size, image: `data:${mime};base64,${readFileSync(abs).toString('base64')}` }
   const av = MEDIA[extname(abs).slice(1).toLowerCase()]
   if (av) return { size: st.size, media: av.split('/')[0], ...(o.media && st.size <= MEDIA_MAX && { src: `data:${av};base64,${readFileSync(abs).toString('base64')}` }) }
+  if (/\.(sqlite3?|db3?)$/i.test(abs) && st.size <= DB_MAX) {
+    // #1: a SQLite database: its tables (db.ts, in a worker), the rows and queries through dbRead; one it can't read, a
+    // file card that says why
+    const head = Buffer.alloc(16)
+    const fd = openSync(abs, 'r')
+    try {
+      readSync(fd, head, 0, 16, 0)
+    } finally {
+      closeSync(fd)
+    }
+    if (isDb(head))
+      try {
+        return { size: st.size, db: (await dbOf(abs, { op: 'tables' })) as { tables: unknown[] } }
+      } catch (e) {
+        return { size: st.size, why: (e as Error).message }
+      }
+  }
   if (/\.xls[xm]$/i.test(abs) && st.size <= SHEET_MAX) {
     // an Excel workbook: its sheets as tables (sheet.ts, in a worker); one it can't read, a file card as before; one
     // past its limits or its time, a file card that says why

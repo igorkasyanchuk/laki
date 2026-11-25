@@ -1453,6 +1453,21 @@ html[data-motion='none'] .lift { transform: none; }
 .prompt-file button { flex: none; width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%; background: transparent; color: var(--muted); font-size: var(--fs-3); line-height: 18px; }
 .prompt-file button:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
 .prompt-images .prompt-file { align-self: center; }
+.db-view { display: flex; min-height: 0; height: 100%; } /* #1: a SQLite database in Files (SidePanel.tsx DbView) */
+.db-tables { display: flex; flex: none; flex-direction: column; gap: var(--sp-1); width: 30%; min-width: 120px; max-width: 220px; padding: var(--sp-3); border-right: 1px solid var(--line); overflow-y: auto; }
+.db-tables button { display: flex; align-items: center; gap: var(--sp-3); justify-content: space-between; padding: var(--sp-2) var(--sp-3); border: none; border-radius: var(--r-s); background: none; color: var(--fg); text-align: left; }
+.db-tables button.on { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.db-tables .db-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-tables .db-head { padding: var(--sp-2) var(--sp-3); }
+.db-tables .db-query-btn { justify-content: flex-start; margin-top: var(--sp-3); }
+.db-main { display: flex; flex: 1; flex-direction: column; min-width: 0; overflow: auto; }
+.db-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line); }
+.db-bar .db-filter { flex: 1 1 140px; min-width: 0; }
+.db-sql { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.db-sql textarea { flex: 1; min-width: 0; resize: vertical; }
+.db-schema { margin: 0; padding: var(--sp-4); white-space: pre-wrap; font-size: var(--fs-2); }
+.db-grid th.db-sort { cursor: var(--cur-act); }
+.db-grid th.db-sort:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .prompt-file button.prompt-file-name { flex: 0 1 auto; width: auto; height: auto; border-radius: 0; background: none; color: inherit; font-size: inherit; line-height: inherit; text-decoration: underline dotted; cursor: var(--cur-act); } /* #10: a long paste's name: read or edit it */
 .prompt-tools { display: flex; align-items: center; gap: var(--sp-2); }
 /* a pasted secret's line (secretHint.tsx): its kind, the value masked, Send as it is, Pass as a secret */

@@ -879,7 +879,12 @@ are tested in `test/units-more.test.ts`.
   runs in a worker (`files.ts` `sheetsOf`, the entry `sheetWorker.ts`, `out/main/sheetWorker.js`): 256 MB of heap, 3 s,
   past either or a limit a file card with *Too big to show as a table* (`why`), so a crafted workbook never stalls the
   daemon, shown read only by
-  `CsvTable`'s `grid`, a `.seg` tab per sheet (`.pv-sheets`). ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
+  `CsvTable`'s `grid`, a `.seg` tab per sheet (`.pv-sheets`). A SQLite database (#1: `.sqlite`, `.sqlite3`, `.db`,
+  `.db3` with SQLite's header, 2 GB at most; `daemon/db.ts`) comes with its tables (`fileRead`'s `db`), and `DbView`
+  asks `dbRead` (FilePreview's `db`, the `file.db` cap) for a table's rows (`DB_ROWS`, sorted by a column's head,
+  filtered by words in any column: `LIKE` with `%` and `_` escaped), its schema (its CREATE, indexes and triggers) or a
+  query (SELECT or WITH only, one statement, `DB_QUERY_ROWS`), opened read-only, in a worker (`files.ts` `dbOf`,
+  `dbWorker.ts`: 256 MB, 5 s); Copy as CSV. ponytail: no editing yet, nor a host's database. ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
   (`securityLevel: strict`), each chart an `<img>` of its SVG (inline, a brainstorm's 50 were 18k nodes that every
   next chart laid out again), in `FONT` (an image has no web fonts), drawn once ui.tsx' `useNear` says it nears the
   screen, one at a time with a yield between (`turn`), kept by theme and text (`pics`, 200). `useNear` also holds back

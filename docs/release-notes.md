@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A SQLite database in Files opens as its tables: each table's rows (sort, filter), its schema, and a read-only SQL query with Copy as CSV.
 - Agents suggest a task they noticed (a flaky test, a bug next door) instead of starting it: a card under their tab to Start, Edit first or Dismiss (`laki suggest`).
 - The Preview keeps a size per workspace, says it with the scale (*390 × 844 · 80%*) and in the screenshots it sends, and has a Desktop size; agents set theirs with `laki browser viewport phone`.
 - A long paste (a log, a stack trace) becomes a file chip in the prompt box, *pasted-text.txt · 312 lines*: the agent gets the file, a click reads or edits it, ⇧⌘V pastes as text.

@@ -53,5 +53,6 @@ daemon's `process.execPath`, which is that binary.
 | `laki mcp` | `cliArgv` too: the skills' MCP command (`skill.ts:36`), Laki AI's (`ai.ts:870` `mcpWith`) | `out/main/cli.js mcp` |
 | hooks | `core.ts:291` `hookArgv` | `out/main/hook.js` |
 | the sheet worker | `src/daemon/files.ts` `sheetsOf`: a `worker_threads` Worker in the daemon's process (no spawn) | `out/main/sheetWorker.js` |
+| the database worker | `src/daemon/files.ts` `dbOf` (#1), as the sheet worker | `out/main/dbWorker.js` |
 | widget scripts | `widgets.ts:1204` runs, `widgetEvents.ts:341` streams: the daemon's `process.execPath` | an extension's `.js` |
 | `--headless` | `src/main/index.ts:89`: main spawns `serve` | `out/main/cli.js serve` |

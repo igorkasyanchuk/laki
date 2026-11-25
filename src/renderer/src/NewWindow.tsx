@@ -507,6 +507,7 @@ export function PanelWindow() {
           path={shown.path}
           line={shown.line}
           load={() => api.call<FileContent>('fileRead', { ws, path: shown.path, storage: shown.storage, media: true })}
+          db={q => api.call('dbRead', { ws, path: shown.path, storage: shown.storage, ...q })}
           onOpen={() => void api.call('openIn', { ws, app: shown.storage ? 'default' : 'editor', file: shown.path, storage: shown.storage }).catch(fail)}
           onReveal={() => void api.call('openIn', { ws, app: 'finder', file: shown.path, storage: shown.storage }).catch(fail)}
           openLabel={shown.storage ? 'Open' : undefined}
