@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.65.0 · Nov 26, 2026
 
 - Remote access at a stable address pins the page's code on your phone: a file the tunnel changed is refused, the page warns and your Mac offers to stop remote access.
 - The rail's selection slides to the page you pick, as the Terminal | Reader switch does (Motion: None and Reduce motion keep it still).
