@@ -648,7 +648,7 @@ const api = {
   signIn: p => signIn({ tab: p.tab, act: p.act }),
   mcpSignIn: p => mcpSignIn({ tab: p.tab, name: p.name, act: p.act }), // an MCP server's band: Sign in (the agent's own login), Dismiss
   keptOpen: p => artifactsMod.keptOpen(p),
-  dataBackup: p => backupMod.dataBackup(p), // laki backup: the user's data in a .tgz (dataBackup.ts)
+  dataBackup: p => backupMod.dataBackup(p).then(r => (backupMod.weeklyOffer(r.file), r)), // laki backup: the user's data in a .tgz (dataBackup.ts); the weekly one offered once after
   dataRestore: p => backupMod.dataRestore(p, () => shutdown()), // laki restore: dryRun says what changes; else staged, moved in as the daemon restarts
   uninstall: p => uninstallMod.uninstall(p, () => shutdown()), // B3: Uninstall Laki's rows; run: removed (stop: the daemon too, now)
   skillOpen: p => metersMod.skillOpen(p), // B7: a skill a tab's chat loaded, its SKILL.md in the editor // A9: each agent CLI's version, the newest, how it updates
@@ -2378,6 +2378,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('dndTick', 20_000, () => core.dndTick(), { idle: 'keep' }) // U8: Do not disturb ends on time, its digest shown
   ticks.register('logTick', 3_600_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep' }) // R3: past 10 MB while it runs too, not only at its start
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
+  ticks.register('backupTick', Number(process.env.LAKI_BACKUP_MS) || 3_600_000, () => void backupMod.backupTick(), { idle: 'keep' }) // #B2: the weekly backup, when it's due (tests: LAKI_BACKUP_MS, both the tick and the week)
   ticks.register('sweepRunning', Number(process.env.LAKI_SWEEP_MS) || 2000, core.sweepRunning, { idle: 'slow' }) // tests' shorter
   ticks.register('hookTick', 30000, () => core.hookTick(), { idle: 'slow' }) // hooks not heard: a tab's strip says so
   ticks.register('shellTick', 2000, core.shellTick, { idle: 'pause' })

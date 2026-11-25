@@ -39,6 +39,7 @@ export const SECTIONS: { id: string; label: string; icon: IconName; group: strin
 // A result opens the section and shows the first label, row or heading starting with the title. Add new settings here.
 export const FIND: [string, string, string?][] = [
   ['general', 'New workspaces start', 'default agent profile preset'],
+  ['general', 'Back up every week', 'backup weekly automatic folder restore copies'],
   ['git', 'Branch prefix', 'git worktree'],
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['notifications', 'macOS notifications', 'notify waiting done limit mute'],

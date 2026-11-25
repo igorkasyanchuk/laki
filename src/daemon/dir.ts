@@ -33,7 +33,7 @@ export const DATA_SECRETS = ['daemon.json', 'daemon.lock', 'mcp', 'net-proxy.jso
 // keys, tokens and sign-ins, logs, temp files, the trash) stays out. review-notes: the Review tab's unsent comments (in
 // DATA_SECRETS only so an agent's Read can't see them). Not turns: their refs are in each repo, an index without them
 // would offer rewinds that fail
-export const BACKUP_KEEP = ['state.json', 'notes', 'todo-list.json', 'plans', 'workflows', 'widgets', 'ai-chats', 'ai-chat.json', 'prompts.json', 'flow-trust', 'review-notes']
+export const BACKUP_KEEP = ['state.json', 'notes', 'todo-list.json', 'plans', 'workflows', 'widgets', 'ai-chats', 'ai-chat.json', 'prompts.json', 'flow-trust', 'review-notes', 'usage-days.json']
 // R13: a workspace's Walk throughs (ai.ts reviewSteps), out of its agents' reach (the storage folder is theirs to write)
 export const walkFile = (ws: string) => (/^[\w.-]+$/.test(ws) ? join(dir, 'review-walks', `${ws}.json`) : undefined)
 // a project workflow's text as you allowed it (workflow.ts' trust), beside its hash in state.flowTrust: the trust

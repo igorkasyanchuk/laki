@@ -171,7 +171,15 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   run: the daemon stops 200 ms after its answer and `shutdown` calls `apply` last (the daemon.lock kept till then): each
   `BACKUP_KEEP` name moved into `aside` (`<data>/backup-before-restore-<time>`), the backup's moved in, this Mac's
   remote access and tunnels written back into its state.json. The user's only (AGENT_NO, REMOTE_NO, ANSWER_NO;
-  `backup` cap); `test/cli-more.test.ts`;
+  `backup` cap); `test/cli-more.test.ts`; `usage-days.json` (the Usage page's days) in `BACKUP_KEEP` too.
+  **Weekly** (#B2): `settings.backupEvery` (`weekly`; unset or `off`: none) and `backupDir` (~ is home), the user's alone
+  (AGENT_SETTINGS_NO, REMOTE_KEYS' `backup.*`; a client has no settingsSet). `backupTick` (main.ts' ticks, hourly;
+  `LAKI_BACKUP_MS` is both the tick and the week, tests'): once the newest `.tgz` in the folder is that old,
+  `dataBackup` into `laki-weekly-<YYYY-MM-DD-HHMMSS>.tgz`, `state.backupLast { at, file, bytes }` (this Mac's: MACHINE,
+  out of archives; the view's `backupLast`), then all but the newest 4 matching `WEEKLY` removed, nothing else. A
+  failure: a daemon.log line and a notice, a day apart at most. `dataBackup`'s RPC then `weeklyOffer`: once
+  (`backupOffered`), when `backupEvery` was never set, a notice with Every week (the Mac's) or No; Every week sets it
+  on, into that backup's folder. `test/backup-auto.test.ts`.
 - memory's compaction (`daemon/memory.ts`): `memoryCompact` (`project`: its learned memories, never the user's, to Laki
   AI's model through `ai.ts` `aiOnce` (OpenRouter's `aiComplete`, or `claude -p`/`codex exec` with no tools), back as
   `{memories: [{text, from}]}`; an answer that isn't one, empty or longer changes nothing; what changed meanwhile

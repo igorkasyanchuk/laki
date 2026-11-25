@@ -1106,6 +1106,7 @@ export function view(): View {
   return {
     ...(n => n && { modelNeeds: n, claudeHas: claudeVersion() })(modelNeedsView()),
     ...(agentCliMod.outdated.length && { agentUpdates: agentCliMod.outdated }), // A9: a dot on Settings
+    ...(state.backupLast && { backupLast: state.backupLast }), // #B2: Settings › General › Backup's last one
     projects: state.projects.filter(p => !p.archived).map(projectView),
     ...(shelved.size && {
       archivedProjects: state.projects.filter(p => p.archived).map(p => ({
@@ -3162,6 +3163,8 @@ export function settingsSet(o: Settings, own = false) {
   if ('termShell' in o && o.termShell !== state.settings?.termShell) o = { ...o, termShell: termShellOk(o.termShell) } // checked only as it changes: Settings sends every setting back, a shell gone since too
   if ('artifactHosts' in o) o = { ...o, artifactHosts: Array.isArray(o.artifactHosts) ? [...new Set(o.artifactHosts.filter(artHostOk).map(h => h.toLowerCase()))].slice(0, 200) : undefined } // S18: names on the internet only
   if ('costWarn' in o) o = { ...o, costWarn: costWarnParse(o.costWarn) } // #3: dollars, or refused
+  if ('backupEvery' in o && o.backupEvery !== undefined && o.backupEvery !== 'off' && o.backupEvery !== 'weekly') throw new Error(`Back up: weekly or off, not ${JSON.stringify(o.backupEvery)}`)
+  if ('backupDir' in o && o.backupDir !== undefined) o = { ...o, backupDir: (d => { if (d && !(d.startsWith('/') || d.startsWith('~'))) throw new Error("Back up into: a folder's full path (~ is home)"); return d || undefined })(String(o.backupDir).trim()) }
   if ('mcp' in o) o = { ...o, mcp: mcpOk(o.mcp, state.settings?.mcp, MASK, ENV_KEY) } // #6: every project's MCP servers (a value sent back masked: the one kept)
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])

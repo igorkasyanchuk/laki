@@ -10,13 +10,15 @@
 // gates.ts' AGENT_NO, REMOTE_NO and main.ts' ANSWER_NO
 import { spawn } from 'node:child_process'
 import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { homedir } from 'node:os'
 import { VERSION } from '../shared/version.ts'
-import { agentsBusy, log, state, STATE_V, view } from './core.ts'
+import { agentsBusy, changed, log, save, settingsSet, state, STATE_V, view } from './core.ts'
+import { alertShow } from './alerts.ts'
 import { BACKUP_KEEP as KEEP, dir } from './dir.ts'
 import { envJson, envKept } from './envKeys.ts'
 
-const MACHINE = ['remote', 'remoteDevices', 'tunnels'] as const // this Mac's remote access and tunnels: their keys stay here
+const MACHINE = ['remote', 'remoteDevices', 'tunnels', 'backupLast'] as const // this Mac's remote access and tunnels: their keys stay here
 const SKIP = ['*.tmp', '*.broken-*', '._*'] // writeAtomic's temp files, a store set aside, macOS's AppleDouble copies
 export type Counts = Record<'projects' | 'workspaces' | 'notes' | 'specs' | 'workflows' | 'extensions' | 'aiChats' | 'prompts' | 'reviewComments', number>
 // secrets: the names whose values stay in this Mac's Keychain (envKeys.ts), never in the archive
@@ -94,6 +96,56 @@ export async function dataBackup(p: { file?: unknown }) {
   } finally {
     rmSync(stage, { recursive: true, force: true })
   }
+}
+
+// #B2: the weekly backup (Settings › General › Backup: backupEvery weekly, into backupDir): from an hourly tick, when
+// the newest .tgz in that folder (yours or Laki's) is a week old or more (LAKI_BACKUP_MS: tests'), a backup there named
+// laki-weekly-<date>.tgz, then all but the newest COPIES of that name removed: never another file. A failure (no
+// folder, a full disk): one notice and a line in daemon.log, at most once a day. Off unless you turn it on; after your
+// first backup Laki offers it once, into that backup's folder
+export const WEEKLY = /^laki-weekly-\d{4}-\d{2}-\d{2}-\d{6}\.tgz$/
+const COPIES = 4
+const DAY = 86400e3
+const every = () => Number(process.env.LAKI_BACKUP_MS) || 7 * DAY
+const folderOf = (d: string) => resolve(homedir(), d.replace(/^~(?=\/|$)/, '.'))
+const named = (t: number) => (d => `laki-weekly-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${[d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join('')}.tgz`)(new Date(t))
+let failedAt = -Infinity
+let backing = false
+export async function backupTick(now = Date.now()) {
+  const st = state.settings
+  if (st?.backupEvery !== 'weekly' || !st.backupDir || backing || pending) return
+  backing = true
+  const folder = folderOf(st.backupDir)
+  try {
+    if (!existsSync(folder) || !statSync(folder).isDirectory()) throw new Error(`${folder} isn't there`)
+    const newest = Math.max(-Infinity, ...readdirSync(folder).filter(n => n.endsWith('.tgz')).map(n => (s => (s?.isFile() ? s.mtimeMs : -Infinity))(statSync(join(folder, n), { throwIfNoEntry: false }))))
+    if (now - newest < every()) return
+    const file = join(folder, named(now))
+    if (existsSync(file)) return // one this second already
+    const r = await dataBackup({ file })
+    state.backupLast = { at: now, file, bytes: r.bytes }
+    save()
+    changed()
+    for (const n of readdirSync(folder).filter(n => WEEKLY.test(n)).sort().slice(0, -COPIES)) rmSync(join(folder, n), { force: true }) // dated names: oldest first
+  } catch (e) {
+    if (now - failedAt < DAY) return
+    failedAt = now
+    const why = (e as Error).message
+    log(`weekly backup: failed: ${why}`)
+    void Promise.resolve(alertShow({ title: "The weekly backup didn't run", text: `${why}. Settings › General › Backup picks another folder or turns it off.` }, 'notice', 'Laki')).catch(() => {})
+  } finally {
+    backing = false
+  }
+}
+// after a backup of yours (laki backup, Back up…): once, if the weekly one was never set, offered into that folder
+export function weeklyOffer(file: string) {
+  const st = state.settings
+  if (st?.backupOffered || st?.backupEvery !== undefined) return
+  settingsSet({ backupOffered: true })
+  const folder = dirname(file)
+  void Promise.resolve(alertShow({ title: 'Back up every week?', text: `Laki can make a backup like this one into ${folder} each week and keep the newest ${COPIES}.`, choices: ['Every week', 'No'] }, 'notice', 'Laki', undefined, ['Every week']))
+    .then(a => (a as { choice?: string }).choice === 'Every week' && state.settings?.backupEvery === undefined && settingsSet({ backupEvery: 'weekly', backupDir: folder }))
+    .catch(() => {})
 }
 
 let pending: { stage: string; aside: string } | undefined

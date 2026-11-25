@@ -176,6 +176,8 @@ export type AppSettings = Paint & {
   quietMinutes?: number // U8: Quiet's default length in minutes (unset: 60)
   longTurn?: number // minutes: a turn working that long notifies (unset, 0: off)
   costWarn?: CostWarn // #3: a workspace's cost past these dollars: colored, told once each (on only if true)
+  backupEvery?: 'off' | 'weekly' // #B2: a backup into backupDir each week
+  backupDir?: string
   mcp?: McpServer[] // #6: MCP servers for every project's agents (shared/mcp.ts)
   continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
@@ -999,6 +1001,7 @@ export function SettingsPage(p: {
   updateIdle?: boolean // Update when idle asked (view.updateIdle)
   managed?: { from: string; keys: string[]; remote?: false; bypass?: false; agents?: string[] } // a managed policy's locks (view.managed)
   ptyHostOff?: string // R9: why new terminals run in the daemon (view.ptyHostOff)
+  backupLast?: { at: number; file: string; bytes: number } // #B2: the last weekly backup (view.backupLast)
   clients?: { show: (label: string) => void; copy: (text: string) => void } // T12: Security › Trusted clients (the app's window: a client's list is yours)
   onUpdateIdle?: (on: boolean) => void
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
@@ -1791,6 +1794,15 @@ export function SettingsPage(p: {
               {p.backup && (
                 <Group title="Backup" hint="Carry your Laki to another Mac, or back to how it was">
                   <BackupField api={p.backup} />
+                  <Switch className="switch-row" on={s.backupEvery === 'weekly'} onChange={on => set({ backupEvery: on ? 'weekly' : 'off', ...(on && !s.backupDir && { backupDir: '~/Documents/Laki backups' }) })}>
+                    <Says title="Back up every week" hint="A backup into the folder below once the newest there is a week old; the newest 4 kept, nothing else in it touched" />
+                  </Switch>
+                  {s.backupEvery === 'weekly' && (
+                    <>
+                      <FolderField value={s.backupDir} placeholder="~/Documents/Laki backups" label="Weekly backups' folder" onChange={backupDir => set({ backupDir })} />
+                      <p className="muted small">{p.backupLast ? `Last: ${new Date(p.backupLast.at).toLocaleString()}, ${(p.backupLast.bytes / 1e6).toFixed(1)} MB, ${p.backupLast.file}` : 'None yet: the first one runs within the hour'}</p>
+                    </>
+                  )}
                 </Group>
               )}
               <Group title="Pages" hint="On unless you turn them off; a new install starts with Labs off">
