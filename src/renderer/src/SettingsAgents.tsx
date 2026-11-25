@@ -837,11 +837,12 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
           {!!c.held?.length && (
             <>
               <h4>Kept from its environment</h4>
-              <p className="muted small">Secret-looking variables Laki was started with that {c.profile ?? agent}'s agent doesn't get (names only).</p>
+              <p className="muted small">Variables Laki was started with that {c.profile ?? agent}'s agent doesn't get: a secret-looking name, or a value that is one (names and why only, never the value).</p>
               <ul className="sees-list">
                 {c.held.map(n => (
                   <li key={n}>
                     <span className="mono small">{n}</span>
+                    {c.heldWhy?.[n] && c.heldWhy[n] !== 'its name' && <span className="muted small"> · {c.heldWhy[n]}</span>}
                     {c.profile && (
                       <button className="ghost sm" onClick={() => void api.call('presetSave', { name: c.profile, set: { envAllow: [...(c.envAllow ?? []), n] } }).then(() => setC({ ...c, envAllow: [...(c.envAllow ?? []), n], held: c.held!.filter(x => x !== n) }), (e: Error) => setErr(e.message))}>
                         Allow for this profile

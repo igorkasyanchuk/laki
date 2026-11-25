@@ -2064,6 +2064,7 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
 }
 // the names an agent of this profile doesn't get (What it sees, laki doctor): none while hideSecrets is off
 export const heldFrom = (agent: string, profile?: string) => (state.settings?.hideSecrets ? envSplit(plainEnv(), envAllowOf(agent, presetNamed(profile)?.envAllow)).held : [])
+export const heldWhyFrom = (agent: string, profile?: string) => (state.settings?.hideSecrets ? envSplit(plainEnv(), envAllowOf(agent, presetNamed(profile)?.envAllow)).why : {}) // each one's reason: its name, or its value's shape (never the value)
 
 // what Laki adds to a tab's environment: over this Mac's (childEnv), or all of it on an SSH host (hostScript); hooks:
 // where its agents' hook files are

@@ -181,10 +181,13 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
 
 ## Known limits
 
-- *Hide secret-looking variables from agents* (on for new installs) keeps names like `…_TOKEN`, `…_SECRET`, `…_KEY`,
-  `AWS_SECRET…`, `NPM_TOKEN` and `GITHUB_TOKEN` of the environment Laki was started with out of agent tabs, by name
-  only: a secret under a plain name (a `DATABASE_URL` with a password) still goes through, and so do the agent's own
-  sign-in key, what you set in Settings, a project or a profile, and a profile's *Let through*. Terminals you open,
+- *Hide secret-looking variables from agents* (on for new installs) keeps variables of the environment Laki was
+  started with out of agent tabs by name (`…_TOKEN`, `…_SECRET`, `…_KEY`, `AWS_SECRET…`, `NPM_TOKEN`, `GITHUB_TOKEN`)
+  and by value: a URL with a password in it (`DATABASE_URL=postgres://app:…@db`) or a value in one of the shapes Ship's
+  secret check knows (a GitHub, OpenAI or AWS key…), whatever its name; Settings shows each one's name and why, never
+  the value. Still not caught: a secret under a plain name in no known shape (a random password alone, an in-house
+  token). The agent's own sign-in key, what you set in Settings, a project or a profile, and a profile's *Let through*
+  pass, a let-through name even when its value looks like a secret. Terminals you open,
   setup scripts and Run actions get the whole environment. An agent can't turn it off or let a name through.
 
 - The macOS wrapper sandbox (a profile's *Wrapper sandbox*) runs an agent that has no sandbox of its own, or has it

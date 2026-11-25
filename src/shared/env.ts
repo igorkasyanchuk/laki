@@ -1,10 +1,11 @@
-// What an agent's environment holds back (settings.hideSecrets): names that look like secrets in the daemon's own
-// environment (where Laki was started: a shell's exports, a launchd job's), never the values. Pure: test/units-more.test.ts.
+// What an agent's environment holds back (settings.hideSecrets): variables in the daemon's own environment (where Laki
+// was started: a shell's exports, a launchd job's) whose name looks like a secret's, or whose value is one (a password
+// in a URL, a key's shape: secretValue), each with why; a value is never shown or logged. Pure: test/units-more.test.ts.
 // Settings' env, the project's and the profile's always pass (the user put them there), and so does the agent's own
 // sign-in key (AGENT_KEY_ENV); a profile's envAllow lets more through by name.
 import { secretsIn } from './secrets.ts'
 
-// ponytail: names, not values: a secret under a plain name (DATABASE_URL with a password in it) passes
+// Not caught: a secret under a plain name in no known shape (a random password alone, an in-house token format)
 export const SECRET_ENV: RegExp[] = [/_TOKEN$/i, /AUTH_?TOKEN/i, /_SECRET/i, /^SECRET_/i, /_PASSWORD$/i, /_PASSWD$/i, /_KEY$/i, /^AWS_(SECRET|SESSION)/i, /_CREDENTIALS?$/i, /^NPM_TOKEN$/, /^GH_TOKEN$/, /^GITHUB_TOKEN$/, /^GITLAB_TOKEN$/, /_API_KEY$/i, /_PAT$/i]
 // what looks like one but isn't: an agent's socket, a key's id or its file's path
 const HARMLESS: RegExp[] = [/_SOCK$/i, /_KEY_?ID$/i, /_KEY_(FILE|PATH)$/i]
@@ -21,16 +22,20 @@ export const secretLooking = (name: string) => SECRET_ENV.some(r => r.test(name)
 // or one of secrets.ts' shapes (a token, a key)
 export const URL_CREDS = /[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i
 export const secretValue = (v: string) => URL_CREDS.test(v) || secretsIn(v).length > 0
-// pass: what goes on; held: the names kept back, sorted
-export function envSplit(env: Record<string, string | undefined>, allow: readonly string[] = []): { pass: Record<string, string>; held: string[] } {
+// why a value is one (the words Settings shows beside its name): a URL's password, else the shape secretsIn found
+export const secretWhy = (v: string) => (URL_CREDS.test(v) ? 'a password in a URL' : (k => (k ? `looks like ${/^(an?|the) /i.test(k) ? k : `${/^[aeiou]/i.test(k) ? 'an' : 'a'} ${k}`}` : ''))(secretsIn(v)[0]?.kind))
+// pass: what goes on; held: the names kept back, sorted; why: each one's reason (its name, or its value's shape). A
+// name let through (allow: the agent's own sign-in key, a profile's Let through) passes whatever its value
+export function envSplit(env: Record<string, string | undefined>, allow: readonly string[] = []): { pass: Record<string, string>; held: string[]; why: Record<string, string> } {
   const pass: Record<string, string> = {}
-  const held: string[] = []
+  const why: Record<string, string> = {}
   for (const [k, v] of Object.entries(env)) {
     if (v === undefined) continue
-    if (secretLooking(k) && !allow.includes(k)) held.push(k)
+    const w = allow.includes(k) ? '' : secretLooking(k) ? 'its name' : v.length < 20000 ? secretWhy(v) : ''
+    if (w) why[k] = w
     else pass[k] = v
   }
-  return { pass, held: held.sort() }
+  return { pass, held: Object.keys(why).sort(), why }
 }
 // what a profile's agent lets through: its own sign-in key and the profile's envAllow
 export const envAllowOf = (agent: string | undefined, envAllow?: readonly string[]) => [...(AGENT_KEY_ENV[agent ?? ''] ?? []), ...(envAllow ?? [])]

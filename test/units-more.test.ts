@@ -1056,11 +1056,33 @@ test('envSplit: each pattern held, the harmless ones and the allow list passed, 
   for (const n of ['SSH_AUTH_SOCK', 'AWS_ACCESS_KEY_ID', 'GPG_KEY_ID', 'SIGNING_KEY_FILE', 'PATH', 'HOME', 'TOKENIZERS_PARALLELISM', 'KEYCHAIN', 'AWS_REGION', 'LESSKEY'])
     assert.ok(!secretLooking(n), n)
   const env = { PATH: '/bin', NPM_TOKEN: 'a', GH_TOKEN: 'b', ANTHROPIC_API_KEY: 'c', OPENAI_API_KEY: 'd', SSH_AUTH_SOCK: '/s', GONE: undefined }
-  assert.deepEqual(envSplit(env), { pass: { PATH: '/bin', SSH_AUTH_SOCK: '/s' }, held: ['ANTHROPIC_API_KEY', 'GH_TOKEN', 'NPM_TOKEN', 'OPENAI_API_KEY'] })
+  assert.deepEqual((({ pass, held }) => ({ pass, held }))(envSplit(env)), { pass: { PATH: '/bin', SSH_AUTH_SOCK: '/s' }, held: ['ANTHROPIC_API_KEY', 'GH_TOKEN', 'NPM_TOKEN', 'OPENAI_API_KEY'] })
   assert.deepEqual(envSplit(env, envAllowOf('claude', ['GH_TOKEN'])).held, ['NPM_TOKEN', 'OPENAI_API_KEY'])
   assert.deepEqual(envSplit(env, envAllowOf('codex')).held, ['ANTHROPIC_API_KEY', 'GH_TOKEN', 'NPM_TOKEN'])
   assert.deepEqual(envAllowOf('custom'), [])
   assert.ok(AGENT_KEY_ENV.claude.includes('ANTHROPIC_API_KEY'))
+})
+
+test('envSplit by value: a password in a URL or a key-shaped value held under any name, with why; the same URL without one, PATH and HOME passed; a name let through passes', () => {
+  const env = {
+    PATH: '/usr/bin:/bin',
+    HOME: '/Users/me',
+    DATABASE_URL: 'postgres://app:fake-pass-123@db.internal:5432/shop',
+    CACHE_URL: 'redis://cache.internal:6379/0',
+    PLAIN: `ghp_${'a1B2'.repeat(9)}`, // a GitHub token's shape under a plain name
+    NPM_TOKEN: 'x',
+  }
+  const r = envSplit(env)
+  assert.deepEqual(r.held, ['DATABASE_URL', 'NPM_TOKEN', 'PLAIN'])
+  assert.equal(r.why.DATABASE_URL, 'a password in a URL')
+  assert.match(r.why.PLAIN, /^looks like an? /)
+  assert.equal(r.why.NPM_TOKEN, 'its name')
+  assert.deepEqual(Object.keys(r.pass).sort(), ['CACHE_URL', 'HOME', 'PATH'])
+  assert.equal(r.pass.HOME, '/Users/me')
+  assert.ok(!JSON.stringify(r.why).includes('fake-pass-123'), 'never the value')
+  const let_ = envSplit(env, envAllowOf('claude', ['DATABASE_URL']))
+  assert.equal(let_.pass.DATABASE_URL, env.DATABASE_URL, 'let through by name: passes, its value whatever it is')
+  assert.ok(!let_.held.includes('DATABASE_URL'))
 })
 
 test('midCut: a long name cut in the middle at its separators, else 60/40, never under 3 a side; short ones as they are; emoji and wide characters by code point', () => {
