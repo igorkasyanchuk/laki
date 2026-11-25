@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.64.0 · Nov 25, 2026
 
 - Comment on any code in Files, not only the diff: a line's number or a selection, into your review or straight to the agent.
 - Mark a workspace Waiting on… (a deploy, a reply): a quiet ring on its row, its own Board column, out of Needs you until its agent asks or starts again; agents can say it too (`laki wait-on`).
