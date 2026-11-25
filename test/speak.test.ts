@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { langOf, speakable } from '../src/shared/speak.ts'
+import { langOf, personalOutput, speakable, spokenNote } from '../src/shared/speak.ts'
 
 test('speakable: two sentences of plain prose, no code, links, paths, URLs or secrets, 240 at most', () => {
   assert.equal(speakable('**Done.** The tests pass now. I also renamed the helper.'), 'Done. The tests pass now.')
@@ -43,4 +43,23 @@ test('spokenNote: "<workspace> asks: <first sentence>", 20 words at most, never 
   assert.equal(long.split(' ').length, SPOKEN_WORDS)
   assert.match(long, /^web asks: w0 w1 .* w17…$/)
   assert.ok(!AGENT_SETTINGS_OK.has('voice'), "the settings are the user's: an agent's settingsSet can't turn them on")
+})
+
+test("#H1: Out loud's Only on headphones: which outputs are yours alone, by their names; unknown or empty: not", () => {
+  const table: [string, boolean][] = [
+    ['AirPods Pro', true],
+    ['Default - AirPods Pro (Bluetooth)', true],
+    ['MacBook Pro Speakers', false],
+    ['LG UltraFine Display Audio', false],
+    ['Jabra Evolve2 65', false], // a headset that doesn't say so: not told apart from a speaker
+    ['Jabra Evolve2 65 Hands-Free', true],
+    ['Sony WH-1000XM5 Headphones', true],
+    ['Galaxy Buds2', true],
+    ['External Headphones', true],
+    ['DELL U2723QE (HDMI)', false],
+    ['', false],
+  ]
+  for (const [label, yours] of table) assert.equal(personalOutput(label), yours, label)
+  assert.equal(spokenNote({ kind: 'ask', ws: 'web', text: 'May I run the tests?', on: true, silent: true }), '', 'silent: not on headphones')
+  assert.equal(spokenNote({ kind: 'ask', ws: 'web', text: 'May I run the tests?', on: true }), 'web asks: May I run the tests?')
 })

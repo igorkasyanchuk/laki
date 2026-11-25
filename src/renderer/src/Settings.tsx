@@ -1,7 +1,8 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The daemon keeps
 // the settings. The sections' parts are SettingsKit.tsx (Says, Group, Scope), SettingsAgents.tsx,
 // SettingsProject.tsx, SettingsConnect.tsx, SettingsResources.tsx and SettingsExtensions.tsx, which it re-exports.
-import { speakable } from '../../shared/speak'
+import { personalOutput, speakable } from '../../shared/speak'
+import { onOutput, outputLabel } from './say'
 import type { Call } from '../../shared/api'
 import { Terminals, TrustedClients } from './SettingsClients'
 import { FitAddon } from '@xterm/addon-fit'
@@ -980,6 +981,15 @@ function BackupField({ api }: { api: BackupApi }) {
       {err && <p className="field-err">{err}</p>}
     </>
   )
+}
+
+// #H1: the output in use now and whether Out loud would speak there (Only on headphones); its name unknown (no media
+// permission given): said so, and silent
+function OutputLine({ only }: { only: boolean }) {
+  const [label, setLabel] = useState(outputLabel())
+  useEffect(() => onOutput(() => setLabel(outputLabel())), [])
+  const name = label.replace(/^default\s*-\s*/i, '')
+  return <p className="muted small">{!name ? "Can't tell which output is in use" + (only ? ': Laki stays silent' : '') : `Now: ${name} · ${!only || personalOutput(label) ? 'Laki speaks' : 'Laki stays silent'}`}</p>
 }
 
 // what Reset the interface keeps of this viewer's: what you made (timers, stopwatches, drafts). Get started shows again
@@ -3143,6 +3153,10 @@ export function SettingsPage(p: {
               <Switch className="switch-row" on={s.voice?.speakDone === true} onChange={on => set({ voice: { ...s.voice, speakDone: on || undefined } })}>
                 <Says title="Speak when done" hint='"web finished: Added the CSV export."' />
               </Switch>
+              <Switch className="switch-row" on={s.voice?.speakOn === 'headphones'} onChange={on => set({ voice: { ...s.voice, speakOn: on ? 'headphones' : undefined } })}>
+                <Says title="Only on headphones" hint="Headphones, AirPods, earbuds or a headset: not out of the Mac's speakers or a display's" />
+              </Switch>
+              <OutputLine only={s.voice?.speakOn === 'headphones'} />
             </Group>
           )}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}

@@ -14,6 +14,7 @@ What this folder's files are. Read the root [AGENTS.md](../../../AGENTS.md) firs
 | `src/renderer/src/Workflows.tsx` | the Workflows page: list, canvas with its blocks and variables sidebar, inspector, file, runs |
 | `src/renderer/src/tell.ts` | the quick bar's hand-off (Q1, Q7's show and tell): `handOff`, the call its target gets, a picture's path in the words (pure: `test/tell.test.ts`) |
 | `src/renderer/src/Ai.tsx` | the AI page: its earlier chats' sidebar, Chat (a thread, the composer, images as thumbnails), Calls and Info tabs |
+| `src/renderer/src/say.ts` | speech out loud (`utter`, `sayQueued`); the default output's name (`outputLabel`, `onOutput`: Out loud's Only on headphones, shared/speak.ts `personalOutput`) |
 | `src/renderer/src/voice.ts` | Settings › Voice's cloud: recording, hold Fn, the text typed where the cursor was |
 | `src/renderer/src/UiKit.tsx` | Settings › Extensions › UI kit: every element with its sample, at each size, its JSON |
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |

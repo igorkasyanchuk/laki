@@ -13,6 +13,18 @@ export function utter(text: string) {
   return u
 }
 
+// #H1: the default audio output's name (enumerateDevices' audiooutput "default"; '' until a media permission was
+// given: never asked for just this), kept as devices change; told: Settings' line
+let outLabel = ''
+const told = new Set<() => void>()
+const readOut = () =>
+  navigator.mediaDevices
+    ?.enumerateDevices()
+    .then(l => ((outLabel = l.find(d => d.kind === 'audiooutput' && d.deviceId === 'default')?.label ?? ''), told.forEach(f => f())))
+    .catch(() => {})
+export const outputLabel = () => outLabel
+export const onOutput = (f: () => void) => (told.add(f), () => void told.delete(f))
+
 const waiting: string[] = []
 let talking = false
 let now: SpeechSynthesisUtterance | undefined
@@ -32,6 +44,8 @@ export function sayQueued(text: string) {
 }
 export function sayInit(on?: (cb: (text: string) => void) => void) {
   on?.(sayQueued)
+  void readOut()
+  navigator.mediaDevices?.addEventListener('devicechange', () => void readOut())
   addEventListener('keydown', e => e.key === 'Escape' && talking && hush(), true)
   addEventListener('pagehide', hush)
 }

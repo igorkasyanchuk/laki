@@ -145,6 +145,7 @@ export const FIND: [string, string, string?][] = [
   ['layout', 'Refraction', 'lens bend edge glass menus toasts liquid'],
   ['voice', "Speak Laki AI's answers", 'read aloud speech say out loud tts spoken answer talk key'],
   ['voice', 'Speak asks', 'read aloud out loud speech say tts spoken ask waiting agent needs you voice'],
+  ['voice', 'Only on headphones', 'airpods earbuds headset out loud speak speakers private'],
   ['voice', 'Speak when done', 'read aloud out loud speech say tts spoken done finished turn agent voice'],
   ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
   ['appearance', 'Favorites', 'theme star starred favorite'],

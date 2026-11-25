@@ -19,8 +19,8 @@ import { hasCap } from '../../shared/caps'
 import { noteCut, noteWhole } from './text'
 import { settle } from './motion'
 import { viewShare } from './viewShare'
-import { spokenNote } from '../../shared/speak'
-import { sayInit } from './say'
+import { personalOutput, spokenNote } from '../../shared/speak'
+import { outputLabel, sayInit } from './say'
 import { toolLine, toolOn } from './AppParts'
 const QUIET = new Set(['turn', 'long', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
 
@@ -282,5 +282,5 @@ export function useDaemon(a: DaemonCtx) {
 // Settings › Voice › Speak asks, Speak when done: what an ask or a finish says out loud (shared/speak.ts spokenNote;
 // main reads it out unless the talk key is down), the app window's own speaker (say.ts) listening for it
 const spoken = (v: View | null | undefined, kind: 'ask' | 'done', w: WorkspaceView | undefined, text: string, inView: boolean) =>
-  spokenNote({ kind, ws: w ? wsName(w) : '', text, on: kind === 'ask' ? v?.settings.voice?.speakAsks : v?.settings.voice?.speakDone, quiet: !!v?.dnd, recording: !!v?.settings.recording, private: !!w?.private || !!v?.projects.find(p => p.id === w?.project)?.private, inView })
+  spokenNote({ kind, ws: w ? wsName(w) : '', text, on: kind === 'ask' ? v?.settings.voice?.speakAsks : v?.settings.voice?.speakDone, quiet: !!v?.dnd, recording: !!v?.settings.recording, private: !!w?.private || !!v?.projects.find(p => p.id === w?.project)?.private, inView, silent: v?.settings.voice?.speakOn === 'headphones' && !personalOutput(outputLabel()) })
 if (bridge?.onSpeak) sayInit(bridge.onSpeak)

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Out loud can speak only on headphones (Settings › Voice): never out of the Mac's speakers or a display's.
 - Voice knows your project's words: workspace, branch and file names go to the model as a hint and are put back in the text (“checkout flow” becomes checkout-flow); a click on an underlined one undoes it.
 - Conflicts with the base say where: *2 files, 3 places* in the status bar, each file a click from the Review tab, and the agent's message names them.
 - Back up every week (Settings › General › Backup): a backup into a folder you pick, the newest four kept; offered once after your first backup.

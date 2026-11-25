@@ -57,11 +57,22 @@ export function langOf(text: string, prefer: readonly string[] = []): string | u
 // sentence>", speakable's (no code, links, paths or secrets), 20 words at most; '' says nothing: the setting off, Quiet,
 // Recording mode, a private workspace, the user dictating, or Laki in front with that tab in view
 export const SPOKEN_WORDS = 20
-export type Spoken = { kind: 'ask' | 'done'; ws: string; text: string; on?: boolean; quiet?: boolean; recording?: boolean; private?: boolean; dictating?: boolean; inView?: boolean }
+// silent: Out loud's Only on headphones, and the default output isn't (personalOutput) or can't be told
+export type Spoken = { kind: 'ask' | 'done'; ws: string; text: string; on?: boolean; quiet?: boolean; recording?: boolean; private?: boolean; dictating?: boolean; inView?: boolean; silent?: boolean }
 export function spokenNote(n: Spoken): string {
-  if (!n.on || n.quiet || n.recording || n.private || n.dictating || n.inView) return ''
+  if (!n.on || n.quiet || n.recording || n.private || n.dictating || n.inView || n.silent) return ''
   const first = speakable(n.text).match(/^[^.!?。！？]+[.!?。！？]*/)?.[0].trim() ?? ''
   const said = `${speakable(n.ws, 60).replace(/[.!?…]+$/, '') || 'An agent'} ${n.kind === 'ask' ? 'asks' : 'finished'}${first ? `: ${first}` : '.'}`
   const words = said.split(' ')
   return words.length > SPOKEN_WORDS ? `${words.slice(0, SPOKEN_WORDS).join(' ').replace(/[,;:]$/, '')}…` : said
+}
+
+// #H1: Settings › Voice › Out loud's Only on headphones (voice.speakOn 'headphones'): is the output, by the name the
+// system gives it (navigator.mediaDevices' default audiooutput; Chromium's "Default - " before it), yours alone:
+// headphones, AirPods, earbuds, buds, a headset, a Bluetooth hands-free one. Speakers, a display's or an HDMI output:
+// not; an empty or unknown name: not either (a headset that doesn't say so too). Pure: test/speak.test.ts
+export function personalOutput(label: string): boolean {
+  const l = label.replace(/^default\s*-\s*/i, '').toLowerCase()
+  if (!l.trim() || /\b(speakers?|display|hdmi|displayport|monitor|tv)\b/.test(l)) return false
+  return /(head ?(phones?|set)|airpods|ear ?(buds?|phones?)|\bbuds(?![a-z])|hands-?free|\bhfp\b)/.test(l)
 }

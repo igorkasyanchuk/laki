@@ -3014,7 +3014,10 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   asks, *Speak when done* "web finished: Added the CSV export." as one finishes: the workspace and the first
   sentence, 20 words at most, without code, links, paths or anything secret-shaped. Never in Quiet or Recording mode,
   for a private workspace, while the talk key's pill is open, or for the tab you're looking at; two at most wait their
-  turn (older ones dropped), and Esc in Laki or the talk key stops it. An agent can't turn them on.
+  turn (older ones dropped), and Esc in Laki or the talk key stops it. An agent can't turn them on. *Only on
+  headphones* speaks only when the Mac's output is headphones, AirPods, earbuds or a headset (by the name macOS gives
+  it), never out of its speakers or a display's; Settings shows the output in use and whether Laki would speak. Its
+  name can be unknown until Laki was allowed the microphone once (it never asks just for this): then it stays silent.
   *Include the selected text* (off until on): what's selected in the app you're in goes with your words, quoted (to
   Laki AI fenced as data): the pill says *+ selection · 3 lines*, and its × leaves it out. It's copied with ⌘C and the
   clipboard put back (Accessibility for Laki; never from a password manager or Keychain Access); in Laki, the page's
