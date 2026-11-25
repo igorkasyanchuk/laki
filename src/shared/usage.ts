@@ -78,7 +78,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text [--expect-url <url|/path>]
   laki browser [<ws>] hover <css> | press <key> | scroll [<css>] [--by <px>] [--to top|bottom] | select <css> <option> | check <css> [--off] | drag <css> <css>
-  laki browser [<ws>] back | forward | reload | tabs [list | new <url> | select <n> | close <n>]
+  laki browser [<ws>] back | forward | reload | tabs [list | new <url> | select <n> | close <n>] | viewport desktop|laptop|tablet|phone|<w>x<h>
                                               a hidden browser on the workspace's localhost (the app must be open);
                                               screenshot prints a PNG's path; in a tab, <ws> is its own;
                                               --expect-url: refused, nothing done, unless it's on that page
@@ -419,7 +419,9 @@ onto a second one (a board's card to a column); scroll scrolls it, or the page w
 goes up, else a screen; --to top or bottom). press presses a key in the focused element: Enter, Escape, Tab,
 ArrowDown, a letter, with Meta+, Control+, Alt+ or Shift+ (Meta+K). hover, press and drag are real input (the page
 can't tell them from yours). back, forward and reload move in its history; tabs lists its tabs (* the one the ops go
-to), tabs new <url> opens another (5 at most), select <n> and close <n>. Each op but screenshot, text and tabs prints
+to), tabs new <url> opens another (5 at most), select <n> and close <n>. viewport lays its tabs out at a size:
+desktop (1440×900), laptop (1280×800, as it starts), tablet (768×1024), phone (390×844) or <w>x<h>, so a phone's
+breakpoints apply; screenshots after it are that size. Each op but screenshot, text and tabs prints
 what it caused: → <url> when the page moved, blocked: (a popup or a link off localhost), console error: lines, and
 the text lines added (+) and gone (-), or (no changes). In a tab, <ws> is its own. --expect-url <url|/path> on any op
 but open: the page it's meant for (that address, or one under it); on any other page it's refused and nothing is
@@ -434,6 +436,7 @@ done, so a page that moved meanwhile isn't typed into.
   laki browser drag ".card:first-child" "#done"
   laki browser scroll --to bottom
   laki browser tabs new /admin
+  laki browser viewport phone
   laki browser screenshot`,
   backup: `Writes your data to one .tgz (the system's tar): manifest.json first (the Laki that made it, the state's
 version, counts), then projects, workspaces and settings (state.json, without this Mac's remote access), notes and

@@ -983,12 +983,13 @@ export function DeviceTab({ api, ws, only }: { api: SimTabApi; ws?: string; only
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/ // main's will-attach-webview's first page; the iframe's only ones
 const canFrame = !bridge && ['localhost', '127.0.0.1'].includes(location.hostname) // a browser on this Mac: an iframe
 
-// the size the page is laid out at (null: the panel's), and whether the sizes bar is open; per viewer
+// the size the page is laid out at (null: the panel's), and whether the sizes bar is open; per viewer and workspace
+// (#2: laki.previewSize.<ws>; a workspace with none yet: the last one picked anywhere, laki.previewSize)
 type Size = { w: number; h: number } | null
 const SIZE_KEY = 'laki.previewSize'
-const keptSize = (): Size => {
+const keptSize = (ws: string): Size => {
   try {
-    const s = JSON.parse(localStorage.getItem(SIZE_KEY) ?? 'null')
+    const s = JSON.parse(localStorage.getItem(`${SIZE_KEY}.${ws}`) ?? localStorage.getItem(SIZE_KEY) ?? 'null')
     return s && parseSize(`${s.w}x${s.h}`) ? { w: s.w, h: s.h } : null
   } catch {
     return null
@@ -1008,11 +1009,11 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   const [url, setUrl] = useState(first) // what's shown
   const [n, setN] = useState(0) // the iframe's reloads
   const [err, setErr] = useState('')
-  const [shot, setShot] = useState<{ data: string; url: string } | null>(null)
+  const [shot, setShot] = useState<{ data: string; url: string; size?: string } | null>(null)
   const [picking, setPicking] = useState(0) // a pick in progress (its number: a later one wins)
   const [picked, setPicked] = useState<{ p: Picked; shot: string } | null>(null) // F5: the composer over the page, by the pick
-  const [size, setSize] = useState<Size>(keptSize)
-  const [sizes, setSizes] = useState(() => !!keptSize()) // the bar
+  const [size, setSize] = useState<Size>(() => keptSize(w.id))
+  const [sizes, setSizes] = useState(() => !!keptSize(w.id)) // the bar
   const [typed, setTyped] = useState(() => (size ? `${size.w}×${size.h}` : '')) // its own size, as typed
   const [box, setBox] = useState({ w: 0, h: 0 }) // the room the page has
   const stage = useRef<HTMLDivElement>(null)
@@ -1029,6 +1030,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
     setTyped(s ? `${s.w}×${s.h}` : '')
     try {
       localStorage.setItem(SIZE_KEY, JSON.stringify(s))
+      localStorage.setItem(`${SIZE_KEY}.${w.id}`, JSON.stringify(s))
     } catch {}
   }
   useLayoutEffect(() => {
@@ -1079,7 +1081,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   }, [parked])
   const capture = () => {
     const id = on(v => v.getWebContentsId())
-    if (bridge?.capture && id) bridge.capture(id).then(data => setShot({ data, url: on(v => v.getURL()) || url }), e => setErr(String(e?.message ?? e)))
+    if (bridge?.capture && id) bridge.capture(id).then(data => setShot({ data, url: on(v => v.getURL()) || url, ...(size && { size: `${size.w}×${size.h}` }) }), e => setErr(String(e?.message ?? e)))
   }
   // F5: design mode. An element of the page, picked with the mouse (this Mac's pages only: never a site's), then a
   // composer by it: what it is, a screenshot of it, your words, Send to the workspace's agent
@@ -1163,7 +1165,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
             }}
           />
           {size && <IconButton icon="refresh" title="Turn it: width and height swapped" onClick={() => pickSize({ w: size.h, h: size.w })} />}
-          {size && <span className="muted small">{Math.round(k * 100)}%</span>}
+          {size && <span className="muted small">{`${size.w} × ${size.h} · ${Math.round(k * 100)}%`}</span>}
         </div>
       )}
       {shot && <ShotBox shot={shot} api={api} onClose={() => setShot(null)} />}
@@ -1373,7 +1375,7 @@ function pickElement(): Promise<Picked | null> {
 }
 
 // a preview's screenshot on its way to the agent, with what to say about it
-function ShotBox({ shot, api, onClose }: { shot: { data: string; url: string }; api: PanelApi; onClose: () => void }) {
+function ShotBox({ shot, api, onClose }: { shot: { data: string; url: string; size?: string }; api: PanelApi; onClose: () => void }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -1382,7 +1384,7 @@ function ShotBox({ shot, api, onClose }: { shot: { data: string; url: string }; 
     setBusy(true)
     api
       .saveImage(shot.data)
-      .then(path => api.toAgent(`${text.trim() || 'Here is how the page looks now.'}\n\nA screenshot of ${shot.url}: ${path}`))
+      .then(path => api.toAgent(`${text.trim() || 'Here is how the page looks now.'}\n\nA screenshot of ${shot.url}${shot.size ? ` laid out at ${shot.size} (the Preview's size)` : ''}: ${path}`))
       .then(onClose, e => (setErr(String(e?.message ?? e)), setBusy(false)))
   }
   return (

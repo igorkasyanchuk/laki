@@ -261,6 +261,7 @@ export const previewAddr = (url: string) => url.replace(/^http:\/\/(?=(localhost
 
 // the preview's sizes (Preview's devices bar): the page laid out at that width and height, scaled down to fit the panel
 export const SIZES: [string, number, number][] = [
+  ['Desktop', 1440, 900],
   ['iPhone SE', 375, 667],
   ['iPhone', 393, 852],
   ['Android', 412, 915],

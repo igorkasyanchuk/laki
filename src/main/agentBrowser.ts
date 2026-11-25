@@ -10,22 +10,25 @@ import { win } from './index.ts'
 // the agent browser (laki browser, MCP's laki_browser): hidden windows per workspace (its tabs, AGENT_TABS at most) in
 // the preview's session, kept to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the
 // daemon through the renderer
-type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string; expect?: string; to?: string; key?: string; px?: number; edge?: string; off?: boolean; act?: string; n?: number } // expect: --expect-url's
+type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string; expect?: string; to?: string; key?: string; px?: number; edge?: string; off?: boolean; act?: string; n?: number; size?: Size } // expect: --expect-url's; size: viewport's
+type Size = { w: number; h: number }
 // errors, blocked: what the page did during an op (its answer's), 20 of each; turn: the op before (one at a time: two
 // at once would mix their clicks and their reports); tabs: its windows, at the one ops go to
-type AgentWin = { tabs: BrowserWindow[]; at: number; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[]; turn: Promise<unknown> }
+// size: laki browser viewport's, every tab's (unset: 1280×800)
+type AgentWin = { tabs: BrowserWindow[]; at: number; idle?: ReturnType<typeof setTimeout>; errors: string[]; blocked: string[]; turn: Promise<unknown>; size?: Size }
 const AGENT_TABS = 5 // ponytail: five tabs per workspace; a sixth is refused
 export const agentWins = new Map<string, AgentWin>()
 export const agentEnd = (a: AgentWin) => (clearTimeout(a.idle), a.tabs.forEach(w => !w.isDestroyed() && w.destroy()))
 const pageJs = (f: string, ...args: unknown[]) => `(${f})(${args.map(a => JSON.stringify(a)).join(',')})`
 // a tab: a hidden window (its timers at full speed), its popups and links off localhost refused and told
 function agentTab(a: AgentWin) {
-  const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: AGENT_BROWSER, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
+  const w = new BrowserWindow({ show: false, width: 1280, height: 800, useContentSize: true, webPreferences: { partition: AGENT_BROWSER, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
   const block = (u: string) => a.blocked.length < 20 && a.blocked.push(u.slice(0, 300))
   w.webContents.setWindowOpenHandler(d => (block(d.url), { action: 'deny' }))
   w.webContents.on('will-navigate', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
   w.webContents.on('will-redirect', (ev, u) => !local(u) && (ev.preventDefault(), block(u)))
   w.webContents.on('console-message', ev => ev.level === 'error' && a.errors.length < 20 && a.errors.push(ev.message.slice(0, 300)))
+  if (a.size) w.setContentSize(a.size.w, a.size.h)
   a.tabs.push(w)
   a.at = a.tabs.length - 1
   return w
@@ -103,10 +106,18 @@ async function browseOp(entry: AgentWin, r: Browse) {
     } else if (act !== 'list') throw new Error(`browser tabs ${act}? list, new <url>, select <n> or close <n>`)
     return { tabs: entry.tabs.map((w, n) => ({ n: n + 1, url: w.webContents.getURL(), title: w.webContents.getTitle(), ...(n === entry.at && { current: true }) })), ...caused() }
   }
+  const viewport = () => (([w, h]) => `${w}×${h}`)(entry.tabs[entry.at].getContentSize())
+  if (r.op === 'viewport' && r.size) {
+    // #2: every tab laid out at it (a phone's width: its own breakpoints), and the next ones
+    entry.size = r.size
+    for (const t of entry.tabs) t.setContentSize(r.size.w, r.size.h)
+    await settle()
+    return { ...page, viewport: viewport(), ...caused() }
+  }
   if (r.op === 'screenshot') {
     const img = await wc.capturePage()
     if (img.isEmpty()) throw new Error('nothing painted yet: try again')
-    return { url: page.url, png: img.toPNG().toString('base64') }
+    return { url: page.url, png: img.toPNG().toString('base64'), viewport: viewport() }
   }
   if (r.op === 'text') return { ...page, text: await wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 20000)`) }
   const was = await lines()

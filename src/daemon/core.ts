@@ -25,7 +25,7 @@ import { AGENT_NAMES, agentBin, LIMIT_AGENTS, endpointOk, keyEvent, MASK, type T
   PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset,
   prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun,
   type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template,
-  type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort } from '../shared/types.ts'
+  type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort, VIEWPORTS, viewportOf } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { WALK_HEAD, walkFresh, walkMd, walkWithout } from '../shared/walk.ts'
@@ -5883,7 +5883,7 @@ export async function accountLogin(p: { id: string; agent: string }) {
 
 // the agent browser (laki browser, MCP's laki_browser): a hidden window of the app's per workspace (main's), asked
 // through the newest connected app window; a page on this Mac only (main checks too). screenshot: a PNG in images/
-export const BROWSE_OPS = ['open', 'screenshot', 'click', 'fill', 'text', 'hover', 'press', 'scroll', 'select', 'check', 'drag', 'back', 'forward', 'reload', 'tabs']
+export const BROWSE_OPS = ['open', 'screenshot', 'click', 'fill', 'text', 'hover', 'press', 'scroll', 'select', 'check', 'drag', 'back', 'forward', 'reload', 'tabs', 'viewport']
 const browsing = new Map<string, { done: (r: { ok: boolean; result?: any; error?: string }) => void }>()
 // Laki AI looked at a tab, or used the agent browser (no tab: a window of its own): the app's glow over that tab's pane,
 // else its window, with Settings › General › Experimental › Laki AI's glow on (the renderer's)
@@ -5900,6 +5900,8 @@ export async function browse(p: BrowseIn) {
   if (p.op === 'select' && !p.text?.trim()) throw new Error('browser select: which option? its text')
   if (p.op === 'scroll' && p.px !== undefined && !(typeof p.px === 'number' && Number.isFinite(p.px))) throw new Error('browser scroll --by: a number of pixels (negative goes up)')
   if (p.op === 'scroll' && p.edge !== undefined && !['top', 'bottom'].includes(p.edge)) throw new Error('browser scroll --to: top or bottom')
+  const size = p.op === 'viewport' ? viewportOf(p.text ?? '') : undefined // #2: its tabs laid out at that size
+  if (p.op === 'viewport' && !size) throw new Error(`browser viewport: ${Object.keys(VIEWPORTS).join(', ')}, or a width×height (390x844)`)
   const act = p.op === 'tabs' ? (p.act ?? 'list') : undefined
   if (act && !['list', 'new', 'select', 'close'].includes(act)) throw new Error(`browser tabs ${act}? list, new <url>, select <n> or close <n>`)
   if ((act === 'select' || act === 'close') && !(Number.isInteger(p.n) && p.n! >= 1)) throw new Error(`browser tabs ${act}: which tab? its number (tabs list)`)
@@ -5916,11 +5918,11 @@ export async function browse(p: BrowseIn) {
   const r = await new Promise<{ ok: boolean; result?: any; error?: string }>(done => {
     const t = setTimeout(() => (browsing.delete(id), done({ ok: false, error: "the agent browser didn't answer in 30 s" })), 30000)
     browsing.set(id, { done: r => (clearTimeout(t), browsing.delete(id), done(r)) })
-    host.send({ ev: 'browse', req: id, ws: ws.id, home: `http://localhost:${ws.port}/`, op: p.op, url, selector: p.selector, text: p.text, expect, to: p.to, key: p.key, px: p.px, edge: p.edge, off: p.off === true || undefined, act, n: p.n })
+    host.send({ ev: 'browse', req: id, ws: ws.id, home: `http://localhost:${ws.port}/`, op: p.op, url, selector: p.selector, text: p.text, expect, to: p.to, key: p.key, px: p.px, edge: p.edge, off: p.off === true || undefined, act, n: p.n, ...(size && { size: { w: size[0], h: size[1] } }) })
   })
   if (!r.ok) throw new Error(r.error || 'the agent browser failed')
   if (p.op !== 'screenshot') return r.result
-  return { url: r.result.url, path: imageSave({ data: r.result.png, ext: 'png' }) }
+  return { url: r.result.url, path: imageSave({ data: r.result.png, ext: 'png' }), ...(r.result.viewport && { viewport: r.result.viewport }) }
 }
 // the app's answer to a browse or a timer event, by its req
 export function browseDone(p: { id: string; ok: boolean; result?: any; error?: string }) {

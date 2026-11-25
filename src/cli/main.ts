@@ -555,7 +555,7 @@ async function main() {
     case 'browser': {
       // laki browser [ws] <op> …: open, screenshot, click, fill, text, hover, press, scroll, select, check, drag, back,
       // forward, reload, tabs; in a tab, its workspace
-      const ops = ['open', 'screenshot', 'click', 'fill', 'text', 'hover', 'press', 'scroll', 'select', 'check', 'drag', 'back', 'forward', 'reload', 'tabs']
+      const ops = ['open', 'screenshot', 'click', 'fill', 'text', 'hover', 'press', 'scroll', 'select', 'check', 'drag', 'back', 'forward', 'reload', 'tabs', 'viewport']
       const [ws, op, ...more] = ops.includes(rest[0]) && process.env.LAKI_WORKSPACE ? [process.env.LAKI_WORKSPACE, ...rest] : rest
       if (!ws || !ops.includes(op)) throw new Error(`usage: laki browser [ws] ${ops.join(' | ')} … [--expect-url <url|/path>] (laki help browser)`)
       const by = typeof flags.by === 'string' ? Number(flags.by) : undefined
@@ -565,6 +565,7 @@ async function main() {
         : op === 'click' || op === 'hover' || op === 'check' ? { selector: more.join(' '), ...(op === 'check' && flags.off && { off: true }) }
         : op === 'fill' || op === 'select' ? { selector: more[0], text: more.slice(1).join(' ') }
         : op === 'press' ? { key: more.join(' ') }
+        : op === 'viewport' ? { text: more.join(' ') }
         : op === 'drag' ? { selector: more[0], to: more[1] }
         : op === 'scroll' ? { selector: more.join(' ') || undefined, px: by, edge: typeof flags.to === 'string' ? flags.to : undefined }
         : op === 'tabs' ? { act: more[0] ?? 'list', ...(more[0] === 'new' ? { url: more[1] } : more[1] !== undefined && { n: Number(more[1]) }) }

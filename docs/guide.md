@@ -1240,10 +1240,12 @@ line, after the tab restarts.
 - *Preview* (the toolbar's globe): the workspace's dev server in a browser: `$PORT` first; the address bar takes
   a path (`/admin`), another port (`:5173`), `localhost:8080/x` or any website (type `example.com` or a whole URL; in
   the app, not in a browser elsewhere); back, forward, reload, open in your browser. The devices button opens the
-  sizes: *Fit* (the panel's), iPhone SE, iPhone, Android, iPad, Laptop, HD, Full HD, or your own (`1440×900`, Enter):
-  one click lays the page out at that width and height, scaled down to fit (the percentage says how much); the
-  arrows swap width and height. Only the size: no touch, no phone's user agent. The camera takes a screenshot of the page and sends it to the agent
-  with what you write. The crosshair (*Pick*, ⌥⌘P while the
+  sizes: *Fit* (the panel's), Desktop, iPhone SE, iPhone, Android, iPad, Laptop, HD, Full HD, or your own (`1440×900`,
+  Enter): one click lays the page out at that width and height, scaled down to fit (*390 × 844 · 80%* says the size and
+  how much); the arrows swap width and height. Each workspace keeps its own size (a new one starts at the last you
+  picked). Only the size: no touch, no phone's user agent. The camera takes a screenshot of the page and sends it to the
+  agent with what you write, saying the size it was laid out at; a pick says the page's width too. Agents get the same
+  sizes in their own browser: `laki browser viewport phone` (desktop, laptop, tablet, phone or `390x844`). The crosshair (*Pick*, ⌥⌘P while the
   Preview has the focus; Settings › Keys) is design mode, on this Mac's pages (`localhost`) only: hover outlines an
   element, a click opens a small composer by it with its selector, size, text, a screenshot of just that element and
   the file it likely comes from (a quick search of the worktree for its id, a class or its text, when one or two files

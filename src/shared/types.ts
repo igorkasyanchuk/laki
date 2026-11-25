@@ -1588,7 +1588,16 @@ export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the
 // page's console errors meanwhile; blocked: popups and links off localhost refused; changed: click and fill's
 // pageChanges ([]: none); scrolled: a scroll's place (its top, and the most it goes, in px)
-export type BrowseDid = { url: string; title: string; nav?: { url: string; title: string }; errors?: string[]; blocked?: string[]; changed?: string[]; scrolled?: { top: number; max: number } }
+export type BrowseDid = { url: string; title: string; nav?: { url: string; title: string }; errors?: string[]; blocked?: string[]; changed?: string[]; scrolled?: { top: number; max: number }; viewport?: string }
+// #2: the agent browser's sizes (laki browser viewport <name|WxH>; unset: 1280×800), as the Preview's sizes bar has them
+export const VIEWPORTS: Record<string, [number, number]> = { desktop: [1440, 900], laptop: [1280, 800], tablet: [768, 1024], phone: [390, 844] }
+export function viewportOf(s: string): [number, number] | null {
+  const k = s.trim().toLowerCase()
+  if (Object.hasOwn(VIEWPORTS, k)) return VIEWPORTS[k]
+  const m = /^(\d{3,4})\s*[x×]\s*(\d{3,4})$/.exec(k)
+  const [w, h] = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+  return w >= 200 && h >= 200 && w <= 4000 && h <= 4000 ? [w, h] : null
+}
 // laki browser press's key (Enter, Escape, Meta+K, Shift+Tab, a letter, F5) as the DevTools protocol's key event:
 // its modifiers (Alt 1, Control 2, Meta 4, Shift 8), key, code, Windows key code and the text it types (none with
 // Control, Meta or Alt held). Throws on a key it doesn't know
@@ -1643,6 +1652,7 @@ export const browseSays = (r: BrowseDid) =>
     ...(r.blocked ?? []).map(u => `blocked: ${u}`),
     ...(r.errors ?? []).map(e => `console error: ${e}`),
     ...(r.scrolled ? [`scrolled to ${r.scrolled.top} of ${r.scrolled.max}`] : []),
+    ...(r.viewport ? [`viewport: ${r.viewport}`] : []),
     ...(r.changed ? (r.changed.length ? r.changed : ['(no changes)']) : []),
   ].join('\n')
 // laki browser --expect-url: the page the agent means is the one it's on: the same address, or one under it (a path

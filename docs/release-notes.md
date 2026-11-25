@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The Preview keeps a size per workspace, says it with the scale (*390 × 844 · 80%*) and in the screenshots it sends, and has a Desktop size; agents set theirs with `laki browser viewport phone`.
 - A long paste (a log, a stack trace) becomes a file chip in the prompt box, *pasted-text.txt · 312 lines*: the agent gets the file, a click reads or edits it, ⇧⌘V pastes as text.
 - The sidebar's Recent view: a button at its head lists every workspace by when it last worked (Running, Today, Yesterday, Last 7 days…), across projects.
 - Show › Workers off: workspaces an orchestrating agent started stay out of the sidebar, counted on their lead's row and reached through its workers dock.

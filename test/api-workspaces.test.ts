@@ -225,6 +225,7 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'select', selector: '#plan' }), /which option/)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'scroll', edge: 'middle' }), /top or bottom/)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'tabs', act: 'select' }), /its number/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'viewport', text: 'huge' }), /browser viewport: desktop, laptop, tablet, phone, or a width×height/)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'tabs', act: 'new', url: 'https://example.com' }), /localhost only/)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'text' }), /needs Laki's window/)
   // with an app window that can: the op goes to it, its answer comes back (a path: on the workspace's port)
@@ -233,7 +234,7 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   app.notify('view', { tab: null, tabs: [], focused: false, browse: true })
   // through the client's events, as the renderer's: a message with an id would be a reply
   const relay = setInterval(() => {
-    for (const m of app.events.splice(0)) if (m.ev === 'browse') app.call('browseDone', m.op === 'text' ? { id: m.req, ok: true, result: { url: m.url ?? m.home, text: 'Hello' } } : ['drag', 'tabs', 'press'].includes(m.op) ? { id: m.req, ok: true, result: { got: [m.selector, m.to, m.key, m.act, m.n, m.url] } } : { id: m.req, ok: false, error: `no element matches ${m.selector}` })
+    for (const m of app.events.splice(0)) if (m.ev === 'browse') app.call('browseDone', m.op === 'viewport' ? { id: m.req, ok: true, result: { url: m.home, title: '', viewport: `${m.size.w}×${m.size.h}` } } : m.op === 'text' ? { id: m.req, ok: true, result: { url: m.url ?? m.home, text: 'Hello' } } : ['drag', 'tabs', 'press'].includes(m.op) ? { id: m.req, ok: true, result: { got: [m.selector, m.to, m.key, m.act, m.n, m.url] } } : { id: m.req, ok: false, error: `no element matches ${m.selector}` })
   }, 20)
   t.after(() => clearInterval(relay))
   await until(async () => (await rig.rpc('browse', { ws: ws.id, op: 'text', url: '/about' }).catch(() => null))?.text === 'Hello', 'the app answers')
@@ -244,6 +245,9 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   assert.deepEqual((await rig.rpc('browse', { ws: ws.id, op: 'press', key: 'Meta+K' })).got, [null, null, 'Meta+K', null, null, null])
   assert.deepEqual((await rig.rpc('browse', { ws: ws.id, op: 'tabs', act: 'new', url: '/admin' })).got, [null, null, null, 'new', null, `http://localhost:${ws.port}/admin`])
   assert.deepEqual((await rig.rpc('browse', { ws: ws.id, op: 'tabs' })).got, [null, null, null, 'list', null, null])
+  // #2: viewport: a name or a width×height, as a size the app lays its tabs out at
+  assert.equal((await rig.rpc('browse', { ws: ws.id, op: 'viewport', text: 'Phone' })).viewport, '390×844')
+  assert.equal((await rig.cli('browser', ws.id, 'viewport', '1024x768')).out, `http://localhost:${ws.port}/\nviewport: 1024×768\n`)
 })
 
 test('a folder: Create with an agent makes another session beside its own (none: its own back); the creation log in development mode', async t => {
