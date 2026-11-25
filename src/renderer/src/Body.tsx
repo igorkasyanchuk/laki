@@ -4,7 +4,7 @@ import type { AppCtx } from './appCtx'
 import { type AgentDid, type Doctor, placesOf, type TabView } from '../../shared/types'
 import { Backdrop } from './Backdrop'
 import { BrowserPane } from './Browser'
-import { CheckStrip, GoalStrip, HookStrip, InstallStrip, LaterStrip, McpStrip, PlanStrip, QueueStrip, Ready, SecretStrip, ShowStrip, SignInStrip, StarLaki, Welcome, WorkersDock } from './panels'
+import { CheckStrip, GoalStrip, HookStrip, InstallStrip, LaterStrip, McpStrip, PlanStrip, QueueStrip, Ready, SecretStrip, ShowStrip, SignInStrip, SuggestStrip, StarLaki, Welcome, WorkersDock } from './panels'
 import { Glyph as ExtGlyph, inWs, status as extStatus, WidgetBody, WidgetPanel } from './Widgets'
 import { edited, type FileContent, FilePreview, fileNoteText, type FilesRoot, SidePanel } from './SidePanel'
 import type { ReviewNote } from '../../shared/reviewNotes'
@@ -38,7 +38,7 @@ const FullReview = lazy(() => import('./FullReview').then(m => ({ default: m.Ful
 
 export function bodyOf(app: AppCtx) {
   const { artsIn, attachable, browsed, byId, call, checkHid, ciLog, closeFile, closePreview, closeTabs, copy, detachPr, dialog, done, fail, finds, floated, floatTab, full, git, group, groups, guests, hookHid, infoOf, inReader, kh, kt, label, labelApi, laterCancel, laterChange, laterNow, live, narrow, newTabActions, newWs, noBar, openIn, openProject, ownWidgets, pageSeen, paneDeps, panelApi,
-    panelHost, panelShown, panelTab, panelW, paneNow, prAct, previewed, previewW, prFix, project, queueRemove, queueSave, quickNew, railKind, readerLive, readSwitch, replyTo, reviewApi, reviewGo, reviewOn, reviewTight, ring, selectTab, setArtsIn, setAuto, setCheckHid, setDialog, setGroups, setHookHid, setOpenFiles, setPanelOpen, setPanelTab, setPanelW, setPreviewW, setReply, setReveal, setReviewTight, setShownFile, setTimer, settings, setWsId, sizeOf, start, statKey, tab, tabMenu, tabsAt, theme, timers, toast, turnLive, view, welcomeRun, welcomeSample, widgetApi, workerAsks, ws, wsFiles, wsTabMenu, drag } = app
+    panelHost, setNewFor, setNewInit, showNew, panelShown, panelTab, panelW, paneNow, prAct, previewed, previewW, prFix, project, queueRemove, queueSave, quickNew, railKind, readerLive, readSwitch, replyTo, reviewApi, reviewGo, reviewOn, reviewTight, ring, selectTab, setArtsIn, setAuto, setCheckHid, setDialog, setGroups, setHookHid, setOpenFiles, setPanelOpen, setPanelTab, setPanelW, setPreviewW, setReply, setReveal, setReviewTight, setShownFile, setTimer, settings, setWsId, sizeOf, start, statKey, tab, tabMenu, tabsAt, theme, timers, toast, turnLive, view, welcomeRun, welcomeSample, widgetApi, workerAsks, ws, wsFiles, wsTabMenu, drag } = app
   // the workers dock's Stop all: each turn under way gets Esc (stopAll's one tab, as its Stop), after you say so
   const stopWorkers = async (ts: TabView[]) => {
     if (!(await ask(`Stop ${ts.length} ${ts.length === 1 ? "worker's turn" : "workers' turns"}?`, { text: 'Each agent gets Esc, as its own Stop: what it was doing ends there; its tab and its work stay.', ok: `Stop ${ts.length}`, danger: true }))) return
@@ -121,6 +121,16 @@ export function bodyOf(app: AppCtx) {
                         <SecretStrip tab={t} kept={hasCap(view, 'secret.kept')} onGive={(id, o) => call('secretGive', o ? { id, ...o } : { id, refuse: true })} />
                         <WorkersDock tab={t.id} workers={workerAsks(t.id)} onAnswer={(tab, n, label) => call('answer', { tab, n, label })} onOpen={(w, id) => (setReveal(r => [...r, w]), selectTab({ id, workspace: w }))} onAllow={ts => bulkAnswer(ts, true, { view, toast, done })} onStop={stopWorkers} onArchive={hasCap(view, 'archive.dirty') ? archiveWorkers : undefined /* an older daemon archives whatever is there: no bulk */} />
                         <ShowStrip tab={t} onClose={() => void call('showDone', { tab: t.id }).catch(() => {})} onCopy={copy} />
+                        {(w =>
+                          w?.suggests && (
+                            // #5: what its agents suggested: under the tab that did (one gone, or none: the workspace's first agent's)
+                            <SuggestStrip
+                              list={w.suggests.filter(s => !s.answered && (s.tab === t.id || ((!s.tab || !view?.tabs.some(x => x.id === s.tab)) && view?.tabs.find(x => x.workspace === w.id && x.kind === 'agent')?.id === t.id)))}
+                              onStart={s => call<{ made?: string }>('suggestAnswer', { ws: w.id, id: s.id, act: 'start' }).then(r => r.made && showNew(r.made), () => {})}
+                              onEdit={s => (setNewFor(w.project), setNewInit({ prompt: s.prompt, name: s.title, suggested: { ws: w.id, id: s.id } }), setDialog('new'))}
+                              onDismiss={s => void call('suggestAnswer', { ws: w.id, id: s.id, act: 'dismiss' }).catch(() => {})}
+                            />
+                          ))(view?.workspaces.find(x => x.id === t.workspace))}
                         {(noBar || full) && t.kind === 'agent' && settings.turnChanges !== false && <TurnStrip tab={t} api={turnLive(t.workspace)} /> /* the status bar's Turns, when there's none (off, or full screen hides it) */}
                         <PlanStrip tab={t} onAnswer={n => call('answer', { tab: t.id, n })} onSend={text => void call('send', { target: t.id, text, whenIdle: true }).catch(() => {})} />
                         {t.queue?.length ? <QueueStrip tab={t} onSave={(q, was) => queueSave(t, q, was)} onRemove={i => queueRemove(t, i)} onNow={() => void call('queueNow', { tab: t.id }).catch(() => {})} onResume={() => void call('queueResume', { tab: t.id }).catch(() => {})} onClear={() => queueRemove(t)} /> : null}

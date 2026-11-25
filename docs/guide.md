@@ -3201,6 +3201,7 @@ laki events [--json] [--ws <ref>]... [--type a,b] [--once] [--timeout <s>]   # L
 laki send fix-the-login "now add tests"                 # queued while it works (--queue, the default); typed in when the turn ends
 laki send fix-the-login --steer "skip the e2e tests"    # into its running turn (Claude Code, Codex); others are stopped first
 laki send fix-the-login --interrupt "stop: rebase first" # its turn stopped (Esc), then sent; the reply says which happened
+laki suggest "Fix the flaky test" --why "…" --prompt "…"  # (in an agent's tab) a task it noticed: a card you Start, Edit first or Dismiss
 laki name backend                                       # in an agent's tab: other agents reach it as @backend, in any workspace
 laki agents                                             # the named agents: where, which agent, what they're doing
 laki ask @backend "which endpoint lists teams?"         # typed in when its turn ends, its reply printed (laki send @backend: no wait)

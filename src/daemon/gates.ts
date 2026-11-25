@@ -10,6 +10,7 @@ const TICK = "move Laki's clock (its timers and tidies run on their own)"
 export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a report's page loads (the user's viewer asks)",
   artifactAllow: "let a report's page load from another host (the user does, in the viewer)",
   flowTrustDiff: "read the text the user allowed a workflow at (it would shape its change to it)",
+  suggestAnswer: 'start or dismiss a suggested task (the user picks, on its card)',
   askExplain: "explain the user's ask (an agent spends no Laki AI on its own asks)", tabSnooze: "snooze or dismiss what's in the user's Needs you", reviewSteps: "walk the user through a diff (it spends the user's Laki AI)",
   aiCredits: "read Laki AI's OpenRouter credits and spend (the user's)", scheduleCopy: 'duplicate a scheduled task (the user does, in Scheduled tasks)',
   promptQuestions: "ask Laki AI what a task leaves open (the New workspace page's Ask me first: it spends the user's AI money)",
@@ -98,7 +99,7 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
 export const AGENT_OWN = new Set(['wsSpend', 'files', 'input', 'send', 'settingsSet', 'scheduleSet', 'updateIdle', 'projectSet', 'wsSet', 'projectTrust', 'memoryAdd', 'queueNow', 'tabMode', 'tabDraft', 'prAct', 'prDraft', 'prAttach', 'prDetach', 'prLabel', 'portKill', 'tabReopen', 'prThreads', 'wsNew', 'tabNew', 'aiAsk', 'tunnelStart', 'tabSet', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo', 'wsUpdate', 'tabClose', 'openIn', 'quickNew', 'run', 'projectAdd', 'wsRm', 'projectRm', 'scheduleRm', 'wsFan'])
 // AGENT_OK: an agent may call it as it is (reads, its own work; a handler's own checks still hold: an ask in the app, a
 // cross-workspace ask, by: 'agent')
-export const AGENT_OK = new Set('events keptList agentVersions ping state clientWho agentModels memoryRm projectFile branches csMachines wsPeek overlapCheck wsStat wsArchive doctor hooksSeen unread seen show showDone browse timer browseDone wsRestore wsFork layoutSet layoutMove tabFocus uiDo todoAdd todoRm memoryCompactLog cliState reminderAdd reminderSet reminderRm failDismiss hookList \
+export const AGENT_OK = new Set('suggest events keptList agentVersions ping state clientWho agentModels memoryRm projectFile branches csMachines wsPeek overlapCheck wsStat wsArchive doctor hooksSeen unread seen show showDone browse timer browseDone wsRestore wsFork layoutSet layoutMove tabFocus uiDo todoAdd todoRm memoryCompactLog cliState reminderAdd reminderSet reminderRm failDismiss hookList \
 storageInfo presetSave apps termShells reorder imageSave bgGet fileSave prFix prLog logs scriptLogs progress turnDiff turnList alertShow noticeShow secretAsk prList prRefresh meme aiState aiQuestion aiShot aiOpenApp aiHelp aiPermission aiNew aiStop voiceModels queueClear queueSet queueResume hook worktreeList diff baseBranches fileRead sourceGuess artifactList skills agentCommands issueList \
 usageDays commits commitDiff prLabels ghCard blame fileWeb prDiff prFile prFiles device sim cloudflared usage limits accounts resources shareStop tabWake tunnelStop tunnelCheck ship screen resize view detach remoteCheck widgetRender widgetSet widgetLogs widgetLog widgetLogClear widgetFull widgetWhat widgetRun widgetRm widgetRestore widgetTrash widgetUndo widgetRemix widgetSlug widgetAction \
 widgetStore widgetReload widgetFiles widgetWrite widgetPush widgetEmit widgetEvents widgetTools widgetToolCall widgetGrantRm widgetRuns widgetAnnotations widgetMock widgetDev widgetNew widgetCheck noteRm planList planNew planGet planSave planFile planUpload planWrite planRm flowList flowSave flowTrust flowPause flowRm flowRestore flowTrash flowHistory flowRevert flowStart flowEvent flowStop \
@@ -115,7 +116,7 @@ export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answ
 // devices, secrets and keys, accounts, webhooks, extensions' files, what runs outside a workspace (a clone, the CLI's
 // install, apps' windows: device's and Laki AI's aiShot, an app opened: aiOpenApp), the clock. hookAdd: a new webhook and its secret; presetSave: a profile's args and env, as
 // REMOTE_KEYS' presets; hook: agents' own (hookWho); tunnelStart, scheduleSet: S11
-export const REMOTE_NO = new Set(['scheduleCopy', 'secretForget', 'gitTidy', 'goalSet', 'flowImportSave', 'dataBackup', 'dataRestore', 'keptOpen', 'keptRm', 'uninstall',
+export const REMOTE_NO = new Set(['suggest', 'scheduleCopy', 'secretForget', 'gitTidy', 'goalSet', 'flowImportSave', 'dataBackup', 'dataRestore', 'keptOpen', 'keptRm', 'uninstall',
   'skillOpen', 'wsRepair', 'events', 'clientLog', 'tabUnbox', 'projectNetAllow', 'ticketMint', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'clientWho', 'diskTidy', 'proofShot', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext',
   'agentContextOpen', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'stateOwn', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'imageRead', 'remoteStart',
@@ -125,7 +126,7 @@ export const REMOTE_NO = new Set(['scheduleCopy', 'secretForget', 'gitTidy', 'go
   'widgetMock', 'widgetCheck', ...TICKS])
 // REMOTE_OK: the page may call it; main.ts' remoteNo still refuses some by what they say (widgetSet's on, a settingsSet of
 // REMOTE_KEYS, a share with no end, a project's scripts and auto-answer rules)
-export const REMOTE_OK = new Set(['tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'promptQuestions', 'promptImprove', 'goalClear',
+export const REMOTE_OK = new Set(['suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'promptQuestions', 'promptImprove', 'goalClear',
   'flowExport', 'flowImport', 'flowWaitEnd', 'signIn', 'mcpSignIn', 'keptList', 'agentVersions', 'secretKeep', 'wsSpend', 'tabBell', 'remoteKeep', 'agentLog', 'diskUsage',
   'mergeQueueStart', 'mergeQueueStop', 'archivedKeep', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet',
   ...'ping state projectAdd sampleNew sampleRm projectRm projectArchive updateIdle agentModels projectSet memoryAdd memoryRm projectFile projectTrust branches csMachines wsNew quickNew wsRm wsPeek overlapCheck wsStat wsArchive doctor hooksSeen wsFan answer unread seen show showDone browse timer browseDone wsRestore wsFork tabNew layoutSet layoutMove tabFocus uiDo todoAdd todoRm memoryCompact \

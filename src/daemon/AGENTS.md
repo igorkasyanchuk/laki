@@ -20,7 +20,8 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/daemon/e2e.ts` | S14, remote access end to end: HKDF-SHA-256 keys, AES-256-GCM frames with per-direction counters (`channel`, `first`), a device key wrapped by its cookie (`wrap`, `unwrap`); the page's half is `src/renderer/src/e2e.ts` (WebCrypto, IndexedDB) |
 | `src/daemon/resources.ts` | listening ports, memory and CPU by tab, process groups, sleep and wake |
 | `src/daemon/artifacts.ts` | a storage folder's artifacts and the published links, kept in its `.laki-links.json` (`.url` files moved in) |
-| `src/daemon/cap.ts` | a workspace's spend cap: its agents' meters summed (`capView`), the 80% notice, the stop and ask past it (`capTick`, `capToolEnd`), `capSet`, an agent's lower one only (`capRaises`) |
+| `src/daemon/cap.ts` | a workspace's spend cap: its agents' meters summed (`capView`), the 80% notice, the stop and ask past it (`capTick`, `capToolEnd`), `capSet`, an agent's lower one only (`capRaises`); the cost warning (`wsUsd`, `costWarnOf`, `wsCost`, told once per amount in `capTick`) |
+| `src/daemon/suggest.ts` | `laki suggest`: an agent's suggested task on its workspace (`suggest`, withdraw), the user's Start, Dismiss or Edit first's made (`suggestAnswer`) |
 | `src/daemon/meters.ts` | transcripts read as they grow: the context and usage meters, today's spend; the Reader's chat (`chatRead`), its background tasks and MCP calls |
 | `src/daemon/agentUsage.ts` | Grok's and Antigravity's chats by day and model, read only from their own files (Grok's `usage.json`, agy's conversation DB through node's sqlite: cloned, only its new steps read, past 32 MB in a worker, `agyWorker.ts`): the Usage page's and Today's rows |
 | `src/daemon/mcpApps.ts` | MCP Apps in the Reader: a claude call's MCP server (from its Claude config) asked for the tool's `ui://` page, `GET /mcp-app/…` with its CSP, the app's tool calls |

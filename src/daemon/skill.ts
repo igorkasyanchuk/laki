@@ -142,6 +142,8 @@ Unset: don't.
   preset): the user starts commands. \`send\` or \`screen\` on a tab of another workspace asks the user in the app first.
 - \`<ws>\` is a workspace id; \`<ws>/<tab>\` picks a tab (by default the agent's).
 - Don't steer or interrupt a busy agent unless asked: plain \`send\` queues it for its turn's end.
+- Work you notice outside your task (a flaky test, a bug next door) goes to \`laki suggest "<title>" --why "…" --prompt
+  "…"\`: a card the user starts or dismisses. Only work the user asked for goes to \`laki new\`.
 - The CLI talks to the Laki daemon over localhost. In a sandbox that blocks that, ask to run it outside.
 - \`unknown method\`: the running daemon is older than the CLI. Ask the user to restart it (the app's status
   bar offers it; agents resume).

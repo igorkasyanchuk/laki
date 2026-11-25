@@ -17,7 +17,7 @@ export type Tool = { name: string; description: string; inputSchema: object; max
 // a laki_more({ group }) away (mcp.ts); every tool runs by its name, listed or not. --all, LAKI_MCP_ALL=1 and Laki AI's
 // own backends list them all. Every tool has one (test/cli-more.test.ts)
 export const GROUPS: Record<string, { words: string; tools: string[] }> = {
-  core: { words: 'state, a new workspace, a message, a screen, wait, a diff, ask the user, alerts, progress, plan limits', tools: ['laki_state', 'laki_new_workspace', 'laki_send', 'laki_screen', 'laki_wait', 'laki_diff', 'laki_ask', 'laki_ask_agent', 'laki_alert', 'laki_progress', 'laki_secret', 'laki_limits'] },
+  core: { words: 'state, a new workspace, a message, a screen, wait, a diff, ask the user, alerts, progress, plan limits', tools: ['laki_state', 'laki_new_workspace', 'laki_suggest', 'laki_send', 'laki_screen', 'laki_wait', 'laki_diff', 'laki_ask', 'laki_ask_agent', 'laki_alert', 'laki_progress', 'laki_secret', 'laki_limits'] },
   sessions: { words: 'tabs, panes, shells and run scripts, names, stop, archive, open in, projects, profiles, notices', tools: ['laki_name', 'laki_new_tab', 'laki_update_when_idle', 'laki_stop', 'laki_remove', 'laki_archive', 'laki_delete', 'laki_open_in', 'laki_rename', 'laki_shell', 'laki_run', 'laki_panes', 'laki_actions', 'laki_run_action', 'laki_templates', 'laki_profiles', 'laki_find', 'laki_project', 'laki_notice', 'laki_ui', 'laki_script', 'laki_restore'] },
   prs: { words: "pull requests: a workspace's PR, its draft, the PR list", tools: ['laki_attach_pr', 'laki_pr_draft', 'laki_prs'] },
   schedule: { words: 'scheduled tasks, reminders, timers, to-dos', tools: ['laki_schedules', 'laki_schedule_add', 'laki_schedule_set', 'laki_reminder', 'laki_timer', 'laki_todo_add'] },
@@ -252,6 +252,12 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. mode: queue (the default: after its turn, now when it's idle), steer (into its running turn, where the agent reads messages while it works; else its turn is stopped first) or interrupt (its turn stopped, then sent). The result says which happened. Agents only, and never into a question one asks the user. Another workspace's tab: the user is asked first.",
     inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), text: str('the message'), mode: { type: 'string', enum: ['queue', 'steer', 'interrupt'], description: 'queue (default), steer or interrupt' } }, ['target', 'text']),
     run: async a => sentLine(await rpc('send', { target: a.target, text: a.text, mode: ['steer', 'interrupt'].includes(String(a.mode)) ? a.mode : 'queue', agent: true }, 150000)), // another workspace's: the user is asked first
+  },
+  {
+    name: 'laki_suggest',
+    description: "Suggest a task you noticed outside your own (a flaky test, a bug next door) instead of starting it: a card in Laki under your tab, which the user starts as a workspace of its own, edits first or dismisses; nothing starts without them. title: a few words; prompt: what an agent doing it would get, whole; why: what you saw. The same title while open is the same card; one the user dismissed is refused. withdraw: an id of yours they haven't answered. Work the user asked you for goes to laki_new_workspace instead.",
+    inputSchema: obj({ title: str('a few words'), prompt: str('the task, whole, for an agent of its own'), why: str('what you saw that makes it worth doing'), withdraw: str('instead: the id of a suggestion of yours to take back') }),
+    run: a => rpc('suggest', a.withdraw ? { withdraw: a.withdraw, ws: process.env.LAKI_WORKSPACE } : { title: a.title, prompt: a.prompt, why: a.why, ws: process.env.LAKI_WORKSPACE }),
   },
   {
     name: 'laki_name',

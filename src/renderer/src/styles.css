@@ -1340,6 +1340,9 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .show-strip .show-text { padding: var(--sp-1) var(--sp-5) var(--sp-3); white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto; font-size: var(--fs-3); } /* laki show's card (panels.tsx ShowStrip) */
 .show-strip .show-open { display: flex; flex-wrap: wrap; gap: var(--sp-3); padding: 0 var(--sp-5) var(--sp-4); }
 .show-strip .show-open button { display: inline-flex; align-items: center; gap: var(--sp-3); }
+.suggest-strip .suggest-one + .suggest-one { border-top: 1px solid var(--line); } /* #5: laki suggest's cards (panels.tsx SuggestStrip) */
+.suggest-strip .suggest-prompt { padding: 0 var(--sp-5) var(--sp-3); }
+.suggest-strip .suggest-prompt .show-text { padding: var(--sp-2) 0 0; max-height: 40vh; }
 .check-strip.s-failed, .check-strip.s-over { border-top-color: color-mix(in srgb, var(--error) 45%, var(--line)); } /* Done means checked (panels.tsx CheckStrip) */
 .check-strip .queue-head > .icon-svg { color: var(--waiting); } .check-strip.s-passed .queue-head > .icon-svg { color: var(--done); } /* its status mark, not its ✕ */
 .check-list li { flex-wrap: wrap; } .check-list li .queue-text { flex: 1; }

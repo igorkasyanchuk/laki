@@ -354,6 +354,7 @@ export type Workspace = {
   related?: string[] // GitHub PRs and issues it's about, not its primary: its prompt's (a session an agent started), a primary its own PR replaced, one you moved off
   from?: string // the workspace whose agent started it (laki new ., /laki:new, MCP): its prompt's PRs are only related
   fromTab?: string // …and that agent's tab (the one that ran laki new): Created by on the worker, its asks in that tab
+  suggests?: Suggestion[] // #5: tasks its agents suggested (laki suggest, daemon/suggest.ts): the open ones' cards, the answered kept to refuse again
   client?: string // T1: the trusted client (an app outside Laki: laki client) that started it, by its name then: Created by
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   touchedAt?: number // settings.archiveIdle's: the last look it saw, or when it was restored (ms)
@@ -1212,6 +1213,9 @@ export type Cap = { usd?: number; tokens?: number }
 export type CapView = { cap: Cap; usd?: number; tokens?: number; measured: boolean; share?: number }
 // #3: a workspace's cost warning (cap.ts costTick): past yellow its cost turns yellow, past red red, each told once;
 // Settings' (on: off unless true) or a project's own amounts. COST_WARN: what Settings fills in
+// #5: a task an agent suggested (laki suggest): its title, why, the prompt for a workspace of its own; tab: the agent's;
+// answered: yours (started: ws, the workspace it made), kept so the agent can't withdraw or suggest it again
+export type Suggestion = { id: string; title: string; why?: string; prompt: string; tab?: string; at: number; answered?: 'started' | 'dismissed'; ws?: string }
 export type CostWarn = { on?: boolean; yellow?: number; red?: number }
 export const COST_WARN = { yellow: 5, red: 20 }
 export type CostLevel = 'yellow' | 'red'

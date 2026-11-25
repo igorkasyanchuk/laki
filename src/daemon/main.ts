@@ -64,6 +64,7 @@ import { checkAgain, checkStop, checkTidy, goalClear, goalSet, proofShot } from 
 import { reviewDiff, reviewMark, longStop, longTurnTick, sideAsk, sideNew, sideState, tabHandover, turnDiff, turnFork, turnList, turnRewind, turnsDrop, turnsKept, turnsTidy, turnUndo } from './turns.ts' // turnStarts, turnEnds: each turn's changes, the next prompt
 import { alertAnswer, alertMacOnly, alertShow, alertsSeen, noticesTo } from './alerts.ts'
 import { capRaises, capTick } from './cap.ts'
+import { suggest, suggestAnswer } from './suggest.ts'
 import { secretAsk, secretForget, secretGive, secretKeep, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowHold, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust, flowTrustDiff, flowWaitEnd, flowExport, flowImport, flowImportSave } from './workflow.ts'
 import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetFromTerm, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetAnnotations, widgetStore, widgetTerm, termStop, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetFull, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -422,6 +423,8 @@ const api = {
   seen: p => core.seen(p.tab), // the Needs you list's Seen: its ● cleared, as a look does
   show: p => core.show({ ...p, tab: p.from?.tab ?? p.tab }), // laki show: a card under the caller's own tab (its process's, when it's in one)
   showDone: p => core.showDone(String(p.tab ?? '')), // its ✕
+  suggest: p => suggest(p), // #5: laki suggest: an agent's suggested task, a card under its tab (daemon/suggest.ts)
+  suggestAnswer: p => suggestAnswer(p), // its card's Start, Dismiss, and Edit first's workspace made (started): yours
   browse: p => core.browse(p),
   timer: p => core.timer(p),
   browseDone: p => core.browseDone(p),
@@ -879,7 +882,7 @@ const remoteNo = (method: string, p: Params) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
+const FROM = new Set(['suggest', 'suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
   'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
   'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
@@ -1375,7 +1378,7 @@ chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookL
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
   alertAnswer: p => (alertMacOnly(p) ? 'raise or remove a spend cap' : ''), // cap.ts' choices that raise it: the Mac's
 }
-const ANSWER_NO = new Set(['scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
+const ANSWER_NO = new Set(['suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
   'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
   'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy',
   'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext',

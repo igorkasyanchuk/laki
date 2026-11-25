@@ -88,6 +88,9 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Reader's box**: text you haven't sent stays, tab by tab, through ⇧⌘T, a restart or an archive; a chip changes a running Claude Code tab's permission mode, mid-turn too; a turn that ended on an API error offers *Continue* (or does it once by itself).
 - **Tidy on its own**: worktrees nobody touched for 3 to 30 days archived with Undo (off by default), never one with unsaved work or anything running.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
+- **Suggested tasks**: an agent that notices work outside its task (a flaky test, a bug next door) suggests it
+  (`laki suggest`) instead of starting it: a card under its tab with the why and the prompt, *Start*, *Edit first* or
+  *Dismiss*, and a bulb on its row. Nothing starts without you.
 - **Orchestrate**: a workspace an agent started says *Created by @lead* (a click goes to that tab), and the tab that started it has a workers dock: each worker's state, progress and question (answered there), failed ones until cleared, what they spent, and Allow N safe, Archive N done and Stop all, each asking first. The orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
   a workspace each, follow them up and bring their reports together. Agents also talk by name: `laki name backend`
   makes one `@backend` for the rest, `laki ask @backend "…"` asks it and prints its reply.

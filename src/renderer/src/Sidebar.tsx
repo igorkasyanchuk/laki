@@ -330,6 +330,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             <Icon name="alertCircle" size={11} />
           </span>
         )}
+        {!!w.suggests?.some(s => !s.answered) && (
+          <span className="ws-mark" data-tip={`Suggested by its agent: ${w.suggests.filter(s => !s.answered).map(s => s.title).join(' · ')} · open it to start or dismiss`} aria-label="A suggested task">
+            <Icon name="bulb" size={11} />
+          </span>
+        )}
         {w.cost?.level && !w.capOver && (
           <span className={`ws-mark ws-cost ${w.cost.level}`} data-tip={costWords(w.cost)} aria-label={`Cost past your ${w.cost.level} amount`}>
             <Icon name="dollar" size={11} />

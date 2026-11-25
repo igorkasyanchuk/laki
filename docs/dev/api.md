@@ -212,7 +212,7 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   before, its project's id; `wsSet` `name` sets it false; a workspace's `named`: you named it, `wsSet` `name` not from an
   agent (`wsSet` in `FROM`) or `wsNew` `named` with no `from` (the page's typed name, the CLI's `--name`): an agent's
   rename refused unless `asked` (`laki rename --asked`), `wsSet` `auto` (a Browsers page's title) passes it by), that prompt names the workspace instead and the tab keeps its
-  agent's name; a new Local one is named the name given, else `taskTitle` of its prompt (the renderer's `nameOf` too); MCP's `laki_new_tab` takes a `name`), `tabSet` (name, color, `muted`; a name sets `titled`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something; an agent's
+  agent's name; a new Local one is named the name given, else `taskTitle` of its prompt (the renderer's `nameOf` too); MCP's `laki_new_tab` takes a `name`), `tabSet` (name, color, `muted`; a name sets `titled`), `send` (`mode`: `queue`, `steer` or `interrupt`, #4: core's `sendMode`, the CLI's and MCP's default `queue`; its result's `sent`, `steered`, `interrupted` or `queued` (how many), `tools.ts` `sentLine` in words; `enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something; an agent's
   (main.ts `agentSend`): to an agent's tab (`agent: true`), or a terminal of its own workspace, which is then the agent's
   (`agentCaller`, core's `agentTyped`; its keys through `input` too) until you send or type there (`youTyped`: keys with
   no escape), another workspace's terminal refused before any ask), `queueClear`, `queueSet` (the whole list: an edit, a

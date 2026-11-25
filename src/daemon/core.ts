@@ -5496,7 +5496,7 @@ export const shellAgents = new Map<string, { agent: Agent; status: Status }>()
 // who runs a laki command: the tab main.ts finds its process in (tabOfPeer), else what its $LAKI_WORKSPACE and
 // $LAKI_TAB say (the CLI passes them): an agent when that tab is an agent's, or a shell tab running one (shellAgents: the
 // view's runs); you typing in a shell tab, or outside Laki, aren't. Its workspace, else nothing
-const agentTab = (from?: unknown) => {
+export const agentTab = (from?: unknown) => {
   const id = from && typeof from === 'object' && 'tab' in from && typeof from.tab === 'string' ? from.tab : '' // a call's from, as its request has it
   const t = id ? state.tabs.find(x => x.id === id) : undefined
   return t && (t.kind === 'agent' || shellAgents.has(t.id) || treeAgents.has(t.id) || typedBy.has(t.id)) ? t : undefined

@@ -33,13 +33,13 @@ const opens: string[] = [] // laki show's --open <folder|file|url>, again and ag
 const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
-const VALUED = new Set(['hook', 'hook-event', 'login', 'word', 'cap', 'after', 'project', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
+const VALUED = new Set(['why', 'withdraw', 'hook', 'hook-event', 'login', 'word', 'cap', 'after', 'project', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
 const BOOL = new Set(['any', 'reply', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'queue', 'steer', 'interrupt', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof', 'walk'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
 const ALIAS: Record<string, string> = { ext: 'widget', exts: 'widget', widgets: 'widget', flows: 'flow', workflow: 'flow', presets: 'preset', plans: 'plan' }
-const TEXT_AFTER: Record<string, number> = { send: 1, ask: 1, alert: 0, notice: 0, remind: 1, ai: 0, show: 0, secret: 0, progress: 1, 'memory add': 1, 'widget log': 1 }
+const TEXT_AFTER: Record<string, number> = { suggest: 0, send: 1, ask: 1, alert: 0, notice: 0, remind: 1, ai: 0, show: 0, secret: 0, progress: 1, 'memory add': 1, 'widget log': 1 }
 const EXTRA: Record<string, string[]> = { progress: ['--tab'], name: ['--tab'], diff: ['--message'], ship: ['--message'] } // not in USAGE: a tab's own by its id (tests, scripts), -m's long name
 function optNo(a: string) {
   const cmd = ALIAS[args[0]] ?? args[0]
@@ -690,6 +690,17 @@ async function main() {
       const ws = flags.ws === '.' ? process.env.LAKI_WORKSPACE : (flags.ws as string | undefined)
       const r = await rpc('reminderAdd', { at: when, text: words.join(' '), ws, tab: process.env.LAKI_TAB, ...(!process.env.LAKI_TAB && { by: 'the CLI' }), ...(flags.important && { important: true }) })
       return out(r, `reminder ${r.id} at ${new Date(r.at).toLocaleString()}${r.every ? `, then ${r.every}` : ''}${r.important ? ', as a card on screen' : ''}`)
+    }
+    case 'suggest': {
+      // #5: laki suggest "<title>" --prompt "…" [--why "…"] | --withdraw <id>: a task noticed outside this one, a card in
+      // Laki the user starts, edits or dismisses (nothing starts without them)
+      const from = process.env.LAKI_WORKSPACE
+      if (typeof flags.withdraw === 'string') {
+        const r = await rpc('suggest', { withdraw: flags.withdraw, ws: flags.ws ?? from })
+        return out(r, `withdrawn: ${r.withdrawn}`)
+      }
+      const r = await rpc('suggest', { title: rest.join(' '), prompt: flags.prompt, why: flags.why, ws: flags.ws ?? from })
+      return out(r, r.again ? `suggested already (${r.id}): the card is there` : `suggested (${r.id}): a card in Laki; the user starts it, edits it or dismisses it`)
     }
     case 'show': {
       // laki show "<text>" [--open <folder|file|url>…] [--title t]: a card under this tab in Laki, its buttons opening

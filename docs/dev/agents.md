@@ -606,6 +606,21 @@ with no hook and no key (a resumed chat's recap): `sweepRunning` (every 2s) sets
 without output when its last 15 lines lack "esc to interrupt" (claude and codex show it, and redraw, while
 they work).
 
+`send`'s `mode` (#4, core's `sendMode`; `laki send --queue|--steer|--interrupt`, MCP's `laki_send` `mode`): to an agent
+at work (running, no limit, awake, under its cap) `queue` is `whenIdle`, `steer` is `send`'s own `steer` where the
+tab's agent reads what's typed while it works (claude's and codex's, its profile's `steer` not false: `steerable`;
+a queue ahead of it still queues it), else it's interrupted: Esc (`input`), up to 5 s for `idle`, then typed ahead of the
+queue (deliver waits 800 ms after a turn's end, and finds it running). An idle agent gets it now; one that asks
+something, is at a limit, asleep or over its cap is never stopped (`send`'s rules queue it); a terminal: now.
+
+**Suggested tasks** (#5, `daemon/suggest.ts`): `suggest` (an agent's, `laki suggest`, MCP's `laki_suggest`) adds a
+`Suggestion` to its tab's workspace (`Workspace.suggests`; no agent caller: `ws`); the same title while open is that
+one (`again`), a dismissed one's title is refused, `withdraw` takes back one not answered. `suggestAnswer` (yours:
+AGENT_NO, ANSWER_NO) starts it (`wsNew` in its project with its prompt and title, no `fromTab`), dismisses it, or marks
+it `started` with the workspace New workspace made (Edit first: the renderer's `newInit.suggested`). The answered stay,
+`SUGGEST_MAX` of each, so neither comes back. The card: panels.tsx `SuggestStrip` under the tab that suggested it (gone:
+the workspace's first agent's), a bulb on its row.
+
 A turn that ends on an API error (`turn`'s `failed`, not a limit, a refused model or an Esc) keeps its line in `r.failed` (the view's `failed`, only while idle) until a new turn or `failDismiss`: the Reader, Needs you, One next step and the palette offer Continue, which is `send`'s `continue`. `settings.continueOnError`: `continueLater`, once per turn (`autoContinued`, `contSent`: a UserPromptSubmit that isn't its continue starts over), `LAKI_CONTINUE_MS` later, never in a workflow's tab.
 
 A running claude's permission mode: the footer (`claudeMode`), `tabMode`, the chip (`Reader.tsx` `modeItems`, also the tab's menu). S9: `claudeMode` says `default` only with the footer on screen (`FOOT_SEEN`: the input box's rule or `>` prompt, or `? for shortcuts`); without it (a transcript view, a menu, a start not drawn yet) it's `undefined`: the tab keeps the last mode seen with `modeUnknown` (the chip reads *Mode unknown*, its tip the last one), and `tabMode` refuses to press from a mode it can't read. ponytail: the marks are from Claude Code's screens as known in Nov 2026; a build that draws none of them would read as unknown. Not kept across a restart: a resume starts as `t.perm` says. An agent's `tabMode` is refused, and so is the key itself (main.ts `shiftTabNo`, for `input` and `send`: `SHIFT_TAB`, and `keyTail`, per tab, for an Esc in one call and `[Z` in the next, `queueNow`'s Esc too, moved only by `input` as a `send` may just be queued; a plain Esc goes through; `send`'s own escapes are stripped by `typeInto`, `noKeys`). ponytail: only those bytes: a key rebound in claude's `keybindings.json` or a slash command typed isn't.

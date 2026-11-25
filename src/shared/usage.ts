@@ -54,6 +54,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
   laki send <ws>[/<tab>]|@name [--queue|--steer|--interrupt] <text>
                                               type text into an agent: after its turn (--queue, --when-idle), into it, or stopping it
+  laki suggest <title> --prompt <task> [--why <why>] | --withdraw <id>
+                                              a task you noticed outside yours: a card the user starts, edits or dismisses
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
   laki bell <ws|tab> [--off]                  told once when it next finishes, asks, fails or hits a limit
   laki quiet [30m|1h|off]                     no notifications, sounds, cards or pushes for a while; off: a summary
@@ -262,6 +264,14 @@ asked in the app first.
   laki send a1b2 "Now add tests for it"
   laki send a1b2/codex --steer "Skip the e2e tests, they're broken on main"
   laki send @backend --interrupt "Stop: the API changed, rebase on main first"`,
+  suggest: `A task you noticed outside your own (a flaky test, a bug next door), for the user to start: a card under your
+tab in Laki with its title, --why and the --prompt (what an agent of its own would get), and a mark on the workspace's
+row. Start makes a new workspace with that prompt, Edit first opens New workspace filled in, Dismiss drops it; nothing
+starts without the user. The same title while its card is open is the same card; one the user dismissed is refused.
+--withdraw <id> takes back one the user hasn't answered. Work the user asked for goes to laki new instead.
+
+  laki suggest "Fix the flaky checkout test" --why "it failed twice while I ran the suite" --prompt "test/checkout.spec.ts fails about 1 run in 5 on the coupon step; find why and make it reliable"
+  laki suggest --withdraw 3fa2c1`,
   name: `Gives the agent in this tab (\$LAKI_TAB) a name other agents reach it by, in any workspace: @<name> works wherever a
 target goes (laki send, laki ask, laki screen). A word of letters, digits and dashes; one live agent per name (an ended
 one's goes to the next). It stays with the tab until the tab closes or its workspace is archived; laki name "" drops it.

@@ -244,7 +244,7 @@ export type AppBase = {
   newFor: string | undefined
   newImages: Shot[]
   newIn: (p: Project) => void | Promise<void>
-  newInit: (Partial<NewWsParams> & { linked?: boolean | undefined }) | undefined
+  newInit: (Partial<NewWsParams> & { linked?: boolean | undefined; suggested?: { ws: string; id: string } }) | undefined
   newTab: (preset: string, cmd?: string | undefined, w?: WorkspaceView | null, own?: boolean) => Promise<void | null>
   newTabActions: Action[]
   newWord: (p: Project) => "New browser" | "New terminal" | "New workspace"
@@ -342,7 +342,7 @@ export type AppBase = {
   setMaking: Dispatch<SetStateAction<{ key: number; project: string; place?: string | undefined; name: string }[]>>
   setNewFor: Dispatch<SetStateAction<string | undefined>>
   setNewImages: Dispatch<SetStateAction<Shot[]>>
-  setNewInit: Dispatch<SetStateAction<(Partial<NewWsParams> & { linked?: boolean | undefined }) | undefined>>
+  setNewInit: Dispatch<SetStateAction<(Partial<NewWsParams> & { linked?: boolean | undefined; suggested?: { ws: string; id: string } }) | undefined>>
   setOnboard: Dispatch<SetStateAction<{ done: string[]; seen?: boolean | undefined; off?: boolean | undefined }>>
   setOverlapsAt: Dispatch<SetStateAction<{ w: string; list?: Collision[] | undefined; err?: string | undefined } | null>>
   setPanelOpen: Dispatch<SetStateAction<boolean>>

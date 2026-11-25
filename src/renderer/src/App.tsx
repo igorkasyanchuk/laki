@@ -164,7 +164,7 @@ export function App() {
     else if (!dialog) toolShow()
   }, [dialog])
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
-  const [newInit, setNewInit] = useState<Partial<NewWsParams> & { linked?: boolean }>() // a laki://new link's prompt and name (linked: the page says so)
+  const [newInit, setNewInit] = useState<Partial<NewWsParams> & { linked?: boolean; suggested?: { ws: string; id: string } }>() // a laki://new link's prompt and name (linked: the page says so); suggested: a suggested task's Edit first (#5), answered once it's made
   const [newImages, setNewImages] = useState<Shot[]>([]) // the menu bar's screenshots, in the new workspace's prompt
   const [link, setLink] = useState<string>() // a laki:// link, routed once the view is in
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review

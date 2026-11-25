@@ -5,7 +5,7 @@ import { aiOn as aiOnOf } from '../../shared/types'
 import { hasCap } from '../../shared/caps'
 import { version } from '../../../package.json'
 import { COPILOT_INSTALL, CURSOR_INSTALL, INSTALL } from '../../shared/install'
-import { GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, planLeft, resetOf, usageOld, usageRow, type TabView, USAGE_AT, type View } from '../../shared/types'
+import { type Suggestion, GOAL_SAYS, REPO, AGENT_NAMES, type AgentModel, type AgentUsage, type CheckRun, type Doctor, type Agent, FAST, SANDBOX, SANDBOX_NO, sandboxOff, HOME_ACCOUNT, EFFORTS, isAgent, LIMIT_AGENTS, PERMS, permInArgs, type LogLine, MODELS, type ScriptRun, prIn, planLeft, resetOf, usageOld, usageRow, type TabView, USAGE_AT, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph, rollup } from './Glyph'
@@ -2507,6 +2507,43 @@ export function SecretStrip({ tab, onGive, kept = true }: { tab: TabView; onGive
       )}
       <div className="muted small">It goes to a file only you and the agent's commands can read, deleted after 24 hours; the agent gets the file's path, never the value.{keep || saved ? ' A kept one stays in the Keychain, never sent on its own.' : ''}</div>
     </form>
+  )
+}
+
+// #5: tasks an agent suggested (laki suggest), under its tab (none named: the workspace's first agent's): its title and
+// why, the prompt folded; Start (a workspace of its own), Edit first (New workspace filled in), Dismiss
+export function SuggestStrip({ list, onStart, onEdit, onDismiss }: { list: Suggestion[]; onStart: (s: Suggestion) => Promise<unknown>; onEdit: (s: Suggestion) => void; onDismiss: (s: Suggestion) => void }) {
+  const [busy, setBusy] = useState('')
+  if (!list.length) return null
+  return (
+    <div className="queue-strip show-strip suggest-strip" data-dock="bottom" role="region" aria-label={`${list.length} suggested task${list.length === 1 ? '' : 's'}`}>
+      {list.map(s => (
+        <div key={s.id} className="suggest-one">
+          <div className="queue-head">
+            <Icon name="bulb" size={13} />
+            <span className="queue-what">
+              <span className="muted">Suggested task ·</span> <b>{s.title}</b>
+            </span>
+          </div>
+          {s.why && <div className="show-text">{s.why}</div>}
+          <details className="suggest-prompt">
+            <summary className="muted small">The prompt</summary>
+            <div className="show-text mono small">{s.prompt}</div>
+          </details>
+          <div className="show-open">
+            <button className="primary" disabled={busy === s.id} data-tip="A new workspace of its own with this prompt" onClick={() => (setBusy(s.id), void onStart(s).finally(() => setBusy('')))}>
+              <Icon name="run" size={13} /> Start
+            </button>
+            <button data-tip="New workspace, filled in: change it first" onClick={() => onEdit(s)}>
+              Edit first
+            </button>
+            <button className="link" onClick={() => onDismiss(s)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 

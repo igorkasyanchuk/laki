@@ -633,6 +633,7 @@ export function Pages({ app }: { app: AppCtx }) {
                   },
                 )
             ).finally(gone)
+            if (newInit?.suggested) void call('suggestAnswer', { ...newInit.suggested, act: 'started', made: got[0].id }).catch(() => {}) // #5: Edit first's: its card goes
             if (page !== made.current.page) {
               // closed meanwhile: you went on with something else, which keeps the focus; the new one is a click away
               setReveal(r => [...r, ...got.map(w => w.id)])
