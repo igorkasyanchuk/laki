@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Remote access at a stable address pins the page's code on your phone: a file the tunnel changed is refused, the page warns and your Mac offers to stop remote access.
 - The rail's selection slides to the page you pick, as the Terminal | Reader switch does (Motion: None and Reduce motion keep it still).
 - An update went wrong? Settings › Updates' Go back to <version> restarts Laki as the version you had before, kept and checked when the update downloaded.
 - A shell tab shows its last screen after a Mac restart or a crash, dimmed above a line with when; never a Private workspace's.

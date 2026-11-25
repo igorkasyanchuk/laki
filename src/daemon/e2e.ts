@@ -3,8 +3,9 @@
 // link's #k=, never sent; or a paired device's key, given inside a sealed connection) with a salt the daemon sends in
 // clear as it opens, info E2E_INFO. Each frame AES-256-GCM, its 96-bit nonce 4 bytes of direction (0: the page's, 1:
 // the daemon's) then an 8-byte counter, each side's own: a repeated or lower one is refused. The page's half is
-// renderer/src/e2e.ts (WebCrypto, keys it can't read back). ponytail: the page's code still comes through the tunnel,
-// so this stops reading and logging, not a provider that changes the script (SECURITY.md)
+// renderer/src/e2e.ts (WebCrypto, keys it can't read back). ponytail: the page's code still comes through the tunnel:
+// at a stable address its service worker pins it after the first load (#P1, shared/pins.ts), a quick tunnel's not at all
+// (SECURITY.md)
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto'
 
 export const E2E_INFO = 'laki-remote-e2e-v1'

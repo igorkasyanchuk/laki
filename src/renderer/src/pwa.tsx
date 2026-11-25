@@ -3,7 +3,7 @@
 // service worker and offers Add to Home Screen; at a quick tunnel's it says why not. Installed, Notifications turns on
 // Web Push for this device (POST /push: its cookie says which)
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { unb64u } from './api'
+import { api, type Msg, onPins, unb64u } from './api'
 import { IconButton } from './ui'
 
 const far = typeof window !== 'undefined' && location.protocol === 'https:' && !(window as { bridge?: unknown }).bridge
@@ -27,10 +27,43 @@ export async function pwaStart() {
     add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' })
     add('meta', { name: 'theme-color', content: '#171412' })
     window.addEventListener('beforeinstallprompt', e => (e.preventDefault(), (offer = e as unknown as typeof offer), seq++, tell()))
-    if ('serviceWorker' in navigator) await navigator.serviceWorker.register('/sw.js').catch(() => {})
+    if ('serviceWorker' in navigator) {
+      await navigator.serviceWorker.register('/sw.js').catch(() => {})
+      navigator.serviceWorker.addEventListener('message', e => Array.isArray(e.data?.pinBad) && pinWarn(e.data.pinBad)) // #P1: a file asked for that isn't the Mac's
+      onPins(pinsGot)
+    }
   }
   seq++
   tell()
+}
+
+// #P1 (shared/pins.ts): the daemon's list of this page's files, from its sealed socket, to the service worker, which keeps
+// them; its answer: a file that isn't what the Mac serves (a warning over everything, the Mac told), or a newer list
+// swapped in (an update: this page reloads as it)
+function pinsGot(m: Msg) {
+  if (typeof m.v !== 'string' || !m.files || typeof m.files !== 'object') return
+  void navigator.serviceWorker.ready
+    .then(reg => {
+      const ch = new MessageChannel()
+      ch.port1.onmessage = e => (e.data?.bad?.length ? pinWarn(e.data.bad) : e.data?.swap && e.data.replaced && location.reload())
+      reg.active?.postMessage({ pins: { v: m.v, files: m.files } }, [ch.port2])
+    })
+    .catch(() => {})
+}
+let warned = false
+function pinWarn(bad: string[]) {
+  if (warned) return
+  warned = true
+  api.send('pinBad', { bad: bad.slice(0, 5) })
+  const box = document.createElement('div')
+  box.className = 'pin-warn'
+  box.setAttribute('role', 'alertdialog')
+  const h = document.createElement('h2')
+  h.textContent = 'Stop: this page was changed on the way'
+  const p = document.createElement('p')
+  p.textContent = `${bad.slice(0, 3).join(', ')} isn't what your Mac serves: something between them (the tunnel's provider) changed it. Laki kept the copy it trusts and told your Mac. Close this page, and use remote access again only once you know why.`
+  box.append(h, p)
+  document.body.append(box)
 }
 
 const push = (o: object) =>

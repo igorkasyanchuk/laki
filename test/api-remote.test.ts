@@ -1,14 +1,14 @@
 // The daemon's API, remote access and tunnels: the remote page, its token, origin and Host, paired devices' levels,
 // its app manifest and outbox, Touch ID's tickets, cloudflared's tunnels, refused WebSockets (split from api.test.ts)
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import WebSocket from 'ws'
 import { REMOTE_NO, REMOTE_OK } from '../src/daemon/gates.ts'
-import { connect, farKey, fresh, until, tokenOf, farFetch } from './helpers.ts'
+import { connect, farKey, fresh, until, tokenOf, farFetch, FarWs } from './helpers.ts'
 import { channel, keyOf, PAGE } from '../src/daemon/e2e.ts'
 
 test('a tunnel a killed daemon left running is stopped as the next daemon starts (L14)', async t => {
@@ -593,4 +593,40 @@ test("10b, remote access: the remote page's manifest has three shortcuts, each a
   }
   assert.deepEqual([m.id, m.start_url, m.display], ['/', '/', 'standalone'])
   assert.doesNotThrow(() => JSON.parse(JSON.stringify(m)))
+})
+
+test("#P1: a paired device at a stable address gets the page's files' hashes inside its sealed socket only: never in a clear frame or response", async t => {
+  const rig = await fresh(t)
+  const { port } = rig.info()
+  const page = rig.env.LAKI_PAGE
+  mkdirSync(join(page, 'assets'), { recursive: true })
+  writeFileSync(join(page, 'index.html'), '<title>Laki</title><script src="/assets/index-abcdefgh.js"></script>')
+  writeFileSync(join(page, 'assets/index-abcdefgh.js'), 'console.log(1)')
+  // My domain: cloudflared (the fake) signed in, its named tunnel laki on example.dev
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  mkdirSync(join(rig.home, '.cloudflared'), { recursive: true })
+  writeFileSync(join(rig.home, '.cloudflared/cert.pem'), 'a certificate')
+  writeFileSync(join(rig.home, '.cloudflared/6f1e0c1a-0000-4000-8000-000000000001.json'), '{}')
+  await rig.rpc('settingsSet', { tunnel: { name: 'laki', domain: 'example.dev' } })
+  const url = 'https://laki.example.dev'
+  const on = await rig.rpc('remoteStart', { hours: 1, host: '' })
+  const r = await fetch(`http://127.0.0.1:${port}/pin`, { method: 'POST', headers: { origin: url, 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1' }, body: JSON.stringify({ token: tokenOf(on.link), pin: on.pin }) })
+  const cookie = r.headers.get('set-cookie')!.split(';')[0]
+  const ws = new FarWs(port, url, { cookie }, 'device')
+  const raw: Buffer[] = []
+  ws.raw.on('message', d => raw.push(Buffer.from(d as Buffer)))
+  const pins = await new Promise<{ v: string; files: Record<string, string> }>((res, rej) => (ws.on('message', b => (m => m.ev === 'pins' && res(m))(JSON.parse(String(b)))), ws.once('error', rej)))
+  const sha = (s: string) => createHash('sha256').update(s).digest('base64')
+  assert.equal(pins.files['/'], sha(readFileSync(join(page, 'index.html'), 'utf8')))
+  assert.equal(pins.files['/assets/index-abcdefgh.js'], sha('console.log(1)'))
+  assert.ok(pins.files['/sw.js'] && pins.files['/manifest.webmanifest'])
+  ws.raw.close()
+  // never in clear: the socket's frames as they went, the page's files, the app's own state
+  const said = [Buffer.concat(raw).toString('latin1'), ...(await Promise.all(['/', '/sw.js', '/manifest.webmanifest', '/assets/index-abcdefgh.js'].map(p => fetch(`http://127.0.0.1:${port}${p}`, { headers: { host: 'laki.example.dev' } }).then(x => x.text())))), JSON.stringify(await rig.rpc('state'))]
+  for (const s of said) for (const h of [pins.v, pins.files['/assets/index-abcdefgh.js']]) assert.ok(!s.includes(h), `${h} in clear`)
+  // the worker's script carries the decision (shared/pins.ts), its source as it is
+  const sw = await fetch(`http://127.0.0.1:${port}/sw.js`).then(x => x.text())
+  assert.match(sw, /const decide = \(function/)
+  assert.doesNotThrow(() => new Function(sw), 'the worker parses')
+  await rig.rpc('remoteStop') // a quick tunnel's page has no worker (M4's test: no /sw.js there), so no list: opened() sends it only while pwaOn
 })

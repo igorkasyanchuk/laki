@@ -257,6 +257,7 @@ class Api {
           else return
         }
         if (m.ev === 'e2e-device' && typeof m.key === 'string') return void baseKey(fromB64(m.key)).then(k => keyPut('device', k)) // D3: its next visits (no link) seal with it
+        if (m.ev === 'pins') return void ((pinsLast = m), pinsTo?.(m)) // #P1: this page's files' hashes, sealed: to its service worker (pwa.tsx)
         if (m.ev === 'locked') this.locked = true // D6: a passkey device's page, until its state comes
         if (m.ev === undefined && m.id !== undefined) { // a reply; an event may carry an id of its own (a workflow run's)
           const w = this.waiting.get(m.id)
@@ -417,6 +418,10 @@ export function reportView(what: () => { tab: string | null; tabs: string[]; bro
 // (the AI window) hands it to main, which shows the app window and routes it there
 let lakiLink: ((url: string) => void) | undefined
 export const onLakiLink = (f: (url: string) => void) => void (lakiLink = f)
+// #P1: the daemon's list of this page's files (its sealed socket's pins event), to pwa.tsx's pinsGot; one come first is kept
+let pinsLast: Msg | undefined
+let pinsTo: ((m: Msg) => void) | undefined
+export const onPins = (f: (m: Msg) => void) => void ((pinsTo = f), pinsLast && f(pinsLast))
 // a file:/// link's path (a .url file's: a page an agent made on this Mac); '' for anything else
 // what the page on screen tells Laki AI's floating chat as you ask (App's whereNow): the open workflow, its file
 export const pageNow: { workflow?: () => string } = {}

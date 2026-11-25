@@ -7,7 +7,8 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | file | what |
 |---|---|
 | `src/shared/vocab.ts` | #V1: speech-to-text's project words: `vocabOf` (the terms, the focused workspace's first, none Recording mode hides), `spokenOf`, `vocabFix` (whole spoken runs into the term, its `swaps`) |
-| `src/shared/update.ts` | updates' pure parts: `newer`, `releaseOf`, `feedOf`, `RELEASES` |
+| `src/shared/update.ts` | updates' pure parts: `newer`, `releaseOf`, `feedOf`, `RELEASES`; Go back's `keepWhy`, `backRefused`, `backOf`, `STATE_V` |
+| `src/shared/pins.ts` | #P1: the remote page pinned: `Pins`, `pinDecide` (swap only when every fetched file matches; its source goes into the service worker) |
 | `src/shared/helper.ts` | `helperBin`: the binary what runs as node runs on (Laki Node.app, Linux's `laki-node`, when the build has it, else the binary given), `appOf`, `appBinOk` (S1's window binary), `NODE_APP` (docs/dev/helper.md) |
 | `src/shared/tgmd.ts` | an agent's Markdown as Telegram's HTML (`mdToTg`): telegram.ts' pushes and a workspace card's last reply |
 | `src/shared/env.ts` | `envSplit`: the secret-looking names hideSecrets keeps from agent tabs, `AGENT_KEY_ENV` (each agent's own sign-in key), `envAllowOf` |

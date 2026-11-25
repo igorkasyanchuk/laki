@@ -206,9 +206,16 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   through for that session); Codex's is on or off only. Neither limits what the agent itself sends to its model, nor
   WebFetch, which Claude Code's list doesn't cover. Only you can change a profile's network or a project's list.
 
-- Remote access end to end stops a tunnel's provider from reading and logging what's said, not from changing it: the
-  page's own code is still served through the tunnel, so a provider that rewrites that script could read what the page
-  sees. A paired device's page that came from a link before S14 has no key of its own: Add a device again.
+- Remote access end to end stops a tunnel's provider from reading and logging what's said. At a stable address (My
+  domain, Tailscale) a paired device's page also pins its own code: the Mac sends the SHA-256 of each page file inside
+  the sealed connection, and the page's service worker serves those files from its own cache, takes one it hasn't kept
+  only if it matches, and takes an update only if every file it had matches; a file that doesn't is refused, the page
+  shows a warning over everything and the Mac a notice with *Stop remote access*. What that leaves: the device's first
+  load is trust on first use (its code came through the tunnel before anything was pinned); the service worker's own
+  script is fetched by the browser itself (at least daily), so a provider that replaces sw.js replaces the guard; and a
+  provider that blocks the worker's updates can only keep the device on the old page (deny service), not read it. A quick
+  tunnel (a new address each start) has no service worker, so no pinning: its page's code is as the tunnel serves it. A
+  paired device's page that came from a link before S14 has no key of its own: Add a device again.
 - The pty host (the process that keeps terminals alive across a restart) listens on a unix socket of yours alone
   (`<data>/pty.sock`, 0600, or one in the temp folder when the data folder's path is long). A connection's first frame
   must carry the host's secret: 32 random bytes it writes as it starts to `<data>/pty.secret` (0600, always in the data

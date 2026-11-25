@@ -4,8 +4,8 @@
 import './starterEnv.ts' // first: the starter's git and npm variables gone before any module reads process.env
 import { earlyHost } from './ptyEarly.ts' // second: the pty host starting beside the daemon's other modules as they load
 import { execFileSync } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
-import { chmodSync, closeSync, existsSync, fstatSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { createHash, randomBytes } from 'node:crypto'
+import { chmodSync, closeSync, existsSync, fstatSync, linkSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { Socket } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
@@ -42,6 +42,7 @@ import * as prMod from './pr.ts'
 import * as filesMod from './files.ts'
 import * as remoteMod from './remote.ts'
 import * as e2e from './e2e.ts'
+import { pinDecide, type Pins } from '../shared/pins.ts'
 import { activity, activityList, clip80 } from './remoteLog.ts'
 import { agentDid, agentLogOf } from './agentLog.ts'
 import { CONFIRM, confirmKnown, confirmOf, type ConfirmWhat, TICKET_MS } from '../shared/confirm.ts'
@@ -219,19 +220,86 @@ const OFFLINE = `<!doctype html><meta charset="utf-8"><meta name="viewport" cont
 const swJs = () => `const CACHE = 'laki-shell-${(() => { try { return statSync(join(pageDir ?? '', 'index.html')).mtimeMs } catch { return 0 } })()}'
 const SHELL = ['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png']
 const OFFLINE = ${JSON.stringify(OFFLINE)}
+// #P1 (shared/pins.ts): the daemon's list of the page's files, given in its sealed socket; LIST holds it and the cache
+// that has its files (laki-pin-<n>), the one switch point of a swap
+const META = 'laki-pins'
+const LIST = '/.laki-pins'
+const decide = (${pinDecide.toString()})
+let pins
+const pinsRead = () => (pins !== undefined ? Promise.resolve(pins) : caches.open(META).then(c => c.match(LIST)).then(r => (r ? r.json() : null)).then(p => (pins = p), () => (pins = null)))
+const hashOf = buf => crypto.subtle.digest('SHA-256', buf).then(d => btoa(String.fromCharCode(...new Uint8Array(d))))
+const tell = m => self.clients.matchAll({ includeUncontrolled: true }).then(cs => cs.forEach(c => c.postMessage(m)))
+async function pinsTake(next) {
+  const old = await pinsRead()
+  if (old && old.v === next.v) return { swap: true, bad: [], same: true }
+  const was = old ? await caches.open(old.cache) : undefined
+  const had = was ? (await was.keys()).map(r => new URL(r.url).pathname) : []
+  const want = {}
+  for (const p of new Set(['/', ...had])) if (next.files[p]) want[p] = next.files[p] // what it had (and the page): the rest checked as it's asked for
+  const got = {}
+  const bodies = {}
+  const paths = Object.keys(want)
+  for (let i = 0; i < paths.length; i += 6)
+    await Promise.all(paths.slice(i, i + 6).map(async p => {
+      let r = was && old.files[p] === want[p] ? await was.match(p) : undefined
+      if (!r) r = await fetch(p, { cache: 'no-store', credentials: 'same-origin', redirect: 'error' }).catch(() => undefined)
+      if (!r || !r.ok) return
+      const buf = await r.arrayBuffer()
+      got[p] = await hashOf(buf)
+      bodies[p] = new Response(buf, { headers: { 'content-type': r.headers.get('content-type') || 'application/octet-stream' } })
+    }))
+  const d = decide(want, got)
+  if (!d.swap) return d
+  const name = 'laki-pin-' + Date.now()
+  const c = await caches.open(name)
+  for (const p of paths) await c.put(p, bodies[p])
+  pins = { v: next.v, files: next.files, cache: name }
+  await (await caches.open(META)).put(LIST, new Response(JSON.stringify(pins), { headers: { 'content-type': 'application/json' } }))
+  if (old) await caches.delete(old.cache)
+  return { ...d, replaced: !!old }
+}
+// a pinned path: its cached copy; one not cached yet only once the network's matches (cached then); a mismatch told
+async function pinned(r, path) {
+  const p = await pinsRead()
+  if (!p || !p.files[path]) return undefined
+  const c = await caches.open(p.cache)
+  const hit = await c.match(path)
+  if (hit) return hit
+  const res = await fetch(r, path === '/' ? { cache: 'no-store' } : {}).catch(() => undefined)
+  if (!res || !res.ok) return res
+  const buf = await res.clone().arrayBuffer()
+  if ((await hashOf(buf)) !== p.files[path]) return tell({ pinBad: [path] }), Response.error()
+  await c.put(path, res.clone())
+  return res
+}
+self.addEventListener('message', e => {
+  const next = e.data && e.data.pins
+  if (!next || typeof next.v !== 'string' || !next.files || typeof next.files !== 'object') return
+  const port = e.ports && e.ports[0]
+  e.waitUntil(pinsTake(next).then(d => port && port.postMessage(d), x => port && port.postMessage({ swap: false, bad: [], error: String(x) })))
+})
 self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())))
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && !k.startsWith('laki-pin')).map(k => caches.delete(k)))).then(() => self.clients.claim())))
 self.addEventListener('fetch', e => {
   const r = e.request
   const u = new URL(r.url)
   if (r.method !== 'GET' || u.origin !== location.origin) return
   const off = () => new Response(OFFLINE, { headers: { 'content-type': 'text/html; charset=utf-8' } })
-  if (r.mode === 'navigate') return e.respondWith(fetch(r).then(res => (res.status >= 500 ? off() : res), off)) // 5xx: the tunnel's (Cloudflare's 530, a relay's 502), never the page's
+  // the page: the network's answer first (a sign-in's redirect, the tunnel's 5xx: the Mac unreachable), then, pinned,
+  // the kept index.html in place of what came
+  if (r.mode === 'navigate')
+    return e.respondWith(fetch(r).then(async res => {
+      if (res.status >= 500) return off()
+      if (!res.ok || res.type !== 'basic') return res
+      const p = await pinsRead()
+      const kept = p && p.files['/'] ? await pinned(r, '/') : undefined
+      return kept && kept.ok ? new Response(kept.body, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } }) : kept || res
+    }, off))
   if (!u.pathname.startsWith('/assets/') && !SHELL.includes(u.pathname)) return
-  e.respondWith(fetch(r).then(res => {
+  e.respondWith(pinned(r, u.pathname).then(x => x || fetch(r).then(res => {
     if (res.ok && res.type === 'basic' && !res.redirected) { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)) }
     return res
-  }).catch(() => caches.match(r).then(x => x || Response.error())))
+  }).catch(() => caches.match(r).then(x => x || Response.error()))))
 })
 self.addEventListener('push', e => {
   let d = {}
@@ -247,6 +315,40 @@ self.addEventListener('notificationclick', e => {
   e.waitUntil(clients.matchAll({ type: 'window' }).then(l => (l[0] ? l[0].focus() : clients.openWindow('/'))))
 })
 `
+// #P1: the remote page's files and their SHA-256 (shared/pins.ts): / (index.html), assets/, the icons, the manifest and
+// sw.js as served; again once the page's build changes (index.html's mtime: an update while this daemon runs)
+let pinsMemo: { at: number; pins: Pins } | undefined
+export function pinsNow(): Pins | undefined {
+  if (!pageDir) return undefined
+  let at = 0
+  try {
+    at = statSync(join(pageDir, 'index.html')).mtimeMs
+  } catch {
+    return undefined
+  }
+  if (pinsMemo?.at === at) return pinsMemo.pins
+  const h = (b: Buffer | string) => createHash('sha256').update(b).digest('base64')
+  const files: Record<string, string> = { '/': h(readFileSync(join(pageDir, 'index.html'))), '/sw.js': h(swJs()), '/manifest.webmanifest': h(MANIFEST) }
+  const walk = (d: string, rel: string) => {
+    for (const f of readdirSync(d, { withFileTypes: true })) f.isDirectory() ? walk(join(d, f.name), `${rel}${f.name}/`) : f.isFile() && (files[`${rel}${f.name}`] = h(readFileSync(join(d, f.name))))
+  }
+  if (existsSync(join(pageDir, 'assets'))) walk(join(pageDir, 'assets'), '/assets/')
+  for (const p of PWA_ICONS) if (existsSync(join(pageDir, p))) files[p] = h(readFileSync(join(pageDir, p)))
+  pinsMemo = { at, pins: { v: h(JSON.stringify(Object.entries(files).sort())), files } }
+  return pinsMemo.pins
+}
+// #P1: a device's worker found a page file that isn't the one this Mac serves (pinned, its hash differs): the tunnel
+// changed it on the way. A notice with Stop remote access, once an hour
+let pinBadAt = 0
+function pinBad(device: string, bad: unknown) {
+  const paths = (Array.isArray(bad) ? bad : []).filter((p): p is string => typeof p === 'string').map(p => p.slice(0, 120)).slice(0, 5)
+  log(`remote access: device ${device}'s page found ${paths.join(', ') || 'a file'} changed on the way`)
+  if (Date.now() - pinBadAt < 3_600_000) return
+  pinBadAt = Date.now()
+  void Promise.resolve(alertShow({ title: "Remote access: the page was changed on the way", text: `A paired device got ${paths.join(', ') || 'a page file'} different from what this Mac serves: the tunnel's provider (or something between) may be altering it. The device refused it.`, choices: ['Stop remote access', 'Keep it on'] }, 'notice', 'Laki', undefined, ['Stop remote access']))
+    .then(a => (a as { choice?: string }).choice === 'Stop remote access' && remoteMod.remoteStop())
+    .catch(() => {})
+}
 function pwaPage(path: string, res: ServerResponse) {
   const no = () => (res.writeHead(404, { 'content-type': 'text/plain' }), res.end('not found'))
   if (PWA_ICONS.has(path)) return remoteMod.remoteOn() ? page(path, res) : no()
@@ -2250,6 +2352,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     } else first()
     const dk = device && ch ? remoteMod.deviceKeyNew(req.headers.cookie) : undefined // S14: a paired device's own key, given inside its sealed socket (its next visits have no link)
     if (dk) ws.send(ch!.seal(JSON.stringify({ ev: 'e2e-device', key: dk.toString('base64') }))) // past a locked page's filter: it can't come in again without it
+    if (device && ch && remoteMod.pwaOn()) (p => p && ws.send(ch.seal(JSON.stringify({ ev: 'pins', ...p }))))(pinsNow()) // #P1: the page's files' hashes, sealed only (a quick tunnel: no worker to pin them)
     if (!c.remote) core.envAgain()
     if (!c.locked) widgetAsks(c), noticesTo(c), termAsksTo(c) // an extension's asks still waiting: this window shows them too; and the notices up (D6: a locked page's once it unlocks)
     if (core.clients.size === 1) widgetTick(undefined, 'open'), scheduleMod.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
@@ -2272,6 +2375,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         if (c.locked && !UNLOCK.has(m.method)) return m.id !== undefined && c.send({ id: m.id, error: 'locked: unlock with Face ID, Touch ID or the PIN' })
         c.at = now
       }
+      if (m.method === 'pinBad') return void (c.device && ch && pinBad(c.device, m.params?.bad)) // #P1: its worker's report, a paired device's sealed socket only (no api method: nothing else may say it)
       if (m.method === 'attach') {
         const sock = local.get(c)
         try {

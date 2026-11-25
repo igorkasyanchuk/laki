@@ -422,3 +422,25 @@ keeps it in IndexedDB (`laki-e2e`, `keys`: `link`, `device`), and seals with thi
 a kept link one; sends go through `out` one after another (their counters in order), frames are opened in the order
 they came. A 4426 or a `bad key` close says so on the splash. The rig's `tokenOf` keeps a link's secret by origin for
 `farFetch` and `FarWs` (test/helpers.ts).
+
+### The page pinned (#P1)
+
+`shared/pins.ts`. main.ts `pinsNow`: the SHA-256 (base64) of `/` (index.html), every file under `assets/`, the icons,
+`/manifest.webmanifest` and `/sw.js` as served, and `v` (the hash of that list); made again once index.html's mtime
+moves (an update under a running daemon). `opened` sends it as `{ ev: 'pins', v, files }` inside a paired device's
+sealed socket only, and only while `pwaOn` (a stable address: a quick tunnel's page has no worker). The page (`api.ts`
+keeps the last one, `onPins`) hands it to `pwa.tsx pinsGot`, which posts it to the active worker with a MessageChannel.
+The worker (`swJs`): `pinsTake` keeps the list and the name of the cache that holds its files in `laki-pins`
+(`/.laki-pins`, the one switch point); a list it has (`v`) is nothing to do; else what it had cached, and `/`, are
+fetched (`no-store`; a file whose hash didn't change is taken from its old cache) and hashed with WebCrypto, and
+`pinDecide` (its source put into the worker) says swap (all match: a new `laki-pin-<time>` cache, the list, the old
+cache deleted; `replaced`: the page reloads as the new build) or keep (`bad`: the old cache and list stay). `pinned`
+answers a listed path: its cached copy, else the network's once its hash matches (then cached), else `Response.error()`
+and `{ pinBad }` to every page. A navigation goes to the network first (a sign-in's redirect, a 5xx's offline page,
+4xx as they are), and a 200 is answered with the pinned index.html. `activate` keeps `laki-pin*` caches. A mismatch:
+`pinWarn` puts `.pin-warn` over the page (no way past it) and sends `pinBad` on the socket, which main.ts takes from a
+paired device's sealed socket only (not an api method): a line in daemon.log and, once an hour, a notice with *Stop
+remote access*. Tests: test/pins.test.ts (`pinDecide`, as the worker gets it), test/api-remote.test.ts (the list only
+inside the sealed socket, never in a clear frame or response; the worker parses). The worker itself was walked once in
+headless Chrome over CDP (pin, a changed file served from the cache, a changed index.html, a mismatched update kept, a
+matching one swapped); the in-app browser pane registers no service workers.
