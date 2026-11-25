@@ -29,3 +29,7 @@
 /* Settings' kept secrets (KeptSecrets): a row each, its name, where it's kept, Remove */
 .kept-secrets { display: flex; flex-direction: column; gap: var(--sp-2); }
 .kept-secrets .row { align-items: center; gap: var(--sp-3); }
+
+/* #6: Import's list of the agents' own MCP servers: the checkbox its own size (not an input's full width), the text the rest */
+.mcp-import > label.switch-row > input[type='checkbox'] { flex: none; width: auto; }
+.mcp-import > label.switch-row > .grow { min-width: 0; overflow-wrap: anywhere; }
