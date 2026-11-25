@@ -32,11 +32,14 @@ agent-refused, not remote). Tested in `test/fallback.test.ts`.
 `AgentVersions`, behind the `agent.versions` cap). `CLIS`: claude, codex, gemini, grok, opencode and cursor
 (`cursor-agent`), each with its npm package and its own updater. `agentVersions` finds each on the daemon's PATH, runs
 `--version` (8 s), and reads how it was installed off its real path (`howOf`): a global `node_modules` (npm, bun or pnpm:
-the package and `npm install -g <pkg>@latest`…), Homebrew's `Cellar` or `Caskroom` (`brew upgrade [--cask] <name>`),
+the package and `npm install -g <pkg>@<the newest shown>`, `@latest` while none is known…), Homebrew's `Cellar` or `Caskroom` (`brew upgrade [--cask] <name>`),
 else its installer (`claude update`, `opencode upgrade`, `cursor-agent update`; none known: no Update). The newest:
-npm's registry (`<pkg>/latest`, its package or the CLI's known one), kept 6 hours (`fresh` looks now; offline keeps the
-last); `LAKI_NPM_REGISTRY` is tests' fake, and the rig without it asks nothing. `outdated` (a CLI with a newer version
-out, not updating) is the view's `agentUpdates`: the rail's Settings says which in its tooltip, and has a dot with `settings.updateDot` (off unless set: Agents & profiles › Versions). `agentVersionsTick`
+npm's registry (the package's document `<pkg>`: `dist-tags.latest` and its `time`, one request, its package or the CLI's
+known one), kept 6 hours (`fresh` looks now; offline keeps the last); `LAKI_NPM_REGISTRY` is tests' fake, and the rig
+without it asks nothing. Settings' `updateDelay` (days) applies to an npm, bun or pnpm install: a newest younger than
+that is listed with `newestAt` and `offerAt` (when it's offered; `-1`: the registry gave no date, held back) and not
+counted; one with its own updater or Homebrew's gets `noDelay` (it installs what that gives). `outdated` (a CLI with a
+newer version out and offered, not updating) is the view's `agentUpdates`: the rail's Settings says which in its tooltip, and has a dot with `settings.updateDot` (off unless set: Agents & profiles › Versions). `agentVersionsTick`
 (6 h, and a minute after start). `agentUpdate` runs the command as a `script` tab (it stays when it ends, with its exit
 code: a shell's would close) named `update <name>` in the Terminals workspace `update agents` (made once); one at a time
 per CLI. The row says running, done (and, with tabs of it running, that they keep their version until restarted) or

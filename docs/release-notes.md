@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The Update delay applies to agent CLIs too: a version younger than it waits (its age and the day it's offered shown), and Update installs the exact version shown.
 - `laki client add --bind`: a trusted client's token works only from the program that first uses it; another program's call is refused, with Revoke or Allow this program in the window.
 - Fewer tooltips in the sidebar: none on projects, groups, Show more and a workspace being made, where the row says it already.
 - Secrets in the Keychain are stored encrypted with Laki's own key while its window is open, so a plain `security` call from an agent's tab can't read them.

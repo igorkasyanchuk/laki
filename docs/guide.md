@@ -2700,7 +2700,11 @@ a click away; one from before keeps its own).
 - *Agents & profiles* › *Versions*: each agent CLI on this Mac (Claude Code, Codex, Antigravity, Grok, OpenCode, Cursor) with
   its version, the newest out and how it was installed (npm, Homebrew or its own installer). *Update* runs its own
   update in a terminal tab you can watch (*Show*), and the row says how it went; a failed one shows its exit code and
-  *Retry*. Tick several for *Update selected*. Tabs already running keep their version until restarted. When an update
+  *Retry*. Tick several for *Update selected*. Tabs already running keep their version until restarted. An npm, bun or
+  pnpm install updates to the exact version shown, and Settings › General's *Update delay* applies: a newer version
+  younger than that is listed with its age and the day it's offered (one the registry gives no date for is held back),
+  and *Update* asks once more first. A CLI with its own updater or from Homebrew updates to whatever that gives: the row
+  says the delay doesn't apply. When an update
   is out, Settings on the rail says so in its tooltip, and has a dot with *A dot on Settings when an agent update is
   out* on (off by default).
 - *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Antigravity, Grok, OpenCode, or any command); a

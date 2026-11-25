@@ -33,13 +33,15 @@ const realOk = (p: string) => {
 }
 // how it was installed, from where its command really is: a global node_modules (npm's, bun's, pnpm's: its package),
 // Homebrew's Cellar (a formula) or Caskroom (a cask); else its own installer
-export function howOf(real: string, self?: string): { how: string; pkg?: string; cmd?: string } {
+// version: the exact one to install (the one Versions shows), else latest
+export function howOf(real: string, self?: string, version = 'latest'): { how: string; pkg?: string; cmd?: string } {
   const nm = real.lastIndexOf(`${sep}node_modules${sep}`)
   if (nm >= 0) {
     const [a, b] = real.slice(nm + 14).split(sep)
     const pkg = a.startsWith('@') && b ? `${a}/${b}` : a
     const how = /[/\\]\.bun[/\\]/.test(real) ? 'bun' : /[/\\]pnpm[/\\]/.test(real) ? 'pnpm' : 'npm'
-    return { how, pkg, cmd: how === 'bun' ? `bun add -g ${pkg}@latest` : how === 'pnpm' ? `pnpm add -g ${pkg}@latest` : `npm install -g ${pkg}@latest` }
+    const at = `${pkg}@${version}`
+    return { how, pkg, cmd: how === 'bun' ? `bun add -g ${at}` : how === 'pnpm' ? `pnpm add -g ${at}` : `npm install -g ${at}` }
   }
   const brew = /[/\\](Cellar|Caskroom)[/\\]([^/\\]+)[/\\]/.exec(real)
   if (brew) return { how: 'Homebrew', cmd: `brew upgrade ${brew[1] === 'Caskroom' ? '--cask ' : ''}${brew[2]}` }
@@ -54,14 +56,25 @@ export const older = (a: string, b: string) => {
 }
 
 const NEWEST_KEPT = 6 * 3600e3
-let newest: { at: number; v: Record<string, string | undefined> } = { at: 0, v: {} }
-async function latest(pkg: string) {
+type Newest = { version: string; at?: number } // at: when the registry says it was published (none: unknown)
+let newest: { at: number; v: Record<string, Newest | undefined> } = { at: 0, v: {} }
+// the package's document (one request): its latest tag and that version's time
+async function latest(pkg: string): Promise<Newest | undefined> {
   const registry = process.env.LAKI_NPM_REGISTRY || (inRig() ? '' : 'https://registry.npmjs.org')
   if (!registry) return undefined
-  const r = await fetch(`${registry}/${pkg.replace('/', '%2f')}/latest`, { signal: AbortSignal.timeout(8000), redirect: 'error' }).catch(() => null)
-  const v = r?.ok ? ((await r.json().catch(() => ({}))) as { version?: unknown }).version : undefined
-  return typeof v === 'string' && /^\d+\.\d+\.\d+[\w.+-]*$/.test(v) && v.length < 40 ? v : undefined
+  const r = await fetch(`${registry}/${pkg.replace('/', '%2f')}`, { signal: AbortSignal.timeout(15000), redirect: 'error' }).catch(() => null)
+  const d = (r?.ok ? await r.json().catch(() => ({})) : {}) as { 'dist-tags'?: { latest?: unknown }; time?: Record<string, unknown> }
+  const v = d['dist-tags']?.latest
+  if (!(typeof v === 'string' && /^\d+\.\d+\.\d+[\w.+-]*$/.test(v) && v.length < 40)) return undefined
+  const at = Date.parse(String(d.time?.[v] ?? ''))
+  return { version: v, ...(Number.isFinite(at) && { at }) }
 }
+// #A9b: Settings › General's Update delay for the agents' CLIs too: a version is offered once it's that many days old
+// (unset or 0: at once; with a delay, one without a date never, until it has one); a CLI with its own updater (or
+// Homebrew's) updates to whatever that gives: the delay doesn't apply there
+const DAY = 86400e3
+const delayDays = () => Math.max(0, Number(state.settings?.updateDelay) || 0)
+export const offerAt = (n: Newest, days = delayDays()) => (!days ? 0 : n.at === undefined ? Infinity : n.at + days * DAY) // when it's offered
 // updates: the last update tab of each CLI (its own until the next)
 const updates = new Map<string, { tab: string; ws: string }>()
 export let outdated: string[] = [] // the view's agentUpdates: the names of the CLIs with a newer version out
@@ -78,7 +91,7 @@ export async function agentVersions(p: { fresh?: boolean } = {}): Promise<AgentC
     }),
   )
   if (p.fresh || Date.now() - newest.at > NEWEST_KEPT) {
-    const v: Record<string, string | undefined> = {}
+    const v: Record<string, Newest | undefined> = {}
     await Promise.all(found.map(async f => (f.path && (f.pkg ?? f.c.npm) ? (v[f.c.id] = await latest((f.pkg ?? f.c.npm)!).catch(() => undefined)) : undefined))) // none on npm (Cursor's): no newest
     newest = { at: Date.now(), v: (f => (Object.values(f).some(Boolean) ? f : newest.v))(v) } // offline: the last ones kept
   }
@@ -89,10 +102,13 @@ export async function agentVersions(p: { fresh?: boolean } = {}): Promise<AgentC
     const update = u && t ? { tab: t.id, ws: u.ws, state: !s || !s.exited ? 'running' : s.exitCode === 0 ? 'done' : 'failed', ...(s?.exited && { code: s.exitCode ?? undefined }) } as AgentCli['update'] : undefined
     const running = state.tabs.filter(x => x.kind === 'agent' && (f.c.id === 'cursor' || f.c.id === 'copilot' ? x.preset === 'acp' && (f.c.id === 'cursor' ? isCursor : isCopilot)(presetOf(x) ?? { cmd: x.cmd, acp: true }) : x.preset === f.c.id) && sessions.get(x.id) && !sessions.get(x.id)!.exited).length
     const nv = newest.v[f.c.id]
-    return { id: f.c.id, name: f.c.name, ...(f.path && { path: f.path, version: f.version, how: f.how, cmd: f.cmd }), ...(nv && { newest: nv }), ...(running && { running }), ...(update && { update }) } as AgentCli
+    const pinned = !!f.pkg // npm, bun, pnpm: the exact version; else its own updater's (no delay)
+    const offer = nv && pinned ? offerAt(nv) : 0
+    const cmd = pinned && nv ? howOf(realpathSync(f.path!), f.c.self, nv.version).cmd : f.cmd
+    return { id: f.c.id, name: f.c.name, ...(f.path && { path: f.path, version: f.version, how: f.how, cmd }), ...(nv && { newest: nv.version, ...(nv.at !== undefined && { newestAt: nv.at }) }), ...(offer > Date.now() && { offerAt: offer === Infinity ? -1 : offer }), ...(f.path && !pinned && delayDays() > 0 && { noDelay: true }), ...(running && { running }), ...(update && { update }) } as AgentCli
   })
   const was = outdated.join()
-  outdated = out.filter(a => a.version && a.newest && older(a.version, a.newest) && a.update?.state !== 'running').map(a => a.name)
+  outdated = out.filter(a => a.version && a.newest && older(a.version, a.newest) && !a.offerAt && a.update?.state !== 'running').map(a => a.name) // too young for the delay: listed, not counted
   if (outdated.join() !== was) changed()
   return out
 }
@@ -106,7 +122,9 @@ export async function agentUpdate(p: { agent: string }) {
   if (!c) throw new Error(`no agent CLI ${p.agent}: ${CLIS.map(x => x.id).join(', ')}`)
   const path = pathOf(c.cmd)
   if (!path) throw new Error(`${c.name} isn't installed (${c.cmd} isn't on PATH)`)
-  const { cmd } = howOf(realpathSync(path), c.self)
+  const real = realpathSync(path)
+  const nv = newest.v[c.id]
+  const { cmd } = howOf(real, c.self, howOf(real).pkg && nv ? nv.version : 'latest') // the exact version Versions showed
   if (!cmd) throw new Error(`${c.name}: Laki doesn't know how it was installed: update it the way you installed it`)
   const was = updates.get(c.id)
   const s = was && sessions.get(was.tab)

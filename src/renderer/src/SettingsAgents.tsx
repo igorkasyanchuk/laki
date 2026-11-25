@@ -6,7 +6,7 @@ import { heardText, micTest, TEST_MS, useLevel } from './voice'
 import { SILENCES } from '../../shared/talk'
 import { api, bridge } from './api'
 import { Group, Says } from './SettingsKit'
-import { askText, Icon, IconButton, Switch } from './ui'
+import { ask, askText, Icon, IconButton, Switch } from './ui'
 import { BACKENDS, money, tokens } from './Ai'
 import { mostRoom } from './Usage'
 import { shortPath } from './text'
@@ -948,7 +948,17 @@ export function AgentVersions({ openTab }: { openTab?: (tab: string) => void }) 
     const t = setInterval(() => void load(), 3000)
     return () => clearInterval(t)
   }, [busy])
-  const update = (ids: string[]) => (setErr(''), Promise.all(ids.map(id => api.call('agentUpdate', { agent: id }).catch(e => setErr(String((e as Error).message))))).then(() => (setPicked([]), load())))
+  // #A9b: one too young for Settings' Update delay asks once more, naming its age
+  const age = (a: AgentCli) => (a.newestAt ? agoWords(Date.now() - a.newestAt) : 'of unknown age')
+  const young = (a: AgentCli) => out(a) && !!a.offerAt
+  const update = async (ids: string[]) => {
+    setErr('')
+    const early = (list ?? []).filter(a => ids.includes(a.id) && young(a))
+    if (early.length && !(await ask(early.length === 1 ? `Update ${early[0].name} to ${early[0].newest} now?` : `Update ${early.length} agents to versions newer than your delay?`, { text: `${early.map(a => `${a.name} ${a.newest} is ${age(a)}`).join('; ')}: your Update delay would offer ${early.length === 1 ? 'it' : 'them'} later.`, ok: 'Update now' }))) return
+    await Promise.all(ids.map(id => api.call('agentUpdate', { agent: id }).catch(e => setErr(String((e as Error).message)))))
+    setPicked([])
+    void load()
+  }
   const out = (a: AgentCli) => !!(a.version && a.newest && olderThan(a.version, a.newest))
   const can = (a: AgentCli) => !!a.path && !!a.cmd && a.update?.state !== 'running'
   if (!list) return <p className="muted small">{err || 'Looking at the installed agents…'}</p>
@@ -966,8 +976,9 @@ export function AgentVersions({ openTab }: { openTab?: (tab: string) => void }) 
               ) : (
                 <span className="small" data-tip={`${a.path}${a.cmd ? ` · updates with: ${a.cmd}` : ''}`}>
                   <span className="mono">{a.version ?? '?'}</span>
-                  {out(a) ? <span className="warn"> → <span className="mono">{a.newest}</span> is out</span> : a.newest && a.version ? <span className="muted"> · up to date</span> : a.newest ? <span className="muted"> · the newest is {a.newest}</span> : <span className="muted"> · newest not known</span>}
+                  {young(a) ? <span className="muted"> · <span className="mono">{a.newest}</span> is out, {age(a)}: {a.offerAt! > 0 ? `offered ${new Date(a.offerAt!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : 'held back (no date from the registry)'}</span> : out(a) ? <span className="warn"> → <span className="mono">{a.newest}</span> is out</span> : a.newest && a.version ? <span className="muted"> · up to date</span> : a.newest ? <span className="muted"> · the newest is {a.newest}</span> : <span className="muted"> · newest not known</span>}
                   <span className="muted"> · {a.how}</span>
+                  {a.noDelay && <span className="muted"> · its own updater: the Update delay doesn't apply</span>}
                 </span>
               )}
               {u?.state === 'running' && <span className="muted small"> · updating…</span>}
@@ -999,3 +1010,5 @@ export function AgentVersions({ openTab }: { openTab?: (tab: string) => void }) 
     </div>
   )
 }
+// how old, in words: an hour old, 3 days old
+const agoWords = (ms: number) => (h => (h < 1 ? 'under an hour old' : h < 48 ? `${h} hour${h === 1 ? '' : 's'} old` : `${Math.floor(h / 24)} days old`))(Math.floor(ms / 3600e3))
