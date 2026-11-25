@@ -409,3 +409,41 @@ test("cap: a workspace's spend cap: 80% one notice; 100% stops its turn and asks
   assert.deepEqual((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).cap, { usd: 2 })
   await until(async () => !(await rig.tab(ws.id)).queue?.length, 'its queue sent')
 })
+
+test("cost warning: a workspace past yellow, then red: colored, told once each; a raised amount tells again; a project's own off", async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('settingsSet', { costWarn: { on: true, yellow: -1 } }), /a cost warning's yellow: dollars/)
+  await rig.rpc('settingsSet', { costWarn: { on: true, yellow: 0.5, red: 1 } })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const app = await rig.connect()
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, 'chat-2.jsonl')
+  // opus 4.6: $25 a million output tokens
+  const answer = (id: string, output: number) => line({ type: 'assistant', timestamp: new Date().toISOString(), message: { id, model: 'claude-opus-4-6', usage: { input_tokens: 0, output_tokens: output } } })
+  const cost = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).cost
+  const notices = () => app.events.filter(e => e.ev === 'notice')
+  await until(async () => (await rig.rpc('state')).workspaces.length, 'its view') // the meters' first read: before any chat is priced
+  writeFileSync(file, answer('a', 34000)) // $0.85
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-2' } })
+  await until(() => notices().length === 1, 'yellow told')
+  assert.match(notices()[0].text, /has cost \$0\.85 so far, past your yellow amount of \$0\.5/)
+  assert.deepEqual(await cost(), { usd: 0.85, level: 'yellow', warn: { yellow: 0.5, red: 1 } })
+  appendFileSync(file, answer('b', 8000)) // $1.05
+  await until(async () => (await cost()).level === 'red', 'red')
+  await until(() => notices().length === 2, 'red told')
+  assert.match(notices()[1].text, /past your red amount of \$1\./)
+  await new Promise(ok => setTimeout(ok, 600))
+  assert.equal(notices().length, 2, 'each told once')
+  // a raised red: yellow again, told as it passes the new one
+  await rig.rpc('settingsSet', { costWarn: { on: true, yellow: 0.5, red: 2 } })
+  await until(async () => (await cost()).level === 'yellow', 'under the new red')
+  appendFileSync(file, answer('c', 40000)) // $2.05
+  await until(() => notices().length === 3, 'the new red told')
+  assert.match(notices()[2].text, /past your red amount of \$2\./)
+  // its project's own: off there
+  await rig.rpc('projectSet', { id: p.id, costWarn: { on: false } })
+  assert.deepEqual(await cost(), { usd: 2.05 })
+})

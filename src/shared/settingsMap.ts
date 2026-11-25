@@ -52,6 +52,7 @@ export const FIND: [string, string, string?][] = [
   ['notifications', "Glow the window's edge when an agent waits", 'edge glow border pulse waiting attention another tab'],
   ['general', 'Continue after an API error by itself', 'retry overloaded 500 connection dropped auto resume failed'],
   ['notifications', 'A turn runs longer than', 'tell me when long stuck loop hours hung alert notification time'],
+  ['notifications', 'A workspace costs over', 'cost spend money dollars expensive budget warning yellow red price burn loop subagents'],
   ['notifications', 'A plan limit is', 'plan limit nearly used usage 5-hour weekly session quota notify 90% threshold claude codex'],
   ['webhook', 'Phone pushes', 'notifications webhook phone push ntfy slack json notify waiting done'],
   ['telegram', 'Telegram', 'telegram bot botfather phone push notify chat messenger answer tap pair'],

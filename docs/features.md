@@ -63,7 +63,7 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
 - **Notifications** (Settings › Notifications, after General): Quiet, macOS notifications and their sound, then a table
   of what tells you where: a row per event (an agent waits, a turn finished, CI failing, a plan limit, a long turn, a
-  timer), a column per place (macOS, a card on screen, the phone, the sound), the edge glow and the Dock's bounce.
+  workspace's cost past your amounts, a timer), a column per place (macOS, a card on screen, the phone, the sound), the edge glow and the Dock's bounce.
 - **Quiet**: no notifications, sounds, cards or phone pushes for 30 minutes, an hour or until 9:00 (the menu bar's
   menu, ⌘K, `laki quiet 1h`, Settings › Notifications); asks still show in Needs you and `laki alert` still comes. As it
   ends, one notification and card sum up what waits, finished and failed.

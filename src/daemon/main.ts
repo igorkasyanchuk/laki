@@ -1474,6 +1474,7 @@ function agentNo(method: string, p: Params) {
   else if (method === 'presetSave' && p.set && typeof p.set === 'object' && 'wrap' in p.set) notAgent(p, "change a profile's wrapper sandbox")
   else if (method === 'projectSet' && p.allow !== undefined) notAgent(p, "change a project's auto-answer rules (what Laki allows for every agent: the user's, in Settings)")
   else if (method === 'projectSet' && p.alwaysAsk !== undefined) notAgent(p, "change what a project always asks for (the user's, in Settings)")
+  else if (method === 'projectSet' && p.costWarn !== undefined) notAgent(p, "change a project's cost warning (the user's, in Settings)")
   else if (method === 'wsSet' && p.important !== undefined) notAgent(p, 'mark a workspace important (its asks come as cards over every app: the user picks which)')
   else if (method === 'projectTrust' && p.hash !== undefined) notAgent(p, "trust a project's .laki.json")
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")

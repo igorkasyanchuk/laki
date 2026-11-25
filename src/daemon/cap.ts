@@ -6,7 +6,7 @@
 // access at Answer only can't change it (wsSet's keys) nor pick a choice that raises it (alerts.ts' mac). A workflow's
 // own budget holds in its runs too: whichever ends first stops it. core.ts imports it; capTick runs after meterTick.
 // ponytail: a closed tab's spend leaves the sum (its chat isn't read any more); a host's tabs aren't metered
-import { type Cap, type CapView, capSpent, capText, type Tab, type Workspace } from '../shared/types.ts'
+import { type Cap, type CapView, capSpent, capText, COST_WARN, type CostLevel, type CostWarn, type Tab, type Workspace } from '../shared/types.ts'
 import { alertShow } from './alerts.ts'
 import { changed, findWs, input, log, presetOf, queueResume, rtOf, save, sessions, state, wsLog } from './core.ts'
 import { meterView } from './meters.ts'
@@ -77,10 +77,74 @@ const tell = (w: Workspace, text: string, choices?: string[], mac?: string[]) =>
   }
 }
 
+// #3: a workspace's cost warning. Its agents' priced chats summed (the status bar's tabs' meters; none priced: none);
+// the amounts its project sets (on: false, none there), else Settings' when on, else none. Past yellow its cost shows
+// yellow, past red red; each amount is told once, as its cost goes past it while Laki watches: one passed while Laki
+// was off (a restart's first read) is marked told, never told late. A changed amount tells again.
+// ponytail: a claude chat's subagents count as its meter does (their own transcripts aren't read)
+export function wsUsd(w: { id: string }) {
+  let usd = 0
+  let priced = false
+  for (const t of agents(w)) {
+    const c = meterView(t).usage?.cost
+    if (c !== undefined) (usd += c), (priced = true)
+  }
+  return priced ? Math.round(usd * 100) / 100 : undefined
+}
+const amount = (v: unknown) => (typeof v === 'number' && v >= 0.01 && v <= 100000 ? Math.round(v * 100) / 100 : undefined)
+// what a call says for one (Settings' or a project's): its amounts, on; null or {}: none
+export function costWarnParse(v: unknown): CostWarn | undefined {
+  if (v == null || typeof v !== 'object') return
+  const o = v as Record<string, unknown>
+  for (const k of ['yellow', 'red'] as const) if (o[k] != null && amount(o[k]) === undefined) throw new Error(`a cost warning's ${k}: dollars, 0.01 to 100000`)
+  const c: CostWarn = { ...(typeof o.on === 'boolean' && { on: o.on }), ...(amount(o.yellow) && { yellow: amount(o.yellow) }), ...(amount(o.red) && { red: amount(o.red) }) }
+  return Object.keys(c).length ? c : undefined
+}
+export function costWarnOf(w: Workspace): CostWarn | undefined {
+  const own = state.projects.find(p => p.id === w.project)?.costWarn
+  const all = state.settings?.costWarn
+  if (own?.on === false) return
+  const mine = !!(amount(own?.yellow) || amount(own?.red))
+  if (!mine && all?.on !== true) return
+  const pick = (k: CostLevel) => (mine ? amount(own?.[k]) : (amount(all?.[k]) ?? COST_WARN[k]))
+  const warn = { yellow: pick('yellow'), red: pick('red') }
+  return warn.yellow || warn.red ? warn : undefined
+}
+export function wsCost(w: Workspace) {
+  const usd = wsUsd(w)
+  if (usd === undefined) return
+  const warn = costWarnOf(w)
+  const level: CostLevel | undefined = warn?.red && usd >= warn.red ? 'red' : warn?.yellow && usd >= warn.yellow ? 'yellow' : undefined
+  return { usd, ...(level && { level }), ...(warn && { warn }) }
+}
+const costSeen = new Map<string, number>() // a workspace's cost at the last tick: a crossing is one seen live
+let costRead = false // the first tick read every chat there was: a workspace priced only since starts at $0
+function costTick(w: Workspace) {
+  const usd = wsUsd(w)
+  if (usd === undefined) return
+  const was = costSeen.get(w.id) ?? (costRead ? 0 : undefined)
+  costSeen.set(w.id, usd)
+  const warn = costWarnOf(w)
+  if (!warn) return
+  let told = false
+  for (const k of ['red', 'yellow'] as const) { // past both at once: red's told, yellow's marked
+    const at = warn[k]
+    if (!at || usd < at || w.costTold?.[k] === at) continue
+    w.costTold = { ...w.costTold, [k]: at }
+    save()
+    changed()
+    if (was === undefined || was >= at || told) continue
+    told = true
+    wsLog(w, `its agents passed $${at} (the cost warning's ${k})`)
+    void tell(w, `${nameOf(w)} has cost $${usd.toFixed(2)} so far, past your ${k} amount of $${at}.`)
+  }
+}
+
 // every meter tick: the 80% notice, the 100% stop; while over, a turn that started anyway (typed in its terminal) stopped
 export function capTick() {
   for (const w of state.workspaces) {
     if (w.archived) continue
+    costTick(w)
     const v = capView(w)
     if (!v?.share) continue
     if (v.share >= 1 && !w.capOver) over(w, v)
@@ -91,6 +155,7 @@ export function capTick() {
     }
     if (w.capOver) stopTurns(w)
   }
+  costRead = true
 }
 
 const stopped = new Map<string, number>() // tab → the capOver its Esc was for: once each

@@ -8,7 +8,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -174,6 +174,7 @@ export type AppSettings = Paint & {
   notifySound?: string // a macOS sound, 'none', or unset: the default
   quietMinutes?: number // U8: Quiet's default length in minutes (unset: 60)
   longTurn?: number // minutes: a turn working that long notifies (unset, 0: off)
+  costWarn?: CostWarn // #3: a workspace's cost past these dollars: colored, told once each (on only if true)
   continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
@@ -1917,6 +1918,18 @@ export function SettingsPage(p: {
                         ))}
                         <option value={-1}>Custom (minutes)</option>
                       </select>
+                    </span>,
+                  ],
+                  [
+                    <span className="nt-when">
+                      <Switch on={s.costWarn?.on === true} tip="Its cost turns yellow, then red, in the status bar and the sidebar, and Laki tells you once at each amount. A project can set its own (Settings › its name)" onChange={v => set({ costWarn: { ...COST_WARN, ...s.costWarn, on: v } })} />
+                      A workspace costs over $
+                      {(['yellow', 'red'] as const).map((k, i) => (
+                        <span key={k} className="nt-when">
+                          {i > 0 && ', then $'}
+                          <input type="number" min={0.01} step={1} style={{ width: 64 }} aria-label={`Cost warning: ${k}`} disabled={s.costWarn?.on !== true} value={s.costWarn?.[k] ?? COST_WARN[k]} onChange={e => Number(e.target.value) > 0 && set({ costWarn: { ...COST_WARN, ...s.costWarn, [k]: Number(e.target.value) } })} />
+                        </span>
+                      ))}
                     </span>,
                   ],
                   [

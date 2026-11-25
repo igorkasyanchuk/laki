@@ -213,6 +213,7 @@ export type Project = {
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
   cap?: Cap // a new workspace's spend cap here, unless its agent's profile has one (cap.ts)
+  costWarn?: CostWarn // #3: its workspaces' cost warning amounts, over Settings' (on: false turns it off here)
   memory?: Memory[] // the project page's Memory, newest last: the user's (MEMORY_MAX) and what agents learned (auto, MEMORY_MAX); claude and codex get both at every start
   compacted?: CompactRun // its learned memories' last compaction (daemon/memory.ts): when, how many before and after, why, or what failed
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
@@ -305,6 +306,7 @@ export type Workspace = {
   cap?: Cap // its spend cap (cap.ts): its own, {} none; unset: its agent's profile's, else its project's
   capOver?: number // when it went over its cap: its turns stopped, sends wait in its tabs' queues until you add to it or remove it
   capTold?: boolean // its 80% notice sent (for the cap as it is)
+  costTold?: Partial<Record<CostLevel, number>> // #3: the cost warning's amounts it was told at (a higher one tells again)
   project: string
   path: string
   host?: string // its project's SSH host: path is there
@@ -844,6 +846,7 @@ export type Settings = {
   inHooks?: InHook[] // Settings › Webhooks: the hooks a POST from outside starts workflows by (inbound.ts; their secrets in <data>/hooks)
   continueOnError?: boolean // a turn ended on an API error is continued by itself, once, after a minute (unset: off)
   longTurn?: number // minutes: a turn working that long notifies, once (unset, 0: off)
+  costWarn?: CostWarn // #3: a workspace's agents past yellow or red dollars: its cost colored, told once each (unset: off)
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   archiveIdle?: number // days: a worktree nobody touched for so long is archived when it loses nothing, with Undo (unset, 0: off)
   archiveIdleKeepPR?: boolean // archiveIdle leaves one with an open PR alone (unset: on)
@@ -1205,6 +1208,14 @@ export type Cap = { usd?: number; tokens?: number }
 // cap: the one that holds (its own, its profile's, its project's); usd, tokens: what its tabs' meters say; measured: none of
 // its agents is priced or counts tokens (a command profile): the cap shows not measured
 export type CapView = { cap: Cap; usd?: number; tokens?: number; measured: boolean; share?: number }
+// #3: a workspace's cost warning (cap.ts costTick): past yellow its cost turns yellow, past red red, each told once;
+// Settings' (on: off unless true) or a project's own amounts. COST_WARN: what Settings fills in
+export type CostWarn = { on?: boolean; yellow?: number; red?: number }
+export const COST_WARN = { yellow: 5, red: 20 }
+export type CostLevel = 'yellow' | 'red'
+// its cost and the amounts, in words (the status bar's and the sidebar's tooltips)
+export const costWords = (c: { usd: number; level?: CostLevel; warn?: CostWarn }) =>
+  `Its agents' chats: $${c.usd.toFixed(2)} at API prices${c.level ? `, past your ${c.level} amount` : ''}${c.warn ? ` · yellow at ${c.warn.yellow ? `$${c.warn.yellow}` : 'none'}, red at ${c.warn.red ? `$${c.warn.red}` : 'none'}` : ''}`
 const capBig = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n))
 const capMoney = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`
 export const capText = (c: Cap) => [c.usd && capMoney(c.usd), c.tokens && `${capBig(c.tokens)} tokens`].filter(Boolean).join(' or ') || 'none'
@@ -1319,7 +1330,7 @@ export type Stat = { add: number; del: number; files: number; dirty: number; mad
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
 // a workspace's linked ticket (daemon/tickets.ts: its project's Ticket script)
 export type Ticket = { key: string; title?: string; status?: string; url?: string }
-export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; spend?: CapView /* its spend cap and what its agents spent against it (cap.ts) */; broken?: Broken /* T13: its worktree broke (wsRepair) */; ticket?: Ticket; annotAt?: number /* P6: when its extensions' notes on diff lines changed (widgetAnnotations) */; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; proof?: Proof; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
+export type WorkspaceView = Omit<Workspace, 'pending'> & { pending?: PendingView; spend?: CapView /* its spend cap and what its agents spent against it (cap.ts) */; cost?: { usd: number; level?: CostLevel; warn?: CostWarn } /* #3: its agents' chats at API prices, past its warning's amounts (cap.ts costOf) */; broken?: Broken /* T13: its worktree broke (wsRepair) */; ticket?: Ticket; annotAt?: number /* P6: when its extensions' notes on diff lines changed (widgetAnnotations) */; setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; overlaps?: Collision[]; check?: CheckRun; proof?: Proof; artifacts?: number; links?: Link[]; artKey?: string; wtKey?: string } // artKey: its artifacts' pages' key (GET /artifact/<artKey>/<ws>/…); wtKey: its worktree's files' (GET /worktree/…: View as page)
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports

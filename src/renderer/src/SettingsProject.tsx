@@ -4,7 +4,7 @@ import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { bridge } from './api'
 import { ask, Icon, IconButton, iconItems, iconWords, ProjectMark, Switch, TAB_COLORS, useMenu } from './ui'
 import { MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
-import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows, type SecretKept } from '../../shared/types'
+import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, COST_WARN, type CostWarn, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows, type SecretKept } from '../../shared/types'
 import { Group, Says, Scope } from './SettingsKit'
 import { emojiOf } from '../../shared/icons'
 import { ALWAYS_ASK_EG, type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
@@ -125,7 +125,7 @@ export function FolderField({ value, placeholder, label, onChange }: { value?: s
     </span>
   )
 }
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; repoTemplates?: Template[]; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[]; alwaysAsk?: string[] }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; repoTemplates?: Template[]; notes?: string; memory?: Memory[]; color?: string; icon?: string; allow?: AllowRule[]; alwaysAsk?: string[]; costWarn?: CostWarn }
 
 // a project's MCP servers (shared/mcp.ts): each a name, a command (its args one per line) or a URL, its env, and the
 // profiles it's on for (all when none is picked); Claude Code and Codex take them by flags as a tab starts, the others
@@ -343,6 +343,34 @@ export function ActionsField({ value = [], onChange, taken = [] }: { value?: Run
   )
 }
 
+// #3: a project's cost warning: Settings' (none of its own), its own amounts, or off here
+function CostWarnField({ value, onSave }: { value?: CostWarn; onSave: (v: CostWarn | null) => unknown }) {
+  const mode = value?.on === false ? 'off' : value?.yellow || value?.red ? 'own' : 'all'
+  const own = { yellow: value?.yellow ?? COST_WARN.yellow, red: value?.red ?? COST_WARN.red }
+  return (
+    <Group title="Cost warning" hint="Its workspaces' cost turns yellow, then red, past these dollars (its agents' chats at API prices), and Laki tells you once at each">
+      <div className="setting-box">
+        <label className="switch-row">
+          <span className="nt-when">
+            <select aria-label="Cost warning" value={mode} onChange={e => onSave(e.target.value === 'off' ? { on: false } : e.target.value === 'own' ? own : null)}>
+              <option value="all">As in Settings › Notifications</option>
+              <option value="own">Its own amounts</option>
+              <option value="off">Off here</option>
+            </select>
+            {mode === 'own' &&
+              (['yellow', 'red'] as const).map(k => (
+                <span key={k} className="nt-when">
+                  {k} $
+                  <input type="number" min={0.01} step={1} style={{ width: 64 }} aria-label={`Cost warning: ${k}`} value={own[k]} onChange={e => Number(e.target.value) > 0 && onSave({ ...own, [k]: Number(e.target.value) })} />
+                </span>
+              ))}
+          </span>
+        </label>
+      </div>
+    </Group>
+  )
+}
+
 // F14: a project's auto-answer rules: each one's tool, pattern and how often it answered; Remove; a new one checked
 // as the daemon checks it (rulePattern), which says why when it refuses one
 function AllowRules({ rules, onSave }: { rules: AllowRule[]; onSave: (allow: AllowRule[]) => Promise<unknown> }) {
@@ -471,7 +499,7 @@ export function ProjectSection(p: {
   onMemory?: () => void // Settings' Memory row: the project page's Memory
   onAllow?: (allow: AllowRule[]) => Promise<unknown> // F14: its auto-answer rules, the whole list (refused: the daemon says why)
   onAlwaysAsk?: (globs: string[]) => Promise<unknown> // F15: its Always ask for, the whole list
-  onSave: (o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string }) => unknown // color, icon: saved as they're picked
+  onSave: (o: { name?: string; config: ProjectConfig; notes?: string; color?: string; icon?: string; costWarn?: CostWarn | null }) => unknown // color, icon, costWarn: saved as they're picked
   kept?: { list: SecretKept[]; forget: (k: SecretKept) => Promise<unknown> } // the secrets kept for this project (laki secret's Keep)
 }) {
   const [name, setName] = useState(p.project.name)
@@ -546,6 +574,7 @@ export function ProjectSection(p: {
           </div>
         </Group>
       )}
+      <CostWarnField value={p.project.costWarn} onSave={costWarn => p.onSave({ config: c, costWarn })} />
       {p.onAllow && <AllowRules rules={p.project.allow ?? []} onSave={p.onAllow} />}
       {p.onAlwaysAsk && <AlwaysAsk globs={p.project.alwaysAsk ?? []} onSave={p.onAlwaysAsk} />}
       {!p.noNotes && (

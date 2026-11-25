@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Warn when a workspace gets expensive: past your yellow and red amounts ($5 and $20 to start) its cost turns yellow, then red, and Laki tells you once at each (Settings › Notifications; a project can set its own).
 - `laki send` to a working agent queues it for after its turn by default; `--steer` puts it into the running turn, `--interrupt` stops the turn first, and the reply says which happened.
 
 ## 0.64.0 · Nov 25, 2026

@@ -1,7 +1,7 @@
 // the status bar (settings.statusBar, on unless false): under the terminals, or the wide one under everything (wideBar); App's, read from AppCtx
 import type { AppCtx } from './appCtx'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, UsageButton, usageText } from './Usage'
-import { type AiCredits, aiOn } from '../../shared/types'
+import { type AiCredits, aiOn, costWords } from '../../shared/types'
 import { BgButton } from './BgTasks'
 import { FLOW_ENDED } from '../../shared/workflow'
 import { Icon, IconButton, MidText, Num } from './ui'
@@ -46,6 +46,12 @@ export function statusBarOf(app: AppCtx) {
                   <Num value={`${ctxPct(tab.context)}%`} />
                   {!!tab.skills?.length && <span className="sb-skills" aria-hidden><Icon name="bookOpen" size={12} />{tab.skills.length}</span>}
                 </button>
+              )}
+              {ws.cost?.warn && (
+                // #3: its agents' cost while a cost warning holds for it: yellow, then red past its amounts
+                <span className="sb-cost" data-level={ws.cost.level} data-tip={costWords(ws.cost)}>
+                  <Num value={`$${ws.cost.usd.toFixed(2)}`} />
+                </span>
               )}
               {tab?.kind === 'agent' && tab.workspace === ws.id && settings.turnChanges !== false && <TurnButton key={tab.id} tab={tab} api={turnApi(ws.id)} onMenu={openMenu} /> /* F1: the focused agent's kept turns */}
               <BgButton tabs={view.tabs.filter(t => t.workspace === ws.id && t.preset === 'claude')} api={{ bgOutput: readerApi.bgOutput!, send: readerApi.send }} />

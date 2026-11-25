@@ -5,7 +5,7 @@ import { ToolGroup } from './TabBar'
 import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
-import { aiOn, capSpent, capText, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
+import { aiOn, capSpent, capText, costWords, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
 import { Num, ask, cardMorph, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
@@ -318,6 +318,11 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {w.capOver && (
           <span className="ws-mark err" data-tip={`Over its spend cap${w.spend ? ` (${capSpent(w.spend)} of ${capText(w.spend.cap)})` : ''}: its agents are stopped and what you send waits. Its menu's Spend cap… raises it`}>
             <Icon name="alertCircle" size={11} />
+          </span>
+        )}
+        {w.cost?.level && !w.capOver && (
+          <span className={`ws-mark ws-cost ${w.cost.level}`} data-tip={costWords(w.cost)} aria-label={`Cost past your ${w.cost.level} amount`}>
+            <Icon name="dollar" size={11} />
           </span>
         )}
         {w.pending && (

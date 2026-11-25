@@ -66,7 +66,7 @@ import { phone, prune, pushed } from './phone.ts'
 import { tgMigrate, tgView, tgWsGone } from './telegram.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
-import { capOver, capParse, capSet, capToolEnd, capView } from './cap.ts'
+import { capOver, capParse, capSet, capToolEnd, capView, costWarnParse, wsCost } from './cap.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
 import { away, broken, cloudCheck, cloudNew, csGone, forward, hostCfg, hosts, hostScript, hostTab, hostUp, live, mac, making, readHostCfg, readHostCfgs, slot, sshIn, sshOpts, toHost } from './hosts.ts'
@@ -1053,6 +1053,7 @@ function wsView(w: Workspace) {
     ...wsOut(w),
     ...(!w.muted && state.projects.find(p => p.id === w.project)?.muted && { muted: true, mutedBy: 'project' as const }), // Mute project: every check of a workspace's muted holds
     spend: capView(w),
+    cost: wsCost(w),
     setup: existsSync(setupMarker(w)),
     // what runs there
     ports: ports.get(w.id) ?? [],
@@ -1587,8 +1588,9 @@ function slugActions(first?: RunAction[]) {
 
 // a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
 const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
-export function projectSet(ref: string, o: { muted?: boolean; name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean; cap?: unknown }) {
+export function projectSet(ref: string, o: { muted?: boolean; name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean; cap?: unknown; costWarn?: unknown }) {
   const p = findProject(ref)
+  if (o.costWarn !== undefined) p.costWarn = costWarnParse(o.costWarn) // #3: its own amounts over Settings' (cap.ts costWarnOf); null: Settings'
   if (o.cap !== undefined) p.cap = (c => (c.usd || c.tokens ? c : undefined))(capParse(o.cap)) // its new workspaces' spend cap (cap.ts); not an agent's (main.ts)
   // F15: Always ask for, the whole list as Settings has it (main.ts refuses it to agents and remote access): path globs
   if (o.alwaysAsk !== undefined) {
@@ -3149,6 +3151,7 @@ export function settingsSet(o: Settings, own = false) {
   if (o.aiEndpoint) o = { ...o, aiEndpoint: String(o.aiEndpoint.url ?? '').trim() ? { url: endpointOk(o.aiEndpoint.url), model: String(o.aiEndpoint.model ?? '').trim().slice(0, 200) } : undefined } // https, or http on this Mac; no credentials. No URL: none
   if ('termShell' in o && o.termShell !== state.settings?.termShell) o = { ...o, termShell: termShellOk(o.termShell) } // checked only as it changes: Settings sends every setting back, a shell gone since too
   if ('artifactHosts' in o) o = { ...o, artifactHosts: Array.isArray(o.artifactHosts) ? [...new Set(o.artifactHosts.filter(artHostOk).map(h => h.toLowerCase()))].slice(0, 200) : undefined } // S18: names on the internet only
+  if ('costWarn' in o) o = { ...o, costWarn: costWarnParse(o.costWarn) } // #3: dollars, or refused
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)

@@ -77,6 +77,11 @@ changing it: [AGENTS.md](../AGENTS.md).
   you; past it, it stops the workspace's agents as their tool call ends, marks the workspace, and asks: *Add $5 again*,
   *Leave it stopped* or *Remove the cap*. What you send meanwhile waits in the queue. Agents can lower a cap, never raise
   it; a workflow's own budget holds too, whichever comes first. With no meter for its agents the cap says *not measured*.
+- **Cost warning**: Settings › Notifications › *A workspace costs over $5, then $20* (off until you turn it on; the
+  amounts are yours). A workspace whose agents' chats pass the first amount (at API prices, its tabs together) shows its
+  cost in the status bar in yellow and a yellow `$` on its row; past the second, red. Laki tells you once at each amount,
+  with *Open*; a changed amount tells again, and an amount passed while Laki was closed is never told late. A project can
+  have its own amounts or none (Settings › its name › *Cost warning*). Nothing stops: that's the spend cap's job.
 - **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
   access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.
