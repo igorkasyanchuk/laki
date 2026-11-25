@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parseLink } from '../src/renderer/src/links.ts'
-import { feedName, feedOf, heldUntil, newer, notesOf, RELEASES, releaseOf, verdict } from '../src/shared/update.ts'
+import { BACK_FREE, backOf, backRefused, feedName, feedOf, heldUntil, keepWhy, newer, notesOf, RELEASES, releaseOf, STATE_V, verdict } from '../src/shared/update.ts'
 
 test('newer: numbers by part, a pre-release before its release, a leading v', () => {
   assert.equal(newer('0.25.0', '0.24.0'), true)
@@ -98,4 +98,31 @@ test("U13: What's new: a version's first three lines, each with its trailing lak
     assert.ok(lines.length > 0 && lines.length <= 3, v)
     for (const l of lines) assert.ok(!l.link || l.link.startsWith('laki://'), v)
   }
+})
+
+test('#G1 Go back: a copy kept only by the packaged Mac app with 1 GB free; refused unless the kept one is older, intact and the same developer', () => {
+  assert.equal(keepWhy({ mac: true, packaged: true, free: BACK_FREE }), undefined)
+  assert.equal(keepWhy({ mac: true, packaged: true, free: BACK_FREE - 1 }), 'under 1 GB free')
+  assert.equal(keepWhy({ mac: false, packaged: true, free: BACK_FREE * 9 }), 'not the packaged Mac app')
+  assert.equal(keepWhy({ mac: true, packaged: false, free: BACK_FREE * 9 }), 'not the packaged Mac app')
+  const ok = { mac: true, packaged: true, version: '0.64.0', kept: { version: '0.63.0', stateV: STATE_V }, plist: '0.63.0', verified: true, team: 'TEAM1', ownTeam: 'TEAM1' }
+  assert.equal(backRefused(ok), undefined)
+  for (const [c, why] of [
+    [{ ...ok, mac: false }, /Mac app only/],
+    [{ ...ok, packaged: false }, /Mac app only/],
+    [{ ...ok, kept: undefined }, /No earlier version/],
+    [{ ...ok, plist: '0.62.0' }, /isn't Laki 0\.63\.0/],
+    [{ ...ok, plist: undefined }, /isn't Laki 0\.63\.0/],
+    [{ ...ok, kept: { version: '0.64.0' }, plist: '0.64.0' }, /isn't older/],
+    [{ ...ok, kept: { version: '0.65.0' }, plist: '0.65.0' }, /isn't older/],
+    [{ ...ok, verified: false }, /signature doesn't check out/],
+    [{ ...ok, ownTeam: undefined }, /isn't signed with a Developer ID/],
+    [{ ...ok, team: undefined }, /another developer/],
+    [{ ...ok, team: 'TEAM2' }, /another developer/],
+  ] as const)
+    assert.match(backRefused(c) ?? '', why, JSON.stringify(c))
+  // the data warning: a kept version that reads an older state.json (or doesn't say which)
+  assert.deepEqual(backOf({ version: '0.63.0', stateV: STATE_V }), { version: '0.63.0' })
+  assert.deepEqual(backOf({ version: '0.63.0', stateV: STATE_V - 1 }), { version: '0.63.0', newerData: true })
+  assert.deepEqual(backOf({ version: '0.63.0' }), { version: '0.63.0', newerData: true })
 })

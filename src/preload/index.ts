@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('laki', {
   // updates (main's update.ts): its state, or check, download, install; Settings' auto checks; the state as it changes
   update: (op: 'state' | 'check' | 'download' | 'install' | 'skip' | 'pass' | 'unpass'): Promise<object | null> => ipcRenderer.invoke('update', op),
   updateAuto: (on: boolean, days?: number) => ipcRenderer.send('update-auto', on, days),
+  updateBack: (): Promise<string> => ipcRenderer.invoke('update-back'), // #G1: Go back: '' as it relaunches, else why not
   onUpdate: (cb: (s: object) => void) => {
     const f = (_e: unknown, s: object) => cb(s)
     ipcRenderer.on('update', f)

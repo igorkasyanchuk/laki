@@ -494,7 +494,9 @@ export const fileKey = (f: { path: string; storage?: boolean; ext?: string }) =>
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 export const WHEN_DONE_WORDS: Record<string, string> = { sleep: 'goes to sleep', lock: 'locks', shutdown: 'shuts down' }
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
-export const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
+export const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__) || newerDaemon(v)
+// #G1: a daemon from a later build than this packaged app (Go back put an earlier one in its place): the same bar, its words
+export const newerDaemon = (v: { built?: string }) => typeof __BUILT__ === 'string' && !!v.built && v.built > __BUILT__ && location.protocol === 'app:'
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 export const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)

@@ -15,7 +15,7 @@ import { keyFor } from '../shared/keys.ts'
 import { veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dblClickAction, dragOk, externalOf, fromApp as senderOk, fromTokenPage, pageIs, PREVIEW, web, webviewOk, showAtLaunch, titleOf } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, backAsk, BROWSER, confirmAsk, dblClickAction, dragOk, externalOf, fromApp as senderOk, fromTokenPage, pageIs, PREVIEW, web, webviewOk, showAtLaunch, titleOf } from './guards.ts'
 import { signed, updater } from './update.ts'
 import './agentBrowser.ts' // its IPC (browse): registered as it loads
 import { guardFloat, pin, talk, voice } from './floater.ts'
@@ -600,6 +600,8 @@ ipcMain.handle('update', (e, op: unknown) =>
   !from(e) ? null : op === 'check' ? updates.check() : op === 'download' ? updates.download() : op === 'install' ? updates.install() : op === 'skip' ? updates.skip() : op === 'pass' ? updates.pass() : op === 'unpass' ? updates.pass(false) : updates.state(),
 )
 // Settings' Check for updates and Update delay (days)
+// #G1: Go back to the kept version (back.ts): its checks, the swap, a relaunch; '' when it went, else why not
+ipcMain.handle('update-back', async e => (backAsk(sender(e), !!win && e.sender === win.webContents, devOrigin) ? updates.back() : 'Only the app window can do that'))
 ipcMain.on('update-auto', (e, on: unknown, days: unknown) => from(e) && updates.auto(on === true, typeof days === 'number' && days > 0 && days <= 365 ? days : 0))
 
 // the stale-daemon bar's Restart when the daemon refuses this window's shutdown: one another Laki started (another

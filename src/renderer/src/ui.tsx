@@ -683,7 +683,7 @@ export class Boundary extends Component<{ title?: string; onClose?: () => void; 
 
 // The daemon outlives the app, so after an update it can be an older one that lacks what this app asks of
 // it. The status bar says so; restarting it (a second click to confirm) ends the agents, which resume.
-export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
+export function StaleDaemon({ restart, newer }: { restart: () => Promise<unknown>; newer?: boolean }) {
   const [step, setStep] = useState<'' | 'sure' | 'busy'>('')
   const [err, setErr] = useState('') // why it didn't restart: said, not swallowed
   useEffect(() => {
@@ -696,7 +696,7 @@ export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
     <div className="stale-bar" role="alert">
       <Icon name="conflict" size={16} />
       <span>
-        <b>Restart Laki's daemon.</b> It's older than this app, so what's new in it fails until it restarts. Every agent stops and resumes; a turn in
+        <b>Restart Laki's daemon.</b> {newer ? "It's from a later Laki than this app (you went back), so the two may not fit until it restarts." : "It's older than this app, so what's new in it fails until it restarts."} Every agent stops and resumes; a turn in
         progress is cut off.{err && <span className="stale-err"> It didn't restart: {err}</span>}
       </span>
       <button disabled={step === 'busy'} onClick={() => (step === 'sure' ? (setStep('busy'), setErr(''), restart().catch((e: Error) => (setStep(''), setErr(e.message)))) : setStep('sure'))}>

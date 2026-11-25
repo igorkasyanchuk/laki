@@ -17,7 +17,33 @@ export type UpdateState = {
   found?: boolean // this state's check found a version not told about before (the app's toast)
   held?: { version: string; until: number } // a newer release Settings' Update delay holds back until then (ms)
   passed?: string // R7: the newest release is one you chose to skip (Skip this version): not offered until a newer one is out
+  back?: Back // #G1: Settings' Go back to <version>: the version before an update, kept and verified
 }
+
+// #G1: Go back. Before an update installs, main (src/main/back.ts) copies the running bundle to
+// userData/previous/Laki.app (ditto, one kept) with previous.json: its version and the state.json schema it knows. Go
+// back checks it again (its Info.plist's version, codesign --verify --deep --strict, the same Developer ID's Team ID as
+// this copy), swaps it in and relaunches. The packaged Mac app only
+export const STATE_V = 2 // state.json's schema (daemon/core.ts; 2: secret values out of it, envKeys.ts)
+export const BACK_FREE = 1024 ** 3 // a copy only with 1 GB free
+export type Kept = { version: string; stateV?: number }
+export type Back = { version: string; newerData?: boolean } // newerData: this data's schema is newer than it knows
+// why no copy is kept before installing: undefined when one is
+export const keepWhy = (o: { mac: boolean; packaged: boolean; free: number }): string | undefined =>
+  !o.mac || !o.packaged ? 'not the packaged Mac app' : o.free < BACK_FREE ? 'under 1 GB free' : undefined
+// why the kept copy may not replace this one (undefined: it may), in the order they're checked
+export function backRefused(c: { mac: boolean; packaged: boolean; version: string; kept?: Kept; plist?: string; verified?: boolean; team?: string; ownTeam?: string }): string | undefined {
+  if (!c.mac || !c.packaged) return 'Going back is for the Mac app only'
+  if (!c.kept) return 'No earlier version is kept'
+  if (c.plist !== c.kept.version) return `The kept copy isn't Laki ${c.kept.version}`
+  if (!newer(c.version, c.kept.version)) return `Laki ${c.kept.version} isn't older than this one`
+  if (!c.verified) return "The kept copy's signature doesn't check out"
+  if (!c.ownTeam) return "This copy isn't signed with a Developer ID"
+  if (c.team !== c.ownTeam) return 'The kept copy is signed by another developer'
+  return undefined
+}
+// Settings' Go back: a kept version that passed backRefused; its data warning when this data is newer than it reads
+export const backOf = (kept: Kept, stateV = STATE_V): Back => ({ version: kept.version, ...((kept.stateV ?? 0) < stateV && { newerData: true }) })
 
 // R7: what the newest release is to this copy: none (not newer), passed (the one you skipped, exactly), a time it's
 // held until (the update delay; skip: Skip the delay once let that version in), or offer

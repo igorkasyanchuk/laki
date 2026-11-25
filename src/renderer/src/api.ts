@@ -75,6 +75,7 @@ type Bridge = {
   privacyPane?(which: 'microphone' | 'screen'): void // System Settings › Privacy & Security's pane
   quickHeight?(h: number): void // its window as tall as the page
   update?(op: 'state' | 'check' | 'download' | 'install' | 'skip' | 'pass' | 'unpass'): Promise<UpdateState | null> // main's update.ts
+  updateBack?(): Promise<string> // #G1: Go back to the kept version: '' as the app relaunches, else why not
   updateAuto?(on: boolean, days?: number): void // Settings' Check for updates (at launch, then every 4 hours) and Update delay
   onUpdate?(cb: (s: UpdateState) => void): () => void // its state as it changes; the function stops listening
   onAiShot?(cb: (png: string) => void): void // the AI window's: that screenshot (a PNG, base64)

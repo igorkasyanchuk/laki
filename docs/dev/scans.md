@@ -626,6 +626,23 @@ app's Info.plist has `ElectronSquirrelPreventDowngrades` (`build.mac.extendInfo`
 older than the one running, whatever the release's tag says (an older signed build tagged as new). Settings ›
 General's `UpdatesField`. ponytail: no Linux self-update (no new dependency), no channels, no daemon restart.
 
+Go back (#G1, `src/main/back.ts`; pure parts in `src/shared/update.ts`: `keepWhy`, `backRefused`, `backOf`, in
+`test/update.test.ts`): on `update-downloaded`, `keepNow` copies the running bundle with `ditto` to
+`userData/previous/next/Laki.app`, then in place of `previous/Laki.app` (one kept), and writes `previous.json`
+(`{ version, stateV }`: `STATE_V`, moved to shared/update.ts, core re-exports it); none under `BACK_FREE` (1 GB) free or
+off the packaged Mac app. `install` waits for it 5 s at most (`keepWait`: a copy still going is killed, none kept). The
+first `update` state ask looks at it 10 s later (`lookBack`): `refused` (the Info.plist's
+`CFBundleShortVersionString` equals the record's version, older than this one, `codesign --verify --deep --strict`,
+`codesign -dv`'s Team ID for a Developer ID authority, the same as this bundle's) or the state's `back`
+(`{ version, newerData }`: the record's `stateV` below this one's). IPC `update-back` (guards.ts `backAsk`: `fromApp`
+and the main window's own webContents; `test/main-guards.test.ts`) runs `goBack`: checks, moves the copy beside the bundle
+(`Laki.app.back`; `ditto` across disks), checks it again there, renames this bundle to `Laki.app.gone` and the copy into
+its place (any failure puts both back), sets update.json's `pass` to this version, removes `.gone` in a detached `rm`,
+`app.relaunch()`, `app.exit(0)`. The daemon keeps running from the later build: the earlier app's `newerDaemon`
+(AppParts.tsx: its `built` later than this build's, on `app:` only) shows the stale bar with its own words, whose Restart
+starts the earlier daemon (an older `STATE_V` then keeps state.json aside, R7's `newerData`). The swap is checked by
+hand on a packaged, signed app (scripts/pack-smoke.sh's build), not in tests.
+
 What's new (U13): settings' `seenVersion` is the version whose card was closed (core's `load`: a new install's own
 `VERSION`, one from before U13 `''`). While it isn't this app's version (package.json's), App loads the release notes
 (`?raw`, only then) and `update.ts` `notesOf` gives that version's first three lines (`## <version> ·`'s bullets), a

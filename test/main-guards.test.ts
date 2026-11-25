@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { titleOf, appFile, appPage, BROWSER, confirmAsk, dockAgents, dockMenu, dragOk, recentOk, showAtLaunch, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
+import { backAsk, titleOf, appFile, appPage, BROWSER, confirmAsk, dockAgents, dockMenu, dragOk, recentOk, showAtLaunch, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
 
 test('main guards: only the app window’s main frame on the app’s own page is the app', () => {
   const page = 'app://laki/index.html'
@@ -214,4 +214,16 @@ test("a window's title: control characters out, 120 at most, Laki when empty; Re
   assert.equal(titleOf('launch-plan — stealth', ['launch-plan', 'stealth']), 'Laki — Laki')
   assert.equal(titleOf('launch-plan', ['launch-plan']), 'Laki')
   assert.equal(titleOf('shell — fix-login', ['', '  ']), 'shell — fix-login', 'a blank name hides nothing')
+})
+
+test("#G1 Go back's IPC: the app window's own page only, and main's handler checks it", () => {
+  const win = { type: 'window', main: true, url: 'app://laki/index.html' }
+  assert.equal(backAsk(win, true), true)
+  assert.equal(backAsk(win, false), false, "another of the app's windows")
+  assert.equal(backAsk({ ...win, type: 'webview' }, true), false, 'a webview')
+  assert.equal(backAsk({ ...win, main: false }, true), false, 'a frame inside')
+  assert.equal(backAsk({ ...win, url: 'https://evil.example/' }, true), false, 'a site')
+  assert.equal(backAsk({ ...win, url: 'http://localhost:5199/' }, true), false, 'a dev origin, built')
+  const main = readFileSync(new URL('../src/main/index.ts', import.meta.url), 'utf8')
+  assert.match(main, /ipcMain\.handle\('update-back', async e => \(backAsk\(sender\(e\), !!win && e\.sender === win\.webContents, devOrigin\)/)
 })

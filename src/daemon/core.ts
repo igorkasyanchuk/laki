@@ -46,6 +46,7 @@ import { agentLogDrop } from './agentLog.ts'
 import { envJson, envRestore, envRetry, envScrub, envStash, envUnread } from './envKeys.ts'
 import { keysWhere, onKeys } from './keychain.ts'
 import * as screensMod from './screens.ts'
+import { STATE_V } from '../shared/update.ts'
 import { LOCKFILE } from '../shared/overlap.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
@@ -220,7 +221,7 @@ export const askPty = { on: false } // R9: an install from before the pty host's
 // R7: the state's schema number, stamped as it's saved. One a newer Laki wrote (a higher v) is copied aside as
 // state.json.v<N> before this one's first save, and the view says so (newerData): its fields this build doesn't know
 // may not survive
-export const STATE_V = 2 // 2: secret values out of it (envKeys.ts), their names null
+export { STATE_V } // shared/update.ts' (Go back reads it too); 2: secret values out of it (envKeys.ts), their names null
 let newerData: number | undefined
 // R7: a dated copy of each day's state as it loaded (state.json.bak-YYYY-MM-DD, today's replaced by a later start), the
 // BACKUPS newest kept; an unreadable state.json loads the newest that reads (then 0.47's single state.json.bak)

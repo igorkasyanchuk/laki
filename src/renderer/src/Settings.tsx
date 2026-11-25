@@ -12,7 +12,7 @@ import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRe
 import { type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
-import { RELEASES_URL, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
+import { RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
@@ -683,6 +683,28 @@ function HotkeyField(p: { clash?: string; on: boolean; keys: string; def: string
   )
 }
 
+// #G1: Go back to the version before the last update (main's back.ts kept it and checked it): asked first, with what
+// its older data format means; the app relaunches as it, and the daemon's bar then offers to restart that too
+function GoBack({ back, now }: { back: NonNullable<UpdateState['back']>; now: string }) {
+  const [err, setErr] = useState('')
+  const data = back.newerData ? ` Your data is in a newer format than Laki ${back.version} knows: it keeps a copy as state.json.v${STATE_V} in Laki's data folder and may not keep what ${now} added.` : ''
+  const go = async () => {
+    if (!(await ask(`Go back to Laki ${back.version}?`, { text: `Laki restarts as ${back.version}, and ${now} is skipped until you offer it again. Your agents keep running.${data}`, ok: 'Go back' }))) return
+    setErr('')
+    setErr(await bridge!.updateBack!().catch((e: Error) => e.message))
+  }
+  return (
+    <div className="row cli-row">
+      <Says title={`Laki ${back.version} is kept`} hint={`The version before this update, checked: same developer, signature intact.${data}`} />
+      <span className="grow" />
+      <button type="button" onClick={() => void go()}>
+        Go back to {back.version}
+      </button>
+      {err && <p className="field-err">{err}</p>}
+    </div>
+  )
+}
+
 // main's update.ts: this version, the newest release (its notes), and the one next step: Download (a signed Mac:
 // here, then Restart to update; elsewhere the release's page), or Check now
 function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean; onOn: (on: boolean) => void; delay: number; onDelay: (days: number) => void; idle?: boolean; onIdle?: (on: boolean) => void }) {
@@ -758,6 +780,7 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
           </a>
         </div>
       )}
+      {u.back && bridge?.updateBack && <GoBack back={u.back} now={u.version} />}
       <p className="muted small update-back">
         A release went wrong for you?{' '}
         <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>

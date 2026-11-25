@@ -3,7 +3,7 @@
 // cards, What's new, the body, the ask bar, a phone's key bar, the tab strip at the bottom, the pages; App's, from AppCtx
 import type { AppCtx } from './appCtx'
 import { AskWrap } from './Diff'
-import { BarChoices, KeyBar, PeekGlow, staleDaemon, UnlockForm, WHEN_DONE_WORDS } from './AppParts'
+import { BarChoices, KeyBar, newerDaemon, PeekGlow, staleDaemon, UnlockForm, WHEN_DONE_WORDS } from './AppParts'
 import { CopyDiagnostics, WhatsNew } from './panels'
 import { Countdown, Icon, IconButton, StaleDaemon } from './ui'
 import { Pages } from './Dialogs'
@@ -22,7 +22,7 @@ export function mainOf(app: AppCtx) {
         <>
         {full && <IconButton icon="minimize" title={kt('Exit full screen', 'full')} className="full-exit" onClick={() => toggleFull(false)} />}
         <TabBar app={app} />
-        {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} />}
+        {connected && staleDaemon(view) && <StaleDaemon restart={restartDaemon} newer={newerDaemon(view)} />}
         {hung === 'yes' && (
           <div className="stale-bar soft" role="alert">
             <Icon name="alertCircle" size={16} />

@@ -7,7 +7,8 @@ import { app, autoUpdater, net } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { feedName, RELEASES, type Release, releaseOf, UPDATE_EVERY, type UpdateState, verdict } from '../shared/update.ts'
+import { backOf, feedName, RELEASES, type Release, releaseOf, UPDATE_EVERY, type UpdateState, verdict } from '../shared/update.ts'
+import { goBack, keepNow, keepWait, kept as keptBack, refused } from './back.ts'
 
 // update.json: `told`, the last version the app was told about (one toast each); `skip`, the one Skip the delay once let in
 const toldFile = () => join(app.getPath('userData'), 'update.json')
@@ -93,7 +94,7 @@ export function updater(send: (s: UpdateState) => void) {
     if (!s.latest || !s.install || !s.latest.feed) return s
     if (!wired) {
       wired = true
-      autoUpdater.on('update-downloaded', () => set({ status: 'ready' }))
+      autoUpdater.on('update-downloaded', () => (set({ status: 'ready' }), void keepNow().then(() => set({ back: undefined })))) // #G1: this version kept for Go back (the one kept before: gone)
       autoUpdater.on('update-not-available', () => set({ status: 'error', error: `The release has no update for this Mac` }))
       autoUpdater.on('error', e => set({ status: 'error', error: `The download failed: ${e.message}` }))
     }
@@ -108,10 +109,25 @@ export function updater(send: (s: UpdateState) => void) {
   }
 
   // the app quits (its windows close for good: main's before-quit-for-update) and opens again as the new version
-  function install() {
+  async function install() {
     if (s.status !== 'ready') return s
+    await keepWait() // #G1: the copy of this version, a few seconds at most
     autoUpdater.quitAndInstall()
     return s
+  }
+
+  // #G1: Settings' Go back to <version>: shown once the kept copy checks out (looked at once, a little after the first
+  // ask for the state: codesign reads the whole bundle); going back skips the version it leaves
+  let looked = false
+  function lookBack() {
+    if (looked) return
+    looked = true
+    setTimeout(() => void refused().then(why => (k => !why && k && set({ back: backOf(k) }))(keptBack()), () => {}), 10_000).unref()
+  }
+  async function back(): Promise<string> {
+    const why = await goBack(v => keep({ pass: v }))
+    if (why) set({ back: undefined })
+    return why ?? ''
   }
 
   // Settings' Check for updates: at launch (once, a little after), then every UPDATE_EVERY; off stops both. The
@@ -130,5 +146,5 @@ export function updater(send: (s: UpdateState) => void) {
     every = setInterval(() => void check(true), UPDATE_EVERY)
   }
 
-  return { state: () => s, check, download, install, skip, pass, auto }
+  return { state: () => (lookBack(), s), check, download, install, skip, pass, auto, back }
 }

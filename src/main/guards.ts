@@ -35,6 +35,8 @@ export const fromApp = (s: Sender, devOrigin = '') => s.type === 'window' && s.m
 export const fromTokenPage = (s: Sender, devOrigin = '') => fromApp(s, devOrigin) && tokenPage(s.url, devOrigin)
 // Touch ID's confirm IPC (main's 'confirm', shared/confirm.ts): the app window's own page (isWin: its webContents), never a
 // small window, a webview or a frame, and only for one of CONFIRM's actions (main says its words, not the page)
+// #G1: Go back's IPC (update-back): the app window's own page (isWin: its webContents), never a small window or a frame
+export const backAsk = (s: Sender, isWin: boolean, devOrigin = '') => fromApp(s, devOrigin) && isWin
 export const confirmAsk = (s: Sender, isWin: boolean, what: unknown, devOrigin = '') => fromApp(s, devOrigin) && isWin && confirmKnown(what)
 // one of the app's other pages by name: its ?window= (new, ai, tab, sim)
 // a double click on the title bar's empty room, as macOS's own (System Settings › Desktop & Dock › Double-click a

@@ -66,3 +66,7 @@ Intel/AMD). [The guide](guide.md#linux-and-windows-through-wsl) says how to run 
 - An agent Laki can't find isn't on the PATH your login shell gives: `$SHELL -lic 'which claude'`.
 - After an update, a yellow bar offers to restart Laki's daemon on the new version (your agents keep running until
   then).
+- An update went wrong for you? Settings › General › Updates' *Go back to <version>* puts the version you had before
+  back (the Mac app keeps one copy of it when an update downloads, with 1 GB free): it checks that copy's signature and
+  developer, restarts Laki as it and skips the newer one until you offer it again; the yellow bar then restarts the daemon
+  to match. Your data stays; if it's in a newer format than that version reads, Settings says so first.
