@@ -40,6 +40,7 @@ test('db: tables with their rows and schema; a table sorted and filtered; SELECT
   assert.deepEqual([r.cols, r.rows], [['n', 'top'], [['5', '250']]])
   assert.throws(() => dbRead(file, { op: 'query', sql: 'DELETE FROM users' }), /a SELECT/)
   assert.throws(() => dbRead(file, { op: 'query', sql: 'SELECT 1; DELETE FROM users' }), /one statement/)
+  assert.deepEqual((dbRead(file, { op: 'query', sql: "SELECT 'a;b' AS x;" }) as any).rows, [['a;b']], 'a ; in a string is one statement')
   assert.throws(() => dbRead(file, { op: 'query', sql: 'WITH x AS (SELECT 1) INSERT INTO users (email) SELECT * FROM x' }), /readonly|read-only|attempt to write/i)
   assert.equal((dbRead(file, { op: 'tables' }) as any).tables[2].rows, 250, 'nothing written')
   // a WAL database is read through a clone: its folder keeps no -shm or -wal of Laki's

@@ -72,8 +72,9 @@ export function dbRead(path: string, q: DbAsk, tmp?: string): { tables: DbTable[
     }
     const sql = q.sql.trim().replace(/;\s*$/, '')
     if (!/^(select|with)\b/i.test(sql)) throw new Error('a query here is a SELECT (or WITH … SELECT): nothing that changes the database')
-    if (sql.includes(';')) throw new Error('one statement at a time')
-    return rowsOf(d.prepare(sql).iterate(), DB_QUERY_ROWS)
+    const st = d.prepare(sql)
+    if (st.sourceSQL.trim().replace(/;\s*$/, '').length < sql.length) throw new Error('one statement at a time') // more after the first: never run
+    return rowsOf(st.iterate(), DB_QUERY_ROWS)
   } finally {
     d.close()
   }

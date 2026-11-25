@@ -774,7 +774,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
       base: '',
       ...(d && { ...d, project: proj, preset, noSetup: undefined, ...(preset !== d.preset && { model: undefined, effort: undefined, perm: undefined, fast: undefined, sandbox: undefined }), ...(!there && { place: undefined, base: '' }) }),
       ...groupNew(sep, view.presets.find(x => x.name === preset)?.agent),
-      ...(initial && (({ linked: _, ...x }) => x)(initial)),
+      ...(initial && (({ linked: _, suggested: __, ...x }: typeof initial & { suggested?: unknown }) => x)(initial)), // suggested: Edit first's (#5), the page's own
       ...(notesOf(shots).length && { prompt: [initial?.prompt ?? d?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
     }
   })

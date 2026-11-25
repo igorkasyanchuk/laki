@@ -452,10 +452,11 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
               if (!longPaste(t)) return
               e.preventDefault()
               const el = e.currentTarget
-              const [a, b] = [el.selectionStart, el.selectionEnd]
+              const [a, b, was] = [el.selectionStart, el.selectionEnd, el.value]
+              const put = (s: string) => setText(v => (v === was ? `${v.slice(0, a)}${a && !/\s$/.test(v.slice(0, a)) ? ' ' : ''}${s}${v.slice(b)}` : `${v}${v && !/\s$/.test(v) ? ' ' : ''}${s}`)) // typed in meanwhile: at the end
               void keepFile(pastedFile(t), () => Promise.reject(new Error('text only')), (data, name) => daemon.call<string>('fileSave', { data, name })).then(
-                k => setText(v => `${v.slice(0, a)}${a && !/\s$/.test(v.slice(0, a)) ? ' ' : ''}[pasted text, ${linesOf(t)} lines: ${k.path}] ${v.slice(b)}`),
-                () => setText(v => v.slice(0, a) + t + v.slice(b)), // not kept: as text, as before
+                k => put(`[pasted text, ${linesOf(t)} lines: ${k.path}] `),
+                () => put(t), // not kept: as text, as before
               )
             }}
             onKeyDown={e => {

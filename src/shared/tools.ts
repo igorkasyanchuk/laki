@@ -42,7 +42,7 @@ const activeOf = (w: { id: string; created: number }, tabs: View['tabs']) => Mat
 // #4: what a send did, in words (laki send, laki_send)
 export function sentLine(r: { sent?: boolean; steered?: boolean; interrupted?: boolean; queued?: number; over?: boolean }) {
   if (r.over) return `queued (${r.queued} waiting): its workspace is over its spend cap, so it waits till you raise or remove it`
-  if (r.interrupted) return 'interrupted its turn, then sent'
+  if (r.interrupted) return r.sent ? 'interrupted its turn, then sent' : `interrupted its turn; queued (${r.queued} waiting): sent as its turn's end is seen`
   if (r.steered) return 'joined its running turn'
   if (r.sent) return 'sent'
   const ahead = (r.queued ?? 1) - 1

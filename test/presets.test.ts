@@ -619,7 +619,8 @@ test("#6: Settings' MCP servers go to every project's agents (a project's of the
   // Only Laki's MCP servers: none of claude's own config's, Laki's own kept
   await rig.rpc('tabNew', { ws: ws.id, preset: 'claude-only' })
   const only = await until(() => rig.fakeLog().filter(l => l.bin === 'claude' && l.args?.includes('--strict-mcp-config'))[0], 'claude-only')
-  assert.equal(only.args.filter((a: string) => a === '--mcp-config').length, 2, "the servers' file and Laki's own")
+  assert.equal(only.args.filter((a: string) => a === '--mcp-config').length, 1, 'one file: the wrapper sandbox reads only its own')
+  assert.deepEqual(Object.keys(only.mcp.cfg.mcpServers), ['search', 'docs', 'laki'], "Laki's own in it")
   // Import: listed (no values), then the picked ones copied; the agents' own files as they were
   writeFileSync(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { linear: { type: 'http', url: 'https://mcp.linear.test/mcp' }, docs: { command: 'x' } } }))
   mkdirSync(join(rig.home, '.codex'), { recursive: true })

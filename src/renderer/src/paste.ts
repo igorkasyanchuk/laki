@@ -8,5 +8,5 @@ export const PASTE_CHARS = 4000
 let plainAt = 0
 export const plainKey = (e: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; key: string }) => void ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'v' && (plainAt = Date.now()))
 export const linesOf = (t: string) => t.replace(/\n$/, '').split('\n').length
-export const longPaste = (t: string) => Date.now() - plainAt > 1000 && (t.length > PASTE_CHARS || linesOf(t) > PASTE_LINES) && !secretsIn(t).length
+export const longPaste = (t: string) => Date.now() - plainAt > 1000 && (t.length > PASTE_CHARS || linesOf(t) > PASTE_LINES) && !(t.length < 200_000 && secretsIn(t).length) // past 200 KB unchecked, as secretHint
 export const pastedFile = (t: string) => new File([t], 'pasted-text.txt', { type: 'text/plain' })

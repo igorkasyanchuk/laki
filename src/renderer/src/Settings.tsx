@@ -3415,7 +3415,7 @@ export function SettingsPage(p: {
                 hint="For every project's agents, given as they start (a project's own add to these; the same name: the project's); never written into the agents' own config"
                 list={s.mcp}
                 profiles={presets.filter(x => !x.off)}
-                onChange={mcp => set({ mcp: mcp.length ? mcp : undefined })}
+                onChange={mcp => set({ mcp })} // [] is none (mcpOk): undefined would be left out of the call, the old list kept
                 onImport={p.call && { find: () => p.call!<{ found: McpFound[] }>('mcpImport', {}).then(r => r.found), copy: pick => p.call!<{ added: string[] }>('mcpImport', { pick }).then(r => r.added) }}
               />
             </>

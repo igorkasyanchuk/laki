@@ -155,7 +155,7 @@ export function capTick() {
     }
     if (w.capOver) stopTurns(w)
   }
-  costRead = true
+  costRead = state.settings?.contextMeter !== false || state.settings?.costs !== false // both off: meterTick read nothing, so turning one on later is a first read too
 }
 
 const stopped = new Map<string, number>() // tab → the capOver its Esc was for: once each

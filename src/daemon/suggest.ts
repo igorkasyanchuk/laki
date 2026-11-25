@@ -54,7 +54,15 @@ export async function suggestAnswer(p: { ws?: unknown; id?: unknown; act?: unkno
   if (!s || s.answered) throw new Error('that suggestion is gone (withdrawn, or answered already)')
   if (!['start', 'dismiss', 'started'].includes(String(p.act))) throw new Error('act: start, dismiss or started')
   let made: Workspace | undefined
-  if (p.act === 'start') made = await wsNew({ project: w.project, prompt: s.prompt, name: s.title } as NewWs)
+  if (p.act === 'start') {
+    s.answered = 'started' // before the await: a second Start meanwhile finds it answered
+    try {
+      made = await wsNew({ project: w.project, prompt: s.prompt, name: s.title } as NewWs)
+    } catch (e) {
+      delete s.answered
+      throw e
+    }
+  }
   const cur = state.workspaces.find(x => x.id === w.id) // its list as it is by now
   if (!cur) return { ok: true, ...(made && { made: made.id }) }
   const ws = made?.id ?? (typeof p.made === 'string' ? p.made : undefined)

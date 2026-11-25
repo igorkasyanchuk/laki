@@ -2144,8 +2144,12 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
-    if (mcp.length) argv.push('--mcp-config', mcpFile(tab, mcp)) // one more: a profile's own --mcp-config stays
-    if (pr?.mcpOnly && h === localHooks) argv.push('--strict-mcp-config', ...(mcp.some(s => s.name === 'laki') ? [] : ['--mcp-config', mcpFile({ ...tab, id: `${tab.id}-laki` }, [lakiMcp()])])) // #6: Only Laki's MCP servers: none of claude's own config's, Laki's own tools kept
+    // #6: Only Laki's MCP servers: none of claude's own config's, Laki's own tools kept (in the same file: the wrapper
+    // sandbox reads that one only, and it goes with the tab)
+    const only = !!pr?.mcpOnly && h === localHooks
+    const own = only && !mcp.some(s => s.name === 'laki') ? [...mcp, lakiMcp()] : mcp
+    if (own.length) argv.push('--mcp-config', mcpFile(tab, own)) // one more: a profile's own --mcp-config stays
+    if (only) argv.push('--strict-mcp-config')
   } else if (tab.preset === 'codex') {
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
@@ -5091,7 +5095,9 @@ export async function sendMode(p: Parameters<typeof send>[0], mode: (typeof SEND
   if (mode === 'steer' && steerable(tab)) return send({ ...p, whenIdle: true, steer: true }) // a queue ahead of it: queued after it, as it says
   input(tab.id, '\x1b')
   for (let i = 0; i < 50 && rtOf(tab.id).status === 'running'; i++) await new Promise(ok => setTimeout(ok, 100))
-  if (rtOf(tab.id).status !== 'idle') throw new Error(`${tab.name} didn't stop${rtOf(tab.id).status === 'waiting' ? ': it asks the user something now' : ''}: send with --queue, or try again`)
+  // its end not seen yet (codex says none on an Esc: sweepRunning's), or it asks something now: queued, it goes as the
+  // turn's end is seen, never lost after the Esc
+  if (rtOf(tab.id).status !== 'idle') return { ...send({ ...p, whenIdle: true }), interrupted: true }
   return { ...send({ ...p, whenIdle: false }), interrupted: true }
 }
 // agy's new chat started with no prompt: the first message Laki types carries the note (agentCmd's noteDue), once

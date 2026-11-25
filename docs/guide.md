@@ -2429,6 +2429,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌃⌥⌘T | from any app (*Show and tell*, off until turned on): a part of the screen, then the quick bar with it and the mic on; ⏎ sends both, E draws on it first, Esc drops both |
 | ⌘O | open a project folder (or drop one on the window or on Laki's Dock icon, even while Laki is closed; on a terminal it types the path), then a new workspace in it |
 | ⌘N | new workspace |
+| ⇧⌘V | in a prompt box: paste a long text as text (a plain paste over 40 lines or 4,000 characters becomes a file chip) |
 | ⌘T / ⌘W | new shell tab / close tab (or the file in front in the preview, when one is open); in a browser: a new page / close it |
 | ⇧⌘T | reopen the tab you closed last in this workspace: an agent's chat resumed (a chat that's gone starts a new one), a shell in its folder; the tab bar's + menu lists the last 10 (File › Reopen Closed Tab) |
 | ⌘⇧N | the tab bar's ＋ menu: shell, an agent preset or a command, picked with ↑↓ and ⏎ (or the item's letter) |

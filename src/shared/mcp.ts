@@ -16,6 +16,9 @@ export const openCodeMcp = (list: McpServer[]) =>
 // opencode's mcp), in Laki's shape; one Laki can't take (no command or URL, a name it refuses): none
 export function mcpFrom(name: string, c: Record<string, unknown>): McpServer | undefined {
   if (!MCP_NAME.test(name)) return
+  // what a server here can't carry: headers (a token), codex's bearer token and headers, an SSE transport (claude gets
+  // http): not offered, rather than a copy that fails
+  if (c.headers || c.http_headers || c.env_http_headers || c.bearer_token_env_var || c.type === 'sse' || c.transport === 'sse') return
   const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
   const words = (v: unknown) => (Array.isArray(v) ? v.filter((a): a is string => typeof a === 'string') : [])
   const vars = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string')) : {})

@@ -47,7 +47,7 @@ export function statusBarOf(app: AppCtx) {
                   {!!tab.skills?.length && <span className="sb-skills" aria-hidden><Icon name="bookOpen" size={12} />{tab.skills.length}</span>}
                 </button>
               )}
-              {ws.cost?.warn && (
+              {costsOn && ws.cost?.warn && (
                 // #3: its agents' cost while a cost warning holds for it: yellow, then red past its amounts
                 <span className="sb-cost" data-level={ws.cost.level} data-tip={costWords(ws.cost)}>
                   <Num value={`$${ws.cost.usd.toFixed(2)}`} />
