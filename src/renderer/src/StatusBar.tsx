@@ -1,11 +1,13 @@
 // the status bar (settings.statusBar, on unless false): under the terminals, or the wide one under everything (wideBar); App's, read from AppCtx
 import type { AppCtx } from './appCtx'
 import { type AgentUsage, ctxPct, ctxText, level, levelWord, UsageButton, usageText } from './Usage'
-import { type AiCredits, aiOn, costWords } from '../../shared/types'
+import { type AiCredits, aiOn, costWords, type WorkspaceView } from '../../shared/types'
 import { BgButton } from './BgTasks'
 import { FLOW_ENDED } from '../../shared/workflow'
-import { Icon, IconButton, MidText, Num } from './ui'
-import { PRStatus } from './Info'
+import { Icon, IconButton, type MenuItem, MidText, Num } from './ui'
+import { conflictWords, PRStatus } from './Info'
+import { reviewFileGo } from './reviewFile'
+import { LOCKFILE } from '../../shared/overlap'
 import { TunnelButton } from './Tunnel'
 import { TurnButton } from './TurnStrip'
 import { WidgetStrip } from './Widgets'
@@ -16,7 +18,13 @@ import { hhmm } from '../../shared/tray'
 import { settingsOf, wsName } from './appCtx'
 
 export function statusBarOf(app: AppCtx) {
-  const { achAll, achKept, achMore, achN, AI_TIP, aiDock, aiFab, aiFloat, attachable, behindMenu, branchFull, call, cfgSheet, connected, costsOn, ctxOn, dialog, dock, fail, flowsOn, fly, footButtons, gallery, git, infoOf, kt, labels, limits, noBar, openMenu, openPort, ownWidgets, pageBar, ports, portStop, portUp, prMenu, problem, project, rail, readerApi, setAiFloat, setAuto, setBranchFull, setDialog, settings, shortBranch, tab, toAi, toggleArtifacts, toSettings, tracked, tunnelApi, turnApi, upd, view, wideBar, widgetApi, ws } = app
+  const { reviewGo, achAll, achKept, achMore, achN, AI_TIP, aiDock, aiFab, aiFloat, attachable, behindMenu, branchFull, call, cfgSheet, connected, costsOn, ctxOn, dialog, dock, fail, flowsOn, fly, footButtons, gallery, git, infoOf, kt, labels, limits, noBar, openMenu, openPort, ownWidgets, pageBar, ports, portStop, portUp, prMenu, problem, project, rail, readerApi, setAiFloat, setAuto, setBranchFull, setDialog, settings, shortBranch, tab, toAi, toggleArtifacts, toSettings, tracked, tunnelApi, turnApi, upd, view, wideBar, widgetApi, ws } = app
+  // #C1: the files merging its base in conflicts in, each opening in its Review tab; a lock file: regenerate it
+  const conflictItems = (w: WorkspaceView): MenuItem[] => [
+    { head: `Conflicts with ${w.base}` },
+    ...(w.stat?.conflicts ?? []).map(c => ({ label: c.path, icon: 'conflict' as const, sub: `${c.places} place${c.places === 1 ? '' : 's'} · ${c.kind}${LOCKFILE.test(c.path) ? ' · a lock file: regenerate it' : ''}`, run: () => (reviewGo(w), reviewFileGo(w.id, c.path)) })),
+    ...(w.stat?.conflictsMore ? [{ head: `and ${w.stat.conflictsMore} more` }] : []),
+  ]
   return view && !(noBar && connected) && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
         <div className={`status ${wideBar ? 'wide' : ''}`}>
           {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
@@ -73,6 +81,12 @@ export function statusBarOf(app: AppCtx) {
                   ↓{ws.stat.behind}
                 </button>
               )}
+              {git && !!ws.stat?.conflicts?.length && !(ws.pr?.state === 'OPEN' && ws.pr.conflict) && (
+                // #C1: no PR saying so: where merging its base in would conflict, beside ↓n
+                <button className="sb-behind sb-conflicts" data-tip={`Where merging ${ws.base} in conflicts: click for the files`} onClick={e => openMenu(e, conflictItems(ws))}>
+                  <Icon name="conflict" size={11} /> {conflictWords(ws.stat.conflicts, ws.stat.conflictsMore)}
+                </button>
+              )}
               {ws.codespace !== undefined && (
                 // a cloud workspace: its codespace and its state (why it failed, cut: all of it on hover)
                 <button className="sb-flow" data-status={ws.csState === 'Failed' ? 'failed' : ws.csState === 'Available' ? undefined : 'waiting'} data-tip={`Codespace ${ws.codespace || '(being made)'}: ${csWord(ws.csState)}${ws.csError ? ` · ${ws.csError}` : ''} · click: your codespaces on GitHub`} onClick={() => openExternal('https://github.com/codespaces')}>
@@ -107,7 +121,7 @@ export function statusBarOf(app: AppCtx) {
                     </span>
                   </button>
                 ))(flowsOn ? ([tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) || view.flows?.find(r => r.ws === ws.id && !FLOW_ENDED.includes(r.status))) : undefined)}{/* the tab's run gone (past the 100 kept): the workspace's; else one going in it (a workspace you picked) */}
-              <PRStatus w={infoOf(ws)} face={!ws.pr?.mine || settings.ownAvatar !== false} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
+              <PRStatus w={infoOf(ws)} face={!ws.pr?.mine || settings.ownAvatar !== false} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} conflicts={ws.stat?.conflicts} conflictsMore={ws.stat?.conflictsMore} onConflicts={e => openMenu(e, conflictItems(ws))} />
               {attachable(ws) && ws.kind !== 'local' && (
                 <button className="pr pr-attach" data-tip={`No PR found for ${ws.branch}: attach one by its URL or number`} onClick={() => setDialog({ attachPr: ws.id })}>
                   + PR

@@ -105,7 +105,10 @@ changing it: [AGENTS.md](../AGENTS.md).
   and one next-step chip, or the turn's time while its agent works; the other marks show on hover and in its card.
 - **Behind the base**: *↓n* beside the branch in the status bar counts the commits its base has that it hasn't (as
   your clone has the base: no fetch). A click: *Update* merges the base in when that's clean, or hands the conflicts
-  to its agent; *Rebase onto …* asks first when the branch has a PR. Laki never pushes it.
+  to its agent; *Rebase onto …* asks first when the branch has a PR. Laki never pushes it. When merging it in would
+  conflict, the conflicts chip (the PR's, or one beside *↓n*) says where, *2 files, 3 places*; its click lists each
+  file with its places and kind (content, delete/modify, rename), and one opens it in the Review tab (a lock file:
+  regenerate it). The message its agent gets names them too.
 - **Labs**: a new install starts with Projects, Board, Schedule, AI and Settings. Notes, To-dos, Specs, Workflows, My
   Desk, Calendar, the rail's Terminal and Browser and the Video, Meme and Timer buttons are one switch away (Settings ›
   General › Pages › *Labs*), or each on its own; ⌘K finds them as *Turn on …*. Achievements start off too (Settings ›

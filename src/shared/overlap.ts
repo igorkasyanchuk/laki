@@ -8,6 +8,8 @@ export type Overlap = { file: string; mine: Span; theirs: Span }
 // what a workspace's view carries: another live workspace's (ws) or what landed on its base since it branched (base)
 export type Collision = Overlap & { ws?: string; base?: string }
 
+// a lock file (core.ts' Done check and snapshot's, a conflict's hint: regenerate it, #C1)
+export const LOCKFILE = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Gemfile\.lock|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|composer\.lock|go\.sum|mix\.lock|Podfile\.lock|flake\.lock)$/
 // lockfiles and their kin: regenerated, not merged by hand
 export const RADAR_SKIP = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|Gemfile\.lock|poetry\.lock|uv\.lock|composer\.lock|go\.sum|Podfile\.lock|Package\.resolved|flake\.lock)$/
 

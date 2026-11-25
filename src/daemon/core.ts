@@ -45,6 +45,7 @@ import { findSecrets, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
 import { envJson, envRestore, envRetry, envScrub, envStash, envUnread } from './envKeys.ts'
 import { keysWhere, onKeys } from './keychain.ts'
+import { LOCKFILE } from '../shared/overlap.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
@@ -6282,7 +6283,7 @@ async function shipWords(ws: Workspace) {
 // a lockfile (verify.ts' PROOF_FACTS), a binary one or one over 1 MB. ok: the hashes not to count (ws.secretOk's and
 // the ones allowed this time). Its words in the log and the result are masked; nothing found costs two git calls
 const SECRET_FILE_MAX = 1 << 20
-const LOCKFILE = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Gemfile\.lock|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|composer\.lock|go\.sum|mix\.lock|Podfile\.lock|flake\.lock)$/
+export { LOCKFILE } // shared/overlap.ts': a lock file, regenerated rather than merged by hand
 export async function shipSecrets(ws: Workspace, tree: string, ok: Set<string> = new Set(ws.secretOk)): Promise<SecretFound[]> {
   const ns = (await git(ws, 'diff-tree', '-r', '-z', '--no-renames', '--name-status', 'HEAD', tree)).split('\0')
   const paths: string[] = []

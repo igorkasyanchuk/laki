@@ -225,7 +225,9 @@ export const AUTO_LABEL: Record<AutoKey, string> = { autoFix: 'Fix failing CI', 
 export const AUTO_SAYS: Record<AutoKey, string> = { autoFix: 'Failing CI goes to the agent, with the logs', autoReview: 'New review comments go to the agent', autoMerge: 'Conflicts with the base: the agent merges it in', autoLand: 'Laki merges it once every check passes' }
 // the status bar's PR: number, CI, then its ⋯ (refresh, merge, the switches: what Laki does on its own); resting on its
 // number: PrCard above it. onMenu: the ⋯ and a right click
-export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; face?: boolean; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onMenu?: (e: MouseEvent<HTMLElement>) => void }) {
+// conflicts: where merging its base in conflicts (the stat's, #C1): the chip says how many files and places, its click onConflicts (a list)
+export const conflictWords = (c: { places: number }[], more = 0) => (n => `${n} file${n === 1 ? '' : 's'}, ${(p => `${p} place${p === 1 ? '' : 's'}`)(c.reduce((a, x) => a + x.places, 0))}`)(c.length + more)
+export function PRStatus({ w, face, onOpen, onToggle, onMenu, conflicts, conflictsMore, onConflicts }: { w: WsInfo; face?: boolean; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onMenu?: (e: MouseEvent<HTMLElement>) => void; conflicts?: { path: string; places: number }[]; conflictsMore?: number; onConflicts?: (e: MouseEvent<HTMLElement>) => void }) {
   const pr = w.pr
   const [card, setCard] = useState<{ left: number; bottom: number } | null>(null)
   const timer = useRef(0)
@@ -254,8 +256,8 @@ export function PRStatus({ w, face, onOpen, onToggle, onMenu }: { w: WsInfo; fac
             <CiMark pr={pr} />
           </button>
           {pr.conflict && (
-            <button className="pr pr-conflict" data-tip="Merge conflicts with its base branch: merge or rebase it" onClick={() => onOpen(pr.url)}>
-              <Icon name="conflict" size={11} /> conflicts
+            <button className="pr pr-conflict" data-tip={conflicts?.length ? 'Where merging its base in conflicts: click for the files' : 'Merge conflicts with its base branch: merge or rebase it'} onClick={e => (conflicts?.length && onConflicts ? onConflicts(e) : onOpen(pr.url))}>
+              <Icon name="conflict" size={11} /> {conflicts?.length ? conflictWords(conflicts, conflictsMore) : 'conflicts'}
             </button>
           )}
           {w.prLinked && <AutoToggles w={w} onToggle={onToggle} /> /* a linked PR: its words why none */}

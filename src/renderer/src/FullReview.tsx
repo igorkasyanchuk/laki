@@ -25,6 +25,7 @@ import type { PanelApi, Thread } from './SidePanel'
 import { Edge, Icon, IconButton, keep as store, load, type MenuItem, Num, useMenu, act, ScrollEdge } from './ui'
 import { fileTree, hunkNext, prName, prNo, reviewList } from './text'
 import './review.css'
+import { reviewFile } from './reviewFile'
 
 export type { ReviewNote } // sent ones carry when, to which tab, and what its turn did (shared/reviewNotes.ts)
 // the PR's conversation, everyone's: a comment, or a review's summary (state: APPROVED, CHANGES_REQUESTED, COMMENTED)
@@ -456,6 +457,19 @@ export function FullReview({ ws, project, base, branch, pr, linked, empty, workt
   }
   const go = (p: string) => (setCur(p), body.current?.querySelector<HTMLElement>(`[data-file="${CSS.escape(p)}"]`)?.scrollIntoView({ block: 'start' }))
   const pinGo = (p: string) => (pin(p), setTimeout(() => go(p), 0)) // the lists move: the file stays in view
+  // #C1: a file the status bar's conflicts list opened here: shown once its section is drawn (5 s at most)
+  useEffect(() => {
+    let t = 0
+    const look = (n = 0) => {
+      if (reviewFile.ws !== ws || !reviewFile.path) return
+      if (body.current?.querySelector(`[data-file="${CSS.escape(reviewFile.path)}"]`)) return go(reviewFile.path), (reviewFile.path = '')
+      if (n < 50) t = window.setTimeout(() => look(n + 1), 100)
+    }
+    const on = () => (clearTimeout(t), look())
+    look()
+    window.addEventListener('laki-review-file', on)
+    return () => (clearTimeout(t), window.removeEventListener('laki-review-file', on))
+  }, [ws])
   // ] and [: the next or previous change (a hunk's @@ head) below its file's sticky head, into the next or previous file
   // at a file's end; only the files near are asked where theirs are (.sp-change's content-visibility: R10)
   const hunk = (dir: 1 | -1) => {

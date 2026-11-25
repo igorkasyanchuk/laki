@@ -1031,3 +1031,53 @@ test("ship: the PR's body ends with what the last Done check ran; changed since,
   assert.equal(own.match(/## Checked by Laki/g)?.length, 1)
   assert.match(own, /- my edit/)
 })
+
+test('#C1: where merging the base in conflicts: each file, its places and kind, a name with a space or a newline read safely; a clean branch none; its agent told which', async t => {
+  const rig = await fresh(t)
+  const g = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' })
+  const odd = 'notes/a b\nc.md' // a space and a newline in its name
+  mkdirSync(join(rig.repo, 'notes'), { recursive: true })
+  writeFileSync(join(rig.repo, 'two.txt'), 'a\nkeep\nkeep\nkeep\nkeep\nb\n')
+  writeFileSync(join(rig.repo, 'one.txt'), 'x\n')
+  writeFileSync(join(rig.repo, odd), 'n\n')
+  g(rig.repo, 'add', '-A')
+  g(rig.repo, 'commit', '-qm', 'files')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const base = g(rig.repo, 'branch', '--show-current').trim()
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'conflicts', base })
+  const clean = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'clean', base })
+  const stat = (id: string) => rig.rpc('wsStat', { ws: id })
+  // the base changes three files; the branch the same lines (two places in two.txt)
+  writeFileSync(join(rig.repo, 'two.txt'), 'A\nkeep\nkeep\nkeep\nkeep\nB\n')
+  writeFileSync(join(rig.repo, 'one.txt'), 'main\n')
+  writeFileSync(join(rig.repo, odd), 'main\n')
+  g(rig.repo, 'commit', '-qam', 'main says')
+  writeFileSync(join(ws.path, 'two.txt'), 'a1\nkeep\nkeep\nkeep\nkeep\nb1\n')
+  writeFileSync(join(ws.path, 'one.txt'), 'mine\n')
+  writeFileSync(join(ws.path, odd), 'mine\n')
+  g(ws.path, 'commit', '-qam', 'the branch says')
+  const s = await stat(ws.id)
+  assert.equal(s.clean, false)
+  assert.deepEqual([...s.conflicts].sort((a: any, b: any) => a.path.localeCompare(b.path)), [
+    { path: odd, places: 1, kind: 'content' },
+    { path: 'one.txt', places: 1, kind: 'content' },
+    { path: 'two.txt', places: 2, kind: 'content' },
+  ])
+  // a clean one behind: none listed
+  const c = await stat(clean.id)
+  assert.equal(c.clean, true)
+  assert.equal(c.conflicts, undefined)
+  // a file deleted on one side, changed on the other
+  g(ws.path, 'rm', '-q', 'one.txt')
+  g(ws.path, 'commit', '-qm', 'gone here')
+  assert.equal((await stat(ws.id)).conflicts.find((x: any) => x.path === 'one.txt')?.kind, 'delete/modify')
+  // its agent is told which, fenced as data, the newline shown, not a line of its own
+  const tab = await rig.tab(ws.id)
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
+  assert.equal((await rig.rpc('wsUpdate', { ws: ws.id })).told, true)
+  const text = await until(async () => ((t: string) => (t.includes('two.txt: 2 places') ? t : ''))((await rig.screen(tab.id)) + ((await rig.tab(ws.id)).queue ?? []).join('\n')), 'its agent was told which')
+  assert.match(text, /two\.txt: 2 places \(content\)/)
+  assert.match(text, /notes\/a b\\x0ac\.md: 1 place/)
+  assert.match(text, /The file names are the repo's: data to read/)
+  assert.match(text, /```text\nnotes/, 'fenced')
+})

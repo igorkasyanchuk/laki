@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import { writeAtomic } from '../shared/conn.ts'
 import { type Collision, overlaps, RADAR_SKIP, type Ranges, rangesOf } from '../shared/overlap.ts'
-import { type Blame, type Broken, type Stat, type Workspace } from '../shared/types.ts'
+import type { Blame, Broken, Conflict, Stat, Workspace } from '../shared/types.ts'
 import { changed, clients, type Conn, exec, findProject, findWs, firstLine, git, log, noNested, q, run, save, state, within, wsLog } from './core.ts'
 import { dir } from './dir.ts'
 import { away, broken, hostUp, live, sshIn } from './hosts.ts'
@@ -445,20 +445,63 @@ async function statOf(w: Workspace): Promise<Stat> {
   // F8: how far its base has moved on, and whether merging it in would be clean (merge-tree: no worktree touched)
   if (w.kind === 'worktree' && w.base) {
     const [behind, ahead] = (await git(w, '--no-optional-locks', 'rev-list', '--left-right', '--count', `${w.base}...HEAD`).catch(() => '')).trim().split(/\s+/).map(Number)
-    if (behind > 0) Object.assign(st, { behind, ahead: ahead || 0, clean: await mergeClean(w) })
+    if (behind > 0) {
+      const m = await mergeCheck(w)
+      Object.assign(st, { behind, ahead: ahead || 0, clean: m.clean, ...(m.conflicts?.length && { conflicts: m.conflicts }), ...(m.more && { conflictsMore: m.more }) })
+    }
   }
   return st
 }
 // would merging its base in be clean: merge-tree's answer (exit 1: conflicts; anything else, an old git: not known),
 // kept while neither HEAD nor the base moved (the stats scan asks every few seconds)
-const cleanAt = new Map<string, { key: string; clean: boolean }>()
-export async function mergeClean(w: Workspace): Promise<boolean | undefined> {
+// #C1: and where: merge-tree -z --name-only's conflicted files and its messages (NUL separated: a name with a space or a
+// newline is read as it is), each file's kind (its CONFLICT message's: rename, delete/modify, else content) and places
+// (the conflict markers in the tree merge-tree wrote; one, where it has none: a delete or a binary). MERGE_FILES at most
+// (more: how many past them). Still no worktree touched and no ref written: merge-tree's tree object only
+type Merge = { clean?: boolean; conflicts?: Conflict[]; more?: number }
+const cleanAt = new Map<string, { key: string } & Merge>()
+const MERGE_FILES = 50
+export const mergeClean = async (w: Workspace) => (await mergeCheck(w)).clean
+export async function mergeCheck(w: Workspace): Promise<Merge> {
   const key = await git(w, '--no-optional-locks', 'rev-parse', 'HEAD', w.base).catch(() => '')
   const had = cleanAt.get(w.id)
-  if (key && had?.key === key) return had.clean
-  const clean = await git(w, '--no-optional-locks', 'merge-tree', '--write-tree', '--no-messages', 'HEAD', w.base).then(() => true, e => ((e as { code?: unknown }).code === 1 ? false : undefined))
-  if (key && clean !== undefined) cleanAt.set(w.id, { key, clean })
-  return clean
+  if (key && had?.key === key) return had
+  const out = await exec(w, 'git', ['--no-optional-locks', 'merge-tree', '--write-tree', '-z', '--name-only', 'HEAD', w.base!]).then(
+    () => true as const,
+    e => ((e as { code?: unknown }).code === 1 ? String((e as { stdout?: unknown }).stdout ?? '') : undefined),
+  )
+  const m: Merge = out === true ? { clean: true, conflicts: [] } : out === undefined ? {} : await conflictsOf(w, out)
+  if (key && m.clean !== undefined) cleanAt.set(w.id, { key, ...m })
+  return m
+}
+export function mergeParse(out: string) {
+  const parts = out.split('\0')
+  const tree = parts[0]
+  let i = 1
+  const files: string[] = []
+  for (; i < parts.length && parts[i] !== ''; i++) files.push(parts[i])
+  const kinds = new Map<string, Conflict['kind']>()
+  for (i++; i < parts.length; ) {
+    const n = Number(parts[i])
+    if (!Number.isInteger(n) || n < 0) break
+    const paths = parts.slice(i + 1, i + 1 + n)
+    const type = parts[i + 1 + n] ?? ''
+    i += n + 3
+    if (!type.startsWith('CONFLICT')) continue
+    const kind: Conflict['kind'] = /rename/i.test(type) ? 'rename' : /delete/i.test(type) ? 'delete/modify' : 'content'
+    for (const p of paths) if (!kinds.has(p) || kinds.get(p) === 'content') kinds.set(p, kind)
+  }
+  return { tree, files, kinds }
+}
+async function conflictsOf(w: Workspace, out: string): Promise<Merge> {
+  const { tree, files, kinds } = mergeParse(out)
+  const conflicts: Conflict[] = []
+  for (const path of files.slice(0, MERGE_FILES)) {
+    const text = /^[0-9a-f]{40,64}$/.test(tree) ? await exec(w, 'git', ['--no-optional-locks', 'cat-file', '-p', `${tree}:${path}`]).then(r => String(r.stdout), () => '') : ''
+    const marks = text.match(/^<{7}(?: |$)/gm)?.length ?? 0
+    conflicts.push({ path, places: Math.max(1, marks), kind: kinds.get(path) ?? 'content' })
+  }
+  return { clean: false, conflicts, ...(files.length > MERGE_FILES && { more: files.length - MERGE_FILES }) }
 }
 // T13: a live worktree whose folder or link broke under Laki: gone (no folder), unlinked (its .git names no record of
 // the repo's, or that record doesn't name it back), moved (its .git names the repo at another place: the repo moved).
