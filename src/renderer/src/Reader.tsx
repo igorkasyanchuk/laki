@@ -13,11 +13,11 @@ import { ask, closeTo, Icon, type MenuItem, ON, openFrom, ScrollEdge, useMenu } 
 import { Modal } from './panels'
 import { linkify, Markdown, RunCode, UiBlocks } from './MarkdownView'
 import { clean } from './Widgets'
-import { bridge, daemonBase, openExternal } from './api'
+import { api as daemon, bridge, daemonBase, openExternal } from './api'
 import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 import { uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { isElement, uiCheck, uiHtml } from '../../shared/widgetUi'
-import { historyKey, useComplete, usePromptHistory } from './PromptInput'
+import { historyKey, keepFile, linesOf, longPaste, pastedFile, plainKey, useComplete, usePromptHistory } from './PromptInput'
 import { useSecretHint } from './secretHint'
 import { useImprove } from './Improve'
 import { type Mention, type ReaderLine, readerShown, readerTimes, retrying, retryText, saidAt, toolSummary, withMentions } from './text'
@@ -446,7 +446,20 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
             onChange={e => (setText(e.target.value), at.look())}
             onSelect={at.look}
             onBlur={at.blur} {...at.aria}
+            onPaste={e => {
+              // #10: a long paste kept as a file (as a prompt box's chip), its path in at the caret; ⇧⌘V: as text
+              const t = e.clipboardData.getData('text/plain')
+              if (!longPaste(t)) return
+              e.preventDefault()
+              const el = e.currentTarget
+              const [a, b] = [el.selectionStart, el.selectionEnd]
+              void keepFile(pastedFile(t), () => Promise.reject(new Error('text only')), (data, name) => daemon.call<string>('fileSave', { data, name })).then(
+                k => setText(v => `${v.slice(0, a)}${a && !/\s$/.test(v.slice(0, a)) ? ' ' : ''}[pasted text, ${linesOf(t)} lines: ${k.path}] ${v.slice(b)}`),
+                () => setText(v => v.slice(0, a) + t + v.slice(b)), // not kept: as text, as before
+              )
+            }}
             onKeyDown={e => {
+              plainKey(e)
               if (at.key(e)) return // @'s menu took it
               if (ghost && e.key === 'Tab' && !e.shiftKey) return void (e.preventDefault(), setText(ghost))
               if (ghost && e.key === 'Escape') return void (e.preventDefault(), e.stopPropagation(), setHid(ghost))

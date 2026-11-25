@@ -64,6 +64,8 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Improve my prompt**: ✨ in a prompt box has Laki AI rewrite your draft with what the chat knows; it stays in the box
   for you to read, and Restore or ⌘Z brings yours back.
 - **Prompt history**: ↑ in an empty prompt box (or ⌥↑) searches every prompt you've sent; a pick fills the box.
+- **Long pastes as files**: a big log or stack trace pasted into a prompt box becomes a chip (*pasted-text.txt · 312
+  lines*) the agent gets as a file; a click reads or edits it, ⇧⌘V pastes it as text.
 - **Notifications** (Settings › Notifications, after General): Quiet, macOS notifications and their sound, then a table
   of what tells you where: a row per event (an agent waits, a turn finished, CI failing, a plan limit, a long turn, a
   workspace's cost past your amounts, a timer), a column per place (macOS, a card on screen, the phone, the sound), the edge glow and the Dock's bounce.

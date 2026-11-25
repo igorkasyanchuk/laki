@@ -8,17 +8,18 @@ import { type ImproveAt, useImprove } from './Improve'
 import { type ActionFile, FILE_MAX, type Template, templatesFor, type View } from '../../shared/types'
 import { sendIs } from '../../shared/keys'
 import { maskSecrets } from '../../shared/secrets'
+import { linesOf, longPaste, pastedFile, plainKey } from './paste'
 import { ago, bytes } from '../../shared/widget'
 import { api, bridge, openExternal } from './api'
 import { type AgentCommand, completeInto, type Mention, completions, pathText, type Ref, type Trigger, triggerAt, withPaths } from './text'
-import { Icon, keep, load, type MenuItem, useMenu } from './ui'
+import { askText, Icon, keep, load, type MenuItem, useMenu } from './ui'
 import { useSecretHint } from './secretHint'
 import { cloudVoice, fnOn, historyOpen, useHistory, useLevel, useVoice, voiceAgain, voiceAgents, voiceCopy, voiceSendTo, voiceIn, voiceSends, voiceStart, voiceStop } from './voice'
 
 // what an extension's action gives a prompt box: its insert at the cursor, its files attached
 export type Inserted = { text: string; files?: ActionFile[] }
 export type Inserts = { label: string; sub?: string; run: () => Promise<Inserted | undefined> }[] // a box's Insert menu: extensions' actions (show prompt)
-export type Img = { path: string; url?: string; size?: number } // saved file, and a data: URL for an image's thumbnail (none: another file, a chip; size: its bytes)
+export type Img = { path: string; url?: string; size?: number; text?: string } // saved file, and a data: URL for an image's thumbnail (none: another file, a chip; size: its bytes; text: a long paste's, #10)
 
 // a Laki AI composer's unsent text and pasted images, per chat (laki.aiDrafts, by key; images as their paths, shown again
 // through aiImage, one no longer kept left out): back as the chat opens again, after a restart too, until sent or emptied
@@ -56,12 +57,21 @@ export function useDraft(key: string) {
 // the prompt the agent gets
 export const withImages = (text: string, imgs: { path: string }[]) => withPaths(text, imgs.map(i => i.path))
 
-// an attached file (fileSave's: <data>/files/<id>/<its name>): its icon, name and size, and its ✕ where it can go
-export const FileChip = ({ path, size, onRemove }: { path: string; size?: number; onRemove?: () => void }) => (
-  <span className="prompt-file" data-tip={path}>
+export { linesOf, longPaste, pastedFile, plainKey } from './paste'
+
+// an attached file (fileSave's: <data>/files/<id>/<its name>): its icon, name and size, and its ✕ where it can go; a
+// long paste's its lines, a click shows and edits it (onOpen)
+export const FileChip = ({ path, size, lines, onOpen, onRemove }: { path: string; size?: number; lines?: number; onOpen?: () => void; onRemove?: () => void }) => (
+  <span className="prompt-file" data-tip={onOpen ? `${path} · click: read or edit it` : path}>
     <Icon name="file" size={13} />
-    <span className="prompt-file-name">{path.split('/').pop()}</span>
-    {size !== undefined && <span className="muted">{bytes(size)}</span>}
+    {onOpen ? (
+      <button type="button" className="link prompt-file-name" onClick={onOpen}>
+        {path.split('/').pop()}
+      </button>
+    ) : (
+      <span className="prompt-file-name">{path.split('/').pop()}</span>
+    )}
+    {lines !== undefined ? <span className="muted">{lines} lines</span> : size !== undefined && <span className="muted">{bytes(size)}</span>}
     {onRemove && (
       <button type="button" aria-label="Remove" onClick={onRemove}>
         ×
@@ -323,7 +333,26 @@ export function PromptInput(p: {
     if (rest.length) p.files!(rest)
     return kept.length + rest.length > 0
   }
-  const paste = (e: ClipboardEvent) => take(filesOf(e.clipboardData.items)) && e.preventDefault() // text pastes as usual
+  const paste = (e: ClipboardEvent) => {
+    if (take(filesOf(e.clipboardData.items))) return e.preventDefault()
+    const t = e.clipboardData.getData('text/plain')
+    if (!p.saveFile || !longPaste(t)) return // text pastes as usual
+    e.preventDefault()
+    void pasteKeep(t)
+  }
+  // #10: a long paste kept as a file, a chip after the others (was: the one it replaces, edited)
+  const pasteKeep = async (t: string, was?: Img) => {
+    setErr('')
+    p.onBusy?.(++saving.current > 0)
+    try {
+      const k = await keepFile(pastedFile(t), p.save, p.saveFile)
+      p.onImages(x => (was && x.includes(was) ? x.map(y => (y === was ? { path: k.path, size: t.length, text: t } : y)) : [...x, { path: k.path, size: t.length, text: t }]))
+    } catch (e) {
+      setErr(`pasted text: ${(e as Error).message}`)
+    }
+    p.onBusy?.(--saving.current > 0)
+  }
+  const pasteOpen = (i: Img) => void askText('Pasted text', { multi: true, value: i.text, ok: 'Save' }).then(t => t !== null && t !== i.text && (t.trim() ? pasteKeep(t, i) : p.onImages(x => x.filter(y => y !== i))))
   // handled here: the default prevented tells the window's own drop (folders become projects) to keep out. A folder is
   // its path, typed in at the cursor (quoted), as a terminal's drop: never read
   const drop = (e: DragEvent) => {
@@ -392,6 +421,7 @@ export function PromptInput(p: {
         {...cmp.aria}
         onPaste={paste}
         onKeyDown={(e: KeyboardEvent) => {
+          plainKey(e)
           if (cmp.key(e)) return
           if (historyKey(e, !p.value)) return e.preventDefault(), history() // an empty box: your prompts
           if (e.key === 'Enter' && (e.metaKey || (p.enter && sendIs(e) && !e.nativeEvent.isComposing))) e.preventDefault(), hint.guard(() => p.onSubmit?.()) // a chat's: Settings › Keys › Send with; a pasted secret's line first (secretHint)
@@ -414,7 +444,7 @@ export function PromptInput(p: {
                 </button>
               </div>
             ) : (
-              <FileChip key={i.path} path={i.path} size={i.size} onRemove={() => p.onImages(x => x.filter(y => y !== i))} />
+              <FileChip key={i.path} path={i.path} size={i.size} lines={i.text === undefined ? undefined : linesOf(i.text)} onOpen={i.text === undefined ? undefined : () => pasteOpen(i)} onRemove={() => p.onImages(x => x.filter(y => y !== i))} />
             ),
           )}
         </div>

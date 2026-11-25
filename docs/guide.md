@@ -2187,6 +2187,12 @@ prompt instead; *Send as it is* sends it unchanged. ⏎ with the line showing wa
 window, nothing is sent to look, and a kept draft keeps it masked. Settings › Agents & profiles › *Warn about a pasted
 secret* turns it off.
 
+Paste a long text (a log, a stack trace: over 40 lines or 4,000 characters) into a prompt box that takes files and it
+becomes a chip, *pasted-text.txt · 312 lines*, instead of filling the box: the agent gets the file's path, the box stays
+readable, and a click on the chip's name shows it to read or edit (emptied, it goes). In a Reader's box the file's path
+goes in where you pasted. ⇧⌘V (Edit › Paste and Match Style) pastes it as text, as before; a paste with a secret in it
+stays text too, so its line can pass it as a secret.
+
 While Claude Code compacts a long chat, its tab and row say *Compacting…*.
 
 **Subagents and background tasks**: while a Claude Code chat has subagents at work or commands left running in the

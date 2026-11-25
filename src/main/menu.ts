@@ -243,7 +243,7 @@ export const appMenu = () => Menu.setApplicationMenu(
         { role: 'cut' },
         { role: 'copy' },
         { role: 'paste' },
-        { role: 'pasteAndMatchStyle' },
+        { role: 'pasteAndMatchStyle', accelerator: 'Shift+CommandOrControl+V' }, // #10: a long paste as text in a prompt box, not a file
         { role: 'delete' },
         { role: 'selectAll' },
         { type: 'separator' },

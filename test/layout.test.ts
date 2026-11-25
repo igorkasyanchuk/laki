@@ -213,3 +213,14 @@ test("#9: the sidebar's Recent view: running first, then by day, newest first, e
   assert.deepEqual(g.map(x => [x.label, x.ws.map(w => w.id).join('')]), [['Running', 'b'], ['Today', 'ah'], ['Yesterday', 'c'], ['Last 7 days', 'de'], ['Last 30 days', 'f'], ['Older', 'g']])
   assert.deepEqual(recentGroups([ws[0]], w => w.at, () => false, now).map(x => x.id), ['today'])
 })
+
+test('#10: a long paste kept as a file: over 40 lines or 4,000 characters, never one with a secret, never right after ⇧⌘V', async () => {
+  const { linesOf, longPaste, plainKey } = await import('../src/renderer/src/paste.ts')
+  assert.equal(longPaste('a\n'.repeat(40)), false)
+  assert.equal(longPaste('a\n'.repeat(41)), true)
+  assert.equal(longPaste('x'.repeat(4001)), true)
+  assert.equal(linesOf('a\nb\n'), 2)
+  assert.equal(longPaste(`${'line\n'.repeat(50)}ghp_${'a'.repeat(36)}`), false)
+  plainKey({ metaKey: true, ctrlKey: false, shiftKey: true, key: 'V' })
+  assert.equal(longPaste('a\n'.repeat(41)), false)
+})

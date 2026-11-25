@@ -1450,6 +1450,7 @@ html[data-motion='none'] .lift { transform: none; }
 .prompt-file button { flex: none; width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%; background: transparent; color: var(--muted); font-size: var(--fs-3); line-height: 18px; }
 .prompt-file button:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
 .prompt-images .prompt-file { align-self: center; }
+.prompt-file button.prompt-file-name { flex: 0 1 auto; width: auto; height: auto; border-radius: 0; background: none; color: inherit; font-size: inherit; line-height: inherit; text-decoration: underline dotted; cursor: var(--cur-act); } /* #10: a long paste's name: read or edit it */
 .prompt-tools { display: flex; align-items: center; gap: var(--sp-2); }
 /* a pasted secret's line (secretHint.tsx): its kind, the value masked, Send as it is, Pass as a secret */
 .secret-hint { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); color: var(--waiting); }

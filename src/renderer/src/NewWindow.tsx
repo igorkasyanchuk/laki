@@ -323,6 +323,7 @@ export function QuickWindow() {
         images={images}
         onImages={setImages}
         save={(data, ext) => api.call<string>('imageSave', { data, ext })}
+        saveFile={(data, name) => api.call<string>('fileSave', { data, name })}
         onBusy={setSaving}
         onSubmit={send}
         enter
