@@ -54,6 +54,12 @@ export function running(pid: number) {
   }
 }
 
+// a command under a terminal of its own (script): BSD's on a Mac (script -q /dev/null cmd…), util-linux's on Linux
+// (script -qec "<cmd>" /dev/null, the line run by $SHELL: sh here, not the rig's fake one)
+export const pty = (cmd: string[], env: NodeJS.ProcessEnv = process.env) =>
+  process.platform === 'linux'
+    ? { file: 'script', args: ['-qec', cmd.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' '), '/dev/null'], env: { ...env, SHELL: '/bin/sh' } }
+    : { file: 'script', args: ['-q', '/dev/null', ...cmd], env }
 export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms = 20000): Promise<T> { // room for a loaded machine: a pass returns at once
   const end = Date.now() + ms * SLOW
   let last: unknown

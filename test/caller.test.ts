@@ -10,7 +10,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { procParent, procPeer } from '../src/daemon/peer.ts'
 import { spawn } from 'node:child_process'
-import { connect, fresh, seen, sleep, until } from './helpers.ts'
+import { connect, fresh, pty, seen, sleep, until } from './helpers.ts'
 
 test("M5: an agent's call is its tab's with Origin: app://laki too; answers, keys into an ask and remote access aren't an agent's; another workspace's terminal asks; one that can't be found is refused", async t => {
   const rig = await fresh(t)
@@ -435,7 +435,8 @@ test("S1: a terminal Laki hasn't seen is held until you allow it in the window: 
   // sh under script: one terminal, its session's leader sh, for every command in the line; daemon.json's token
   const term = (line: string) =>
     new Promise<string>(ok => {
-      const c = spawn('script', ['-q', '/dev/null', 'sh', '-c', line], { env: rig.env, stdio: ['ignore', 'pipe', 'pipe'] })
+      const sh = pty(['sh', '-c', line], rig.env)
+      const c = spawn(sh.file, sh.args, { env: sh.env, stdio: ['ignore', 'pipe', 'pipe'] })
       let out = ''
       c.stdout.on('data', d => (out += d))
       c.on('exit', () => ok(out))

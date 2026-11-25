@@ -9,7 +9,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { AGENT_NO, AGENT_OK, AGENT_OWN } from '../src/daemon/gates.ts'
 import { isHiddenEvent, recorded, type View } from '../src/shared/types.ts'
-import { connect, fresh, seen, sleep, tokenOf, until } from './helpers.ts'
+import { connect, fresh, pty, seen, sleep, tokenOf, until } from './helpers.ts'
 
 test("S2: an agent's rm asks the user; files and tabs are its own workspace's; no share, no file opened by its app; a sandboxed one: none of it", async t => {
   const rig = await fresh(t)
@@ -273,7 +273,8 @@ test("S1: a detached process with daemon.json's token is refused what's yours; t
   assert.equal((await rig.rpc('state')).settings.nextPrompt, undefined)
   // the CLI from a terminal of yours (script gives it one): you, once you allowed that terminal in the window
   const app = await connect(rig)
-  const term = spawn('script', ['-q', '/dev/null', ...node, cli, 'rename', ws.id, 'by-you'], { env, stdio: 'ignore' })
+  const sh = pty([...node, cli, 'rename', ws.id, 'by-you'], env)
+  const term = spawn(sh.file, sh.args, { env: sh.env, stdio: 'ignore' })
   const ask: any = await seen(app, (e: any) => e.ev === 'termAsk', 'the terminal asked about')
   await app.call('termAnswer', { req: ask.req, allow: true })
   await new Promise(ok => term.on('exit', ok))

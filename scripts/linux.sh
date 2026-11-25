@@ -23,7 +23,7 @@ cp dist/*.AppImage /out/
 cp dist/*-linux*.yml /out/ 2> /dev/null || true # the updater feed (package.json build.publish): latest-linux.yml, latest-linux-arm64.yml
 echo "--- smoke test"; script -qec "bash scripts/pack-smoke.sh /tmp/laki-pack" /dev/null < /dev/null; cp /tmp/laki-pack/shot.png /out/ # under a pty: docker run gives no terminal, and the daemon (S1) refuses a caller with none
 [ "$TESTS" = 0 ] && exit
-echo "--- tests (dist/linux/test.log)"; chown -R t /w; r=0; su t -c "npm test" > /out/test.log 2>&1 || r=$?
+echo "--- tests (dist/linux/test.log)"; chown -R t /w; r=0; su t -c "git config --global user.name t && git config --global user.email t@t.invalid && npm test" > /out/test.log 2>&1 || r=$?
 grep -E "^# (tests|pass|fail) |^not ok" /out/test.log; exit $r
 '
 ls -la "$ROOT/dist/linux"

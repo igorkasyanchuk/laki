@@ -6,7 +6,7 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { connect, fresh, seen, until } from './helpers.ts'
+import { connect, fresh, pty, seen, until } from './helpers.ts'
 
 test('S1: an allowed terminal is listed with its tty, what started it and its last call; Revoke asks it again; only the window lists or revokes', async t => {
   const rig = await fresh(t)
@@ -17,7 +17,8 @@ test('S1: an allowed terminal is listed with its tty, what started it and its la
   const go = join(rig.home, 'go')
   const app = await connect(rig) // first: a call from a terminal with no window open is refused at once
   // one terminal (sh under script, its session's leader) for two calls, the second once the test says go
-  const c = spawn('script', ['-q', '/dev/null', 'sh', '-c', `${laki} rename ${ws.id} first; while [ ! -f ${go} ]; do sleep 0.1; done; ${laki} rename ${ws.id} second`], { env: rig.env, stdio: ['ignore', 'pipe', 'pipe'] })
+  const sh = pty(['sh', '-c', `${laki} rename ${ws.id} first; while [ ! -f ${go} ]; do sleep 0.1; done; ${laki} rename ${ws.id} second`], rig.env)
+  const c = spawn(sh.file, sh.args, { env: sh.env, stdio: ['ignore', 'pipe', 'pipe'] })
   let out = ''
   c.stdout.on('data', d => (out += d))
   const ended = new Promise(ok => c.on('exit', ok))

@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { dataDir } from '../src/shared/conn.ts'
-import { fresh, running, until } from './helpers.ts'
+import { fresh, pty, running, until } from './helpers.ts'
 
 // a dev server on two ports
 const LISTEN = `exec node -e 'const h = require("http"); h.createServer().listen(0, "127.0.0.1"); h.createServer().listen(0, "127.0.0.1")'`
@@ -270,7 +270,8 @@ test('cli: starts the daemon when none runs; stop ends it', async t => {
   process.kill(pid)
   await until(() => !running(pid), 'the first daemon gone')
   const laki = `${process.execPath} --experimental-strip-types --no-warnings ${fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))}`
-  const said = execFileSync('script', ['-q', '/dev/null', 'sh', '-c', `${laki} ls --json > /dev/null && ${laki} stop`], { env: rig.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  const sh = pty(['sh', '-c', `${laki} ls --json > /dev/null && ${laki} stop`], rig.env)
+  const said = execFileSync(sh.file, sh.args, { env: sh.env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   assert.doesNotMatch(said, /isn't allowed|couldn't tell/)
   assert.equal(readFileSync(join(rig.data, 'daemon.log'), 'utf8').split('laki daemon on 127.0.0.1').length - 1, 2, 'a second daemon, started from the terminal')
   await until(() => !existsSync(join(rig.data, 'daemon.json')), 'stopped from the terminal that started it')
