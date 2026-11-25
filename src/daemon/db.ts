@@ -2,8 +2,14 @@
 // its tables with their row counts and schema, a table's first DB_ROWS rows (sorted by a column, filtered by words in
 // any of them), and a read-only query (SELECT or WITH only), DB_QUERY_ROWS at most. Opened read-only (node's own
 // node:sqlite, as agentUsage.ts reads agy's): nothing here writes, and SQLite itself refuses a write on that
-// connection. Cells as text: NULL, a blob's size. Pure (test/db.test.ts); the daemon runs it in a worker (dbWorker.ts,
-// files.ts' dbOf: a time and a heap cap). ponytail: a huge table's count(*) is a scan; the worker's time cap ends it
+// connection. In: a clone of it (and its -wal) in a temp folder, as agyRead does: a read-only open of a WAL database
+// would leave its -shm and -wal in the worktree, and the app writing it never waits on Laki's lock. Cells as text: NULL,
+// a blob's size. Pure (test/db.test.ts); the daemon runs it in a worker (dbWorker.ts, files.ts' dbOf: a time and a heap
+// cap, the temp folder its, gone however the worker ends). ponytail: a huge table's count(*) is a scan; the worker's
+// time cap ends it
+import { constants, copyFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+
 export type DbTable = { name: string; kind: 'table' | 'view'; rows?: number; sql: string }
 export type DbRows = { cols: string[]; rows: string[][]; cut?: boolean }
 export type DbAsk = { op: 'tables' } | { op: 'rows'; table: string; sort?: string; desc?: boolean; filter?: string } | { op: 'query'; sql: string }
@@ -30,10 +36,16 @@ const rowsOf = (it: Iterable<unknown>, max: number): DbRows & { cols: string[] }
   return { cols, rows, ...(cut && { cut }) }
 }
 
-export function dbRead(path: string, q: DbAsk): { tables: DbTable[] } | DbRows {
+export function dbRead(path: string, q: DbAsk, tmp?: string): { tables: DbTable[] } | DbRows {
   const sqlite = process.getBuiltinModule?.('node:sqlite') as Sqlite | undefined
   if (!sqlite) throw new Error("this Node can't read SQLite")
-  const d = new sqlite.DatabaseSync(path, { readOnly: true })
+  let file = path
+  if (tmp) {
+    file = join(tmp, 'db')
+    copyFileSync(path, file, constants.COPYFILE_FICLONE) // APFS: a clone, no bytes copied; elsewhere node copies
+    if (existsSync(`${path}-wal`)) copyFileSync(`${path}-wal`, `${file}-wal`, constants.COPYFILE_FICLONE)
+  }
+  const d = new sqlite.DatabaseSync(file, { readOnly: true })
   try {
     if (q.op === 'tables') {
       const all = d.prepare("SELECT name, type, sql, tbl_name FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name").all() as { name: string; type: string; sql: string; tbl_name: string }[]

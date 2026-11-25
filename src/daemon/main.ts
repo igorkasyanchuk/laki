@@ -1485,7 +1485,11 @@ function agentNo(method: string, p: Params) {
   else if (method === 'memoryAdd' && p.auto === false) notAgent(p, "add to a project's memory as the user's (laki memory add without --mine keeps it as learned)")
   else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
   else if (method === 'input' && core.agentCaller(p.from)) shiftTabNo(p, String(p.tab), String(p.data ?? ''))
-  else if (method === 'send' && core.agentCaller(p.from)) shiftTabNo(p, core.resolveTarget(String(p.target ?? '')).id, core.noKeys(String(p.text ?? '')), false) // send strips escapes, but its text can finish an Esc that input left
+  else if (method === 'send' && core.agentCaller(p.from)) {
+    const id = core.resolveTarget(String(p.target ?? '')).id
+    shiftTabNo(p, id, core.noKeys(String(p.text ?? '')), false) // send strips escapes, but its text can finish an Esc that input left
+    if (p.mode === 'interrupt' || p.mode === 'steer') keyTail.set(id, '\x1b') // #4: either may press Esc for the agent, as queueNow's
+  }
   else if (method === 'queueNow' && core.agentCaller(p.from)) keyTail.set(core.resolveTarget(String(p.tab ?? '')).id, '\x1b') // it presses Esc for the agent
   else if (method === 'tabMode') notAgent(p, 'change a permission mode')
   else if (method === 'tabDraft') notAgent(p, "read or change what the user is typing")

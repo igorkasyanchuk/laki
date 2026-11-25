@@ -763,7 +763,7 @@ async function main() {
       // #4: --queue (the default; --when-idle the same), --steer or --interrupt; the reply says which happened
       const modes = (['queue', 'steer', 'interrupt'] as const).filter(m => flags[m] || (m === 'queue' && flags['when-idle']))
       if (modes.length > 1) throw new Error('one of --queue, --steer, --interrupt')
-      const r = await rpc('send', { target, text: words.join(' '), mode: modes[0] ?? 'queue' }, 150000) // another workspace's from an agent: the user is asked first
+      const r = await rpc('send', { target, text: words.join(' '), mode: modes[0] ?? 'queue', ...(modes[0] === 'queue' && { whenIdle: true }) }, 150000) // another workspace's from an agent: the user is asked first; --queue said: a terminal refuses it (no turns)
       return out(r, sentLine(r))
     }
     case 'bell': {

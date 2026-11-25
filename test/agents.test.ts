@@ -32,7 +32,7 @@ test('hooks drive status; queue delivered on Stop; done until viewed', async t =
   const q1 = await rig.rpc('send', { target: ws.id, text: 'second', whenIdle: true })
   assert.equal(q1.queued, 1)
   const q2 = await rig.cli('send', `${ws.id}/claude`, '--when-idle', 'third')
-  assert.match(q2.out, /queued \(2 waiting\)/)
+  assert.match(q2.out, /queued, 1 ahead: sent when its turn ends/)
   tv = await rig.tab(ws.id)
   assert.deepEqual(tv.queue, ['second', 'third'])
   // answer the prompt: a turn ends → "second" goes in, its Stop → "third"

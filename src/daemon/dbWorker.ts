@@ -6,7 +6,7 @@ import { dbRead } from './db.ts'
 
 if (parentPort)
   try {
-    parentPort.postMessage({ r: dbRead(String(workerData.path), workerData.q) })
+    parentPort.postMessage({ r: dbRead(String(workerData.path), workerData.q, String(workerData.tmp)) })
   } catch (e) {
     parentPort.postMessage({ err: (e as Error).message })
   }

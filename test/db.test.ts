@@ -1,6 +1,6 @@
 // #1: a SQLite database in Files (daemon/db.ts, its worker through files.ts): tables, rows, schema, a read-only query
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -42,6 +42,15 @@ test('db: tables with their rows and schema; a table sorted and filtered; SELECT
   assert.throws(() => dbRead(file, { op: 'query', sql: 'SELECT 1; DELETE FROM users' }), /one statement/)
   assert.throws(() => dbRead(file, { op: 'query', sql: 'WITH x AS (SELECT 1) INSERT INTO users (email) SELECT * FROM x' }), /readonly|read-only|attempt to write/i)
   assert.equal((dbRead(file, { op: 'tables' }) as any).tables[2].rows, 250, 'nothing written')
+  // a WAL database is read through a clone: its folder keeps no -shm or -wal of Laki's
+  const dir = mkdtempSync(join(tmpdir(), 'laki-wal-'))
+  const wal = join(dir, 'app.db')
+  const w = new DatabaseSync(wal)
+  w.exec('PRAGMA journal_mode=WAL; CREATE TABLE t (x); INSERT INTO t VALUES (1)')
+  w.close()
+  const tmp = mkdtempSync(join(tmpdir(), 'laki-db-'))
+  assert.deepEqual((dbRead(wal, { op: 'query', sql: 'SELECT x FROM t' }, tmp) as any).rows, [['1']])
+  assert.deepEqual(readdirSync(dir), ['app.db'])
 })
 
 test('db: Files gives a database its tables, and dbRead its rows, through the worker; a .db that is not one is a file', async t => {

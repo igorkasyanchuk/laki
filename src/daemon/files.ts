@@ -3,7 +3,7 @@
 
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -755,12 +755,13 @@ export function dbOf(path: string, q: DbAsk) {
         const here = dirname(fileURLToPath(import.meta.url))
         const file = [join(here, 'dbWorker.js'), join(here, '../dbWorker.js'), join(here, 'dbWorker.ts')].find(f => existsSync(f))
         if (!file) return rej(new Error('database worker not found'))
-        const w = new Worker(file, { workerData: { path, q }, resourceLimits: { maxOldGenerationSizeMb: 256 } })
+        const tmp = mkdtempSync(join(tmpdir(), 'laki-db-')) // its clone's: gone as the worker ends, a stalled one too
+        const w = new Worker(file, { workerData: { path, q, tmp }, resourceLimits: { maxOldGenerationSizeMb: 256 } })
         const slow = () => rej(new Error(`it took over ${DB_MS / 1000} s: a narrower query, or open it in its app`))
         const t = setTimeout(() => (slow(), void w.terminate()), DB_MS)
         w.once('message', (m: { r?: unknown; err?: string }) => (m.err === undefined ? res(m.r) : rej(new Error(m.err))))
         w.once('error', (e: NodeJS.ErrnoException) => (e.code === 'ERR_WORKER_OUT_OF_MEMORY' ? rej(new Error('too big to show')) : rej(e)))
-        w.once('exit', () => (clearTimeout(t), slow())) // a settled promise ignores it
+        w.once('exit', () => (clearTimeout(t), rmSync(tmp, { recursive: true, force: true }), slow())) // a settled promise ignores it
       }),
   )
   dbLine = p.catch(() => {})

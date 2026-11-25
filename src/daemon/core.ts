@@ -5083,7 +5083,7 @@ const steerable = (tab: Tab) => (tab.preset === 'claude' || tab.preset === 'code
 export const SEND_MODES = ['queue', 'steer', 'interrupt'] as const
 export async function sendMode(p: Parameters<typeof send>[0], mode: (typeof SEND_MODES)[number]) {
   const tab = resolveTarget(p.target)
-  if (!tracked(tab)) return send({ ...p, whenIdle: false })
+  if (!tracked(tab)) return send(p) // its whenIdle as said (--queue, --when-idle): refused, a terminal has no turns
   const r = rtOf(tab.id)
   const s = sessions.get(tab.id)
   const busy = r.status === 'running' && !r.limit && !asleep.has(tab.id) && !!s && !s.exited && !capOver(tab.workspace)
