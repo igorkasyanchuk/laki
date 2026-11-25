@@ -223,7 +223,7 @@ const swJs = () => `const CACHE = 'laki-shell-${(() => { try { return statSync(j
 const SHELL = ['/icon-192.png', '/icon-512.png', '/apple-touch-icon.png']
 const OFFLINE = ${JSON.stringify(OFFLINE)}
 const CHANGED = ${JSON.stringify(CHANGED)}
-// #P1 (shared/pins.ts): the daemon's list of the page's files, given in its sealed socket; LIST holds it and the cache
+// #P1 (pins.ts in shared): the daemon's list of the page's files, given in its sealed socket; LIST holds it and the cache
 // that has its files (laki-pin-<n>), the one switch point of a swap
 const META = 'laki-pins'
 const LIST = '/.laki-pins'
