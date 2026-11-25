@@ -52,7 +52,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c] [--prompt text] [--name n] [--model m] [--effort e] [--perm mode] [--fast] [--sandbox|--no-sandbox]
                                               a new tab; with a prompt, its agent starts on it; an agent's --cmd: asked in the app first
-  laki send <ws>[/<tab>]|@name [--when-idle] <text>   type text into an agent (now, or when its turn ends)
+  laki send <ws>[/<tab>]|@name [--queue|--steer|--interrupt] <text>
+                                              type text into an agent: after its turn (--queue, --when-idle), into it, or stopping it
   laki name <name>                            in an agent's tab: its @name, for other agents' send and ask
   laki bell <ws|tab> [--off]                  told once when it next finishes, asks, fails or hits a limit
   laki quiet [30m|1h|off]                     no notifications, sounds, cards or pushes for a while; off: a summary
@@ -250,14 +251,17 @@ script (laki run <ws> setup runs it later). --at starts its agent later, --after
   laki new shop --group Reviews --template review --prompt "#118"   under Reviews, through your review template
   laki new shop --action "PR+audit" --prompt "the login page"        your agent action's prompt, then these words`,
   send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id, name or
-number. --when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). Options go before the
-text; a text that starts with -- goes after --: laki send a1b2 -- --flag is the text. While the agent asks
-something (status waiting: a permission prompt), the text would answer it: leave those to the user, or --when-idle.
-From an agent's tab, a tab in another workspace: the user is asked in the app first.
+number. To an agent at work: --queue (the default; --when-idle the same) waits for its turn to end, --steer puts it
+into the running turn (Claude Code and Codex read what's typed while they work; others are stopped first) and
+--interrupt stops the turn (Esc), then sends. An idle agent gets it at once. The reply says which happened: sent,
+queued (how many ahead), joined its running turn, interrupted. An agent that asks something (status waiting: a
+permission prompt) is never typed into or stopped: it's queued. Options go before the text; a text that starts with
+-- goes after --: laki send a1b2 -- --flag is the text. From an agent's tab, a tab in another workspace: the user is
+asked in the app first.
 
   laki send a1b2 "Now add tests for it"
-  laki send a1b2/codex --when-idle "Rebase on main when you're done"
-  laki send @backend "The API is merged: rebase on main"`,
+  laki send a1b2/codex --steer "Skip the e2e tests, they're broken on main"
+  laki send @backend --interrupt "Stop: the API changed, rebase on main first"`,
   name: `Gives the agent in this tab (\$LAKI_TAB) a name other agents reach it by, in any workspace: @<name> works wherever a
 target goes (laki send, laki ask, laki screen). A word of letters, digits and dashes; one live agent per name (an ended
 one's goes to the next). It stays with the tab until the tab closes or its workspace is archived; laki name "" drops it.

@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- `laki send` to a working agent queues it for after its turn by default; `--steer` puts it into the running turn, `--interrupt` stops the turn first, and the reply says which happened.
+
 ## 0.64.0 · Nov 25, 2026
 
 - Comment on any code in Files, not only the diff: a line's number or a selection, into your review or straight to the agent.

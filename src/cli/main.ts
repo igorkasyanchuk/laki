@@ -15,7 +15,7 @@ import { mcp } from './mcp.ts'
 import { RECIPE_IDS, RECIPES, recipeOf, recipeText } from '../shared/clientRecipes.ts'
 import type { Spend } from '../shared/spend.ts'
 import { completion } from './completion.ts'
-import { askAgent, newWsKit, parseWait, state, waitTabs } from '../shared/tools.ts'
+import { askAgent, newWsKit, parseWait, sentLine, state, waitTabs } from '../shared/tools.ts'
 import { blockName, check, filesFinder, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { atOrThrow, describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
@@ -34,7 +34,7 @@ const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['hook', 'hook-event', 'login', 'word', 'cap', 'after', 'project', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['any', 'reply', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof', 'walk'])
+const BOOL = new Set(['any', 'reply', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'queue', 'steer', 'interrupt', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof', 'walk'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -748,8 +748,11 @@ async function main() {
     }
     case 'send': {
       const [target, ...words] = rest
-      const r = await rpc('send', { target, text: words.join(' '), whenIdle: !!flags['when-idle'] }, 150000) // another workspace's from an agent: the user is asked first
-      return out(r, r.sent ? 'sent' : `queued (${r.queued} waiting): sent when the agent finishes its turn`)
+      // #4: --queue (the default; --when-idle the same), --steer or --interrupt; the reply says which happened
+      const modes = (['queue', 'steer', 'interrupt'] as const).filter(m => flags[m] || (m === 'queue' && flags['when-idle']))
+      if (modes.length > 1) throw new Error('one of --queue, --steer, --interrupt')
+      const r = await rpc('send', { target, text: words.join(' '), mode: modes[0] ?? 'queue' }, 150000) // another workspace's from an agent: the user is asked first
+      return out(r, sentLine(r))
     }
     case 'bell': {
       // T16: laki bell <ws|tab> [--off]: told once when it next finishes or asks (a workspace: its running agents)

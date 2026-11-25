@@ -175,6 +175,20 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   assert.equal((await rig.rpc('queueNow', { tab: sl.id })).sent, true)
   await until(async () => (await rig.screen(sl.id)).includes('answer: woke'), 'typed once it woke', 15000)
 
+  // #4: laki send's modes, each saying what it did: --steer joins the running turn (claude reads what's typed while it
+  // works), --queue waits for its end (how many ahead), --interrupt stops it (Esc) and sends, ahead of the queue
+  const md = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'slow modes' })
+  await until(async () => (await rig.tab(ws.id, 'claude: slow modes')).status === 'running', 'a slow turn')
+  await assert.rejects(rig.rpc('send', { target: md.id, text: 'x', mode: 'now' }), /mode: queue, steer, interrupt/)
+  assert.equal((await rig.cli('send', md.id, '--steer', 'mind the tests')).out, 'joined its running turn\n')
+  assert.equal((await rig.cli('send', md.id, 'after')).out, 'queued, next: sent when its turn ends\n')
+  assert.equal((await rig.cli('send', md.id, '--when-idle', 'after that')).out, 'queued, 1 ahead: sent when its turn ends\n')
+  assert.match((await rig.cli('send', md.id, '--steer', '--interrupt', 'x')).err, /one of --queue, --steer, --interrupt/)
+  assert.equal((await rig.cli('send', md.id, '--interrupt', 'stop now')).out, 'interrupted its turn, then sent\n')
+  await until(async () => (await rig.screen(md.id)).includes('answer: stop now'), 'typed after Esc')
+  await until(async () => (await rig.screen(md.id)).includes('answer: after that'), 'the queue after it')
+  assert.ok((await rig.screen(md.id)).indexOf('answer: stop now') < (await rig.screen(md.id)).indexOf('answer: after'))
+
   // codex reports only a turn's end: Enter starts one
   const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
   await until(async () => (await rig.screen(cx.id)).includes('fake codex'), 'codex up')
@@ -195,7 +209,7 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   // the folder is gone: no tab
   rmSync(ws.path, { recursive: true, force: true })
   await assert.rejects(rig.rpc('tabNew', { ws: ws.id }), /is gone/)
-  assert.equal((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === ws.id).length, 5)
+  assert.equal((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === ws.id).length, 6) // the send modes' tab too
 })
 
 test('claude StopFailure on a usage limit: ◷ until it resets; a time gone by is tomorrow\'s', async t => {

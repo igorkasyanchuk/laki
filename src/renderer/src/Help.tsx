@@ -116,7 +116,7 @@ export function HelpPage({ cli, ship, zoom = 1, keys, global, onClose }: { cli: 
     [`${cli} new <project> --pr <url>`, "a workspace on a PR's branch (a fork's too), its base the PR's"],
     [`${cli} new <project> --fan claude,codex --prompt "…"`, 'a race: the same prompt to each agent, a worktree each; Compare them in the app'],
     [`${cli} browser <ws> open /login · screenshot · click "<css>" · fill "<css>" "text" · text`, 'the agent browser: the dev server in a hidden window of the app'],
-    [`${cli} send <ws>[/<tab>] "run the tests"`, 'type into an agent now; --when-idle waits for its turn to end'],
+    [`${cli} send <ws>[/<tab>] "run the tests"`, 'message an agent: after its turn; --steer into it, --interrupt stops it first'],
     [`${cli} progress 40 "writing tests"`, "in an agent's tab: how far along it is, on the tab (Settings › General › Progress on tabs)"],
     [`${cli} memory . · memory add . "tests: npm test" · memory rm . <id>`, "a project's memory (in a Laki tab, . is its project): read it, keep a learned item, drop one; --mine: yours"],
     [`${cli} screen <ws>[/<tab>]`, 'the bottom of a tab’s screen'],

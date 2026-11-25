@@ -556,7 +556,14 @@ const api = {
   aiEndpointTest: () => aiEndpointTest(),
   voiceText: p => voiceText(p), // Settings › Voice's cloud: { audio: WAV in base64 } → { text }
   voiceModels: () => voiceModels(), // Q11: OpenRouter's speech-to-text models and prices now (its public list), kept an hour
-  send: async p => (text(p.text, 'text'), agentSend(p), await crossAsk(p, 'send'), core.send(p)),
+  send: async p => {
+    text(p.text, 'text')
+    const mode = p.mode as (typeof core.SEND_MODES)[number] | undefined // #4: laki send --queue/--steer/--interrupt
+    if (mode !== undefined && !core.SEND_MODES.includes(mode)) throw new Error(`mode: ${core.SEND_MODES.join(', ')}`)
+    agentSend(p)
+    await crossAsk(p, 'send')
+    return mode ? core.sendMode(p, mode) : core.send(p)
+  },
   prompts: () => core.promptList(), // your prompts, newest first: the prompt boxes' history
   chatList: p => chatList(p), // Import chats: Claude Code's and Codex's sessions in the project's folders, outside Laki
   chatImport: p => chatImport(p),

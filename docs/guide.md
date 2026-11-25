@@ -1502,7 +1502,7 @@ there; a plain-text file outside them (under 100 KB) as its text. Anything else 
 file): a notification says it can't go to an agent: copy it into the project first. While Touch ID asks or an agent's
 Allow card is up, drops do nothing.
 Laki's Dock icon has a menu too (right click, or a long click): *New Task…*, up to five agents waiting (a click shows that tab; never a private workspace in Recording mode), and *Quiet for an Hour* or *End Quiet*. Its recent items are the projects you opened: one there, or a folder opened with Laki, goes to that project's workspace you had open (a folder that isn't a project is added). Settings › General › *Menu bar icon* hides the mark. Its *Show state* (on) shapes the mark by how things stand: its outline when nothing runs, a dot under it while an agent works, filled when one needs you, a bar under it (and ! beside the count) when one is blocked by a plan limit or an error; hover it for the same in words. With *Turn timers* on (Settings › Layout), a
-working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
+working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send` show as `+n`.
 **The queue**: while a tab has follow-ups waiting, a strip under its terminal lists them (*Queued for claude · 2 · goes
 when this turn ends*): ✎ edits one in place (⌘⏎ saves, Esc cancels), ✕ removes it (with Undo), its handle drags it
 into another place; *Send now* stops the turn under way (Esc) and types the first; *Clear* drops them all.
@@ -3177,7 +3177,9 @@ laki ls [--json]
 laki limits [--agent claude] [--json]      # each plan's use and when it resets (agents: laki_limits over MCP)
 laki spend <ws> [--json]                   # where a workspace's tokens went: file reads, command output, the carried chat; hints
 laki events [--json] [--ws <ref>]... [--type a,b] [--once] [--timeout <s>]   # Laki's events as they happen, a line each (extensions' events; never starts Laki; exit 3: --timeout passed)
-laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
+laki send fix-the-login "now add tests"                 # queued while it works (--queue, the default); typed in when the turn ends
+laki send fix-the-login --steer "skip the e2e tests"    # into its running turn (Claude Code, Codex); others are stopped first
+laki send fix-the-login --interrupt "stop: rebase first" # its turn stopped (Esc), then sent; the reply says which happened
 laki name backend                                       # in an agent's tab: other agents reach it as @backend, in any workspace
 laki agents                                             # the named agents: where, which agent, what they're doing
 laki ask @backend "which endpoint lists teams?"         # typed in when its turn ends, its reply printed (laki send @backend: no wait)
@@ -3364,8 +3366,8 @@ What it may do:
 
 - **Always**: read: `laki ls`, `laki agents`, `laki wait`, `laki screen` of an agent, a workspace's diff.
 - **create** (on unless `--scopes` says): `laki new` and `laki tab` with an agent.
-- **send** (on): `laki send` and `laki ask` to an agent: never into a question it's asking you (`--when-idle` queues
-  it for after), never a `!` line or control keys.
+- **send** (on): `laki send` and `laki ask` to an agent: never into a question it's asking you (it's queued for
+  after), never a `!` line or control keys.
 - **cmd**: a command of its own (`--cmd`, a command profile), Run ▾, a terminal's screen or a send into it.
 - **yolo**: an agent that never asks (bypass permissions, codex's approvals off, by `--perm` or its profile) or outside
   its sandbox, and a message to one running so: a prompt to such an agent is as strong as a command.
@@ -3428,8 +3430,8 @@ done
 laki ls --json | jq -r '.tabs[] | select(.status == "waiting") | "\(.workspace)/\(.name)"'
 
 # follow-ups, typed in one at a time as the agent's turns end
-laki send fix-login --when-idle "now add tests and run them"
-laki send fix-login --when-idle "then update the README"
+laki send fix-login "now add tests and run them"
+laki send fix-login "then update the README"
 
 # the same message to every idle Claude
 laki ls --json | jq -r '.tabs[] | select(.agent == "claude" and .status == "idle") | "\(.workspace)/\(.name)"' |

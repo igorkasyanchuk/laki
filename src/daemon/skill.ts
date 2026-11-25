@@ -100,7 +100,9 @@ prompts are the user's prompt templates (read-only), each variable an argument.
    Another agent in a workspace that exists: \`laki tab <ws> --preset codex --prompt "<task>"\`.
 3. Check on it: \`laki screen <ws>\` (the agent's screen), \`laki ls --json\` (running, waiting for a
    permission, idle).
-4. Follow up: \`laki send <ws> "<text>"\`, or \`--when-idle\` to queue it for when the agent's turn ends.
+4. Follow up: \`laki send <ws> "<text>"\`: queued while the agent works (\`--queue\`, the default), \`--steer\` into its
+   running turn, \`--interrupt\` to stop the turn first. The reply says which happened (sent, queued n ahead, joined its
+   turn, interrupted): trust it, don't send again.
 5. Talk to other agents by name: \`laki name <name>\` names you (others reach you as \`@<name>\`), \`laki agents\`
    lists the named ones, \`laki ask @<name> "<question>"\` asks one and prints its reply, \`laki send @<name> "<text>"\`
    tells it something. Asked a question that way, your reply is the answer: say it plainly in your last message.
@@ -139,7 +141,7 @@ Unset: don't.
 - From your tab, \`laki new\` and \`laki tab\` start an agent or a shell, never a command (\`--cmd\`, a command
   preset): the user starts commands. \`send\` or \`screen\` on a tab of another workspace asks the user in the app first.
 - \`<ws>\` is a workspace id; \`<ws>/<tab>\` picks a tab (by default the agent's).
-- Don't type into a busy agent unless asked: use \`send --when-idle\`.
+- Don't steer or interrupt a busy agent unless asked: plain \`send\` queues it for its turn's end.
 - The CLI talks to the Laki daemon over localhost. In a sandbox that blocks that, ask to run it outside.
 - \`unknown method\`: the running daemon is older than the CLI. Ask the user to restart it (the app's status
   bar offers it; agents resume).
@@ -505,7 +507,7 @@ own the plan, the order and what counts as done. ${run} Below, \`laki\` stands f
     laki tab <ws> --cmd 'npm run dev'                     # a command in a terminal tab of it (the user allows yours in the app, each time)
     laki screen <ws>[/<tab>] --lines 200                  # read what an agent shows, nothing typed
     laki wait <ws>… [--timeout 10m]                       # until none of them works: a line each, idle (its answer's start) or waiting (what it asks); exit 0, 2 (one waits), 3 (timed out)
-    laki send <ws>[/<tab>] --when-idle '…'                # a follow-up, queued until its turn ends (without --when-idle: now)
+    laki send <ws>[/<tab>] '…'                            # a follow-up, queued until its turn ends (--steer: into the turn; --interrupt: stop it, then send)
     laki diff <ws> [--uncommitted]                        # what it changed
     laki limits [--agent claude] [--json]                 # how much of each plan is used and when it resets: before long work, pick the agent or account with room left
 
@@ -552,7 +554,7 @@ still at work, wait again; 2: one asks something) and, for each tab that's idle 
 200\` (its \`last\` has the answer's start): look for the envelope and check
 that what's above it backs it (tests run, files there; \`laki diff <ws>\`). Short passes, not one long blocking loop, so
 you can tell the user how it goes in between. A missing or malformed envelope: read the whole screen and ask the worker
-(\`laki send <ws> --when-idle\`).
+(\`laki send <ws>\`).
 
 - DONE and checked: done. Hand its handoff to the tasks that wait on it: in their prompt as they start, or sent to one
   that runs.

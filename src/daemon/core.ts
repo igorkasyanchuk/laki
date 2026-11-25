@@ -5047,7 +5047,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
     if (!tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
     // its profile's Send into the running turn (claude, codex, on unless false: both read what's typed while they work): typed now,
     // unless it asks something, hit a limit, is waking, or has a queue (that goes first, in order)
-    if (p.steer && r.status === 'running' && !r.limit && !woke && !tab.queue?.length && (tab.preset === 'claude' || tab.preset === 'codex') && presetOf(tab)?.steer !== false) {
+    if (p.steer && r.status === 'running' && !r.limit && !woke && !tab.queue?.length && steerable(tab)) {
       typeInto(s, textFor(tab, p.text))
       changed()
       return { tab: tab.id, sent: true, steered: true }
@@ -5065,6 +5065,26 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
   if (tracked(tab)) r.status = 'running'
   changed()
   return { tab: tab.id, sent: true }
+}
+const steerable = (tab: Tab) => (tab.preset === 'claude' || tab.preset === 'codex') && presetOf(tab)?.steer !== false
+// #4: laki send's modes, and the result says which happened: queue (the default: after its turn, now when it's idle),
+// steer (into the running turn where its agent reads what's typed while it works: claude's and codex's, unless its
+// profile's Send into the running turn is off; else interrupted), interrupt (the turn stopped with Esc, as queueNow's,
+// then typed, ahead of its queue). One that asks the user something, is at a limit, asleep or over its spend cap is
+// never stopped: send's own rules queue it. A terminal has no turns: now
+export const SEND_MODES = ['queue', 'steer', 'interrupt'] as const
+export async function sendMode(p: Parameters<typeof send>[0], mode: (typeof SEND_MODES)[number]) {
+  const tab = resolveTarget(p.target)
+  if (!tracked(tab)) return send({ ...p, whenIdle: false })
+  const r = rtOf(tab.id)
+  const s = sessions.get(tab.id)
+  const busy = r.status === 'running' && !r.limit && !asleep.has(tab.id) && !!s && !s.exited && !capOver(tab.workspace)
+  if (mode === 'queue' || !busy) return send({ ...p, whenIdle: true })
+  if (mode === 'steer' && steerable(tab)) return send({ ...p, whenIdle: true, steer: true }) // a queue ahead of it: queued after it, as it says
+  input(tab.id, '\x1b')
+  for (let i = 0; i < 50 && rtOf(tab.id).status === 'running'; i++) await new Promise(ok => setTimeout(ok, 100))
+  if (rtOf(tab.id).status !== 'idle') throw new Error(`${tab.name} didn't stop${rtOf(tab.id).status === 'waiting' ? ': it asks the user something now' : ''}: send with --queue, or try again`)
+  return { ...send({ ...p, whenIdle: false }), interrupted: true }
 }
 // agy's new chat started with no prompt: the first message Laki types carries the note (agentCmd's noteDue), once
 export function noteFirst(tab: Tab, text: string) {

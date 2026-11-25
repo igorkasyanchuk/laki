@@ -39,6 +39,15 @@ export const obj = (properties: Record<string, object>, required: string[] = [])
 // newest turn's start or ask, else when it was made
 const when = (ms?: number) => (ms ? new Date(ms).toLocaleString('sv-SE').slice(0, 19) : undefined)
 const activeOf = (w: { id: string; created: number }, tabs: View['tabs']) => Math.max(w.created || 0, ...tabs.filter(t => t.workspace === w.id).map(t => Math.max(t.runAt ?? 0, t.needAt ?? 0)))
+// #4: what a send did, in words (laki send, laki_send)
+export function sentLine(r: { sent?: boolean; steered?: boolean; interrupted?: boolean; queued?: number; over?: boolean }) {
+  if (r.over) return `queued (${r.queued} waiting): its workspace is over its spend cap, so it waits till you raise or remove it`
+  if (r.interrupted) return 'interrupted its turn, then sent'
+  if (r.steered) return 'joined its running turn'
+  if (r.sent) return 'sent'
+  const ahead = (r.queued ?? 1) - 1
+  return `queued, ${ahead ? `${ahead} ahead` : 'next'}: sent when its turn ends`
+}
 export async function state(rpc: Rpc = conn) {
   const v: View = await rpc('state')
   const live = v.workspaces.filter(w => !w.archived)
@@ -240,9 +249,9 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_send',
-    description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. With when_idle it waits for the agent's turn to end. Agents only, and not while one asks the user something. Another workspace's tab: the user is asked first.",
-    inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), text: str('the message'), when_idle: { type: 'boolean', description: 'queue it until the agent finishes its turn' } }, ['target', 'text']),
-    run: a => rpc('send', { target: a.target, text: a.text, whenIdle: !!a.when_idle, agent: true }, 150000), // another workspace's: the user is asked first
+    description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. mode: queue (the default: after its turn, now when it's idle), steer (into its running turn, where the agent reads messages while it works; else its turn is stopped first) or interrupt (its turn stopped, then sent). The result says which happened. Agents only, and never into a question one asks the user. Another workspace's tab: the user is asked first.",
+    inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), text: str('the message'), mode: { type: 'string', enum: ['queue', 'steer', 'interrupt'], description: 'queue (default), steer or interrupt' } }, ['target', 'text']),
+    run: async a => sentLine(await rpc('send', { target: a.target, text: a.text, mode: ['steer', 'interrupt'].includes(String(a.mode)) ? a.mode : 'queue', agent: true }, 150000)), // another workspace's: the user is asked first
   },
   {
     name: 'laki_name',
