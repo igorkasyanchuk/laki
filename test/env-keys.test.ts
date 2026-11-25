@@ -183,7 +183,8 @@ test("the app's window wraps the Keychain's values (keychain.ts): the item holds
       const m = JSON.parse(String(raw))
       if (m.ev === 'kcWrap') void app.call('kcWrapped', { req: m.req, value: fake(m.op, m.value) })
     })
-    assert.deepEqual(await app.call('kcWrapper', { on: true }), { on: true })
+    assert.equal((await app.call('kcWrapper', {})).keychain, true, 'asked first: this daemon keeps values in the Keychain (the window asks main only then)')
+    assert.deepEqual(await app.call('kcWrapper', { on: true }), { on: true, keychain: true })
     return app
   }
   await wrapper()
@@ -205,4 +206,10 @@ test("the app's window wraps the Keychain's values (keychain.ts): the item holds
   const r = await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ method: 'kcWrapper', params: { on: true } }) }).then(x => x.json())
   assert.match(String(r.error), /only Laki's window/)
   for (const s of [SECRETS[0], 'ghp_fake_rewrapped']) assert.ok(!rig.out.includes(s), 'in no log')
+})
+
+test("a daemon that keeps no value in the Keychain (a test world, another data folder) says so: the window never asks main's safeStorage there (macOS's Keychain dialog in a home with no login keychain)", async t => {
+  const rig = await fresh(t)
+  const app = await connect(rig)
+  assert.deepEqual(await app.call('kcWrapper', {}), { on: false, keychain: false })
 })

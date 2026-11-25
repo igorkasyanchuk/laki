@@ -288,8 +288,11 @@ read the Keychain didn't answer is asked again after a minute.
 name (never a value). aiKey's API and the view are as before (the view only says whether there's a key).
 `test/fakes/keychain-security` fakes `security` (`test/ai.test.ts`, `test/env-keys.test.ts` link it as `$HOME/bin/security`).
 
-**Wrapped** (`WRAP`, `v10:`): an app window that can (main's `kc-wrap-ok`: update.ts' `signed` and
-`safeStorage.isEncryptionAvailable()`) says so as it connects (`kcWrapper { on: true }`, the app's token only); main.ts'
+**Wrapped** (`WRAP`, `v10:`): as it connects, an app window asks the daemon whether it keeps values in the Keychain
+(`kcWrapper {}`: `keychain`, keychainOn's: never a test world's or another data folder's, where macOS would put up a
+dialog for a home with no login keychain), and only then main whether it can (`kc-wrap-ok`: HOME the user's own,
+update.ts' `signed`, `safeStorage.isAsyncEncryptionAvailable()`; main's calls are the async ones, so it never waits on the
+Keychain); it says so (`kcWrapper { on: true }`, the app's token only); main.ts'
 `wrapVia` then sends that window `kcWrap { req, op: wrap | unwrap, value }`, which the window hands to main's `kc-wrap`
 (safeStorage, base64) and answers with `kcWrapped { req, value }` (or `error`), `LAKI_WRAP_WAIT_MS` (3 s) at most.
 keychain.ts' `setWrapper` gets it while any such window is connected. A write: `kcSet` plain as before, then wrapped and

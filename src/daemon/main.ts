@@ -67,7 +67,7 @@ import { reviewDiff, reviewMark, longStop, longTurnTick, sideAsk, sideNew, sideS
 import { alertAnswer, alertMacOnly, alertShow, alertsSeen, noticesTo } from './alerts.ts'
 import { capRaises, capTick } from './cap.ts'
 import { suggest, suggestAnswer } from './suggest.ts'
-import { setWrapper, wrapping } from './keychain.ts'
+import { keychainOn, setWrapper, wrapping } from './keychain.ts'
 import { secretAsk, secretForget, secretGive, secretKeep, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowHold, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust, flowTrustDiff, flowWaitEnd, flowExport, flowImport, flowImportSave } from './workflow.ts'
 import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetFromTerm, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetAnnotations, widgetStore, widgetTerm, termStop, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetFull, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -964,7 +964,7 @@ const api = {
   remoteKeep: p => remoteMod.remoteKeep(typeof p?.now === 'number' ? p.now : undefined), // T10: its idle clock starts over (the window's line, the push's Keep)
   clientLog: (p: { id?: string; refused?: boolean }) => ({ lines: p.id ? clientLogMod.clientLogOf(clientsMod.clientFind(p.id).id, p.refused === true).slice(0, 2000) : [], unknown: clientLogMod.unknownTokens() }), // T12: { id, refused? }: what it did, newest first; calls with a token nobody has today // T9, T11: last call, calls, days left, unused; its limits and what it uses of them now
   clientAnswer: (p: In<typeof clientAnswer>) => clientAnswer(p), // the window's Allow / Deny (call's check: the app's token only)
-  kcWrapper: (p: { on?: boolean }, c) => (wrapperSet(c, p?.on === true), { on: wrapping() }), // keychain.ts: this window wraps the Keychain's values (main's safeStorage), or no longer (the app's token only)
+  kcWrapper: (p: { on?: boolean }, c) => (typeof p?.on === 'boolean' && wrapperSet(c, p.on), { on: wrapping(), keychain: keychainOn() }), // keychain.ts: this window wraps the Keychain's values (main's safeStorage), or no longer (the app's token only); none said: only whether this daemon keeps them there (the window asks main only then)
   kcWrapped: (p: { req?: string; value?: unknown; error?: unknown }) => void (w => w && (typeof p?.value === 'string' ? w.ok(p.value) : w.no(new Error(String(p?.error ?? 'refused')))))(wraps.get(String(p?.req))), // its answer to a kcWrap
   clientWho: (p: { byClient?: string }) => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
   shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)

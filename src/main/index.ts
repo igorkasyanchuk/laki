@@ -5,7 +5,7 @@ import { app, autoUpdater, BrowserWindow, safeStorage, type BrowserWindowConstru
 import { execFile, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { homedir, userInfo } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { appToken, daemonInfo, dataDir, ensureDaemon, freshDaemon, logLine, NODE_API, pidRunning, pingStep, rpc, stopDaemon } from '../shared/conn.ts'
@@ -648,14 +648,17 @@ ipcMain.on('win-title', (e, text: unknown, hide: unknown) => {
 // the daemon's Keychain values wrapped (keychain.ts, through the app window's socket): Electron's safeStorage, whose key
 // is the app's own Keychain item (a program other than Laki reading it is asked about: a plain `security` call from an
 // agent's tab gets the wrapped value, not the secret). Only a Developer ID build (update.ts' signed: an ad-hoc one's
-// signature changes with each build, and the Keychain would ask every time) and only the app's main window. base64
+// signature changes with each build, and the Keychain would ask every time) and only the app's main window. base64.
+// Asked only once the daemon says it keeps values in the Keychain (its default data folder: never a test world's), only
+// with HOME the user's own (another has no login keychain: macOS would put up a dialog), and through the async calls,
+// so main never waits on the Keychain
 let wrapOk: Promise<boolean> | undefined
-const canWrap = () => (wrapOk ??= signed().then(s => s && safeStorage.isEncryptionAvailable(), () => false))
+const canWrap = () => (wrapOk ??= homedir() !== userInfo().homedir ? Promise.resolve(false) : signed().then(s => s && safeStorage.isAsyncEncryptionAvailable(), () => false))
 ipcMain.handle('kc-wrap-ok', e => fromApp(e) && !!win && e.sender === win.webContents && canWrap())
 ipcMain.handle('kc-wrap', async (e, op: unknown, value: unknown) => {
   if (!fromApp(e) || !win || e.sender !== win.webContents || typeof value !== 'string' || !(await canWrap())) return null
   try {
-    return op === 'wrap' ? safeStorage.encryptString(value).toString('base64') : op === 'unwrap' ? safeStorage.decryptString(Buffer.from(value, 'base64')) : null
+    return op === 'wrap' ? (await safeStorage.encryptStringAsync(value)).toString('base64') : op === 'unwrap' ? (await safeStorage.decryptStringAsync(Buffer.from(value, 'base64'))).result : null
   } catch {
     return null // not ours (another app's key, a broken value): the daemon keeps it as it is
   }
