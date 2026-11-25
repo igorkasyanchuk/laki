@@ -47,6 +47,10 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
    node (Laki Node) with fake agents, in a temp home, checks the app's own binary runs no JavaScript as node, and takes a window screenshot. Quit Laki.app first (the daemon can stay): macOS keeps
    the app's data folder under the real home, so a running one holds the single-instance lock and the smoke's window quits. For the Intel build:
    `APP=$PWD/dist/mac/Laki.app scripts/pack-smoke.sh` (under Rosetta).
+   Then `npm run mem` on the same build: the daemon's, the window's and the pty host's memory against package.json's
+   `lakiMem`, 10% allowed (`npm run release` runs it; it uses a `--user-data-dir` of its own, so an open Laki can stay;
+   `npm run mem -- --write` raises the budget on purpose). Go back (Settings › Updates) is checked by hand once on a
+   signed build: update it, then *Go back to <version>*.
 6. Open the app once by hand: a project, a workspace with an agent, a turn's notification, Settings.
 7. Commit (`Release x.y.z`), tag `vx.y.z`.
 

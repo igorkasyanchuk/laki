@@ -1,7 +1,7 @@
 #!/bin/bash
 # A release from this Mac to every platform (docs/manual-release.md): the checks, a new version, macOS arm64 and x64
 # (signed and notarized with the Developer ID in the Keychain), Linux arm64 and x64 AppImages (Docker), each one
-# smoke-tested (and the window walked first: npm run test:ui, LAKI_SKIP_UI=1 skips it, loudly), then a draft release on the public releases repo (package.json's build.publish). Nothing goes live
+# smoke-tested (and the window walked first: npm run test:ui, LAKI_SKIP_UI=1 skips it, loudly; the memory budget after: npm run mem, LAKI_SKIP_MEM=1), then a draft release on the public releases repo (package.json's build.publish). Nothing goes live
 # until `publish`.
 #   scripts/release.sh [minor|patch|major|<x.y.z>] [--no-upload] [--adhoc] [--skip=mac-x64,linux-x64,…] [--any-branch]
 #   scripts/release.sh upload <x.y.z>     upload dist/release/<x.y.z> to its draft (again, after a failed upload)
@@ -280,6 +280,14 @@ if [ ${#MAC[@]} -gt 0 ]; then
   T=${TMPDIR:-/tmp}
   if want mac-arm64; then say "Smoke test: macOS arm64"; APP=$ROOT/$OUT/mac-arm64/Laki.app bash scripts/pack-smoke.sh "$T/laki-smoke-arm64"; fi
   if want mac-x64; then say "Smoke test: macOS x64"; APP=$ROOT/$OUT/mac/Laki.app bash scripts/pack-smoke.sh "$T/laki-smoke-x64"; fi
+  # the memory budget (scripts/mem.ts: package.json's lakiMem, 10% allowed) on this Mac's own build, in a demo world
+  HOSTMAC=$([ "$(uname -m)" = arm64 ] && echo mac-arm64 || echo mac)
+  if [ "${LAKI_SKIP_MEM:-}" = 1 ]; then
+    printf '\n\033[1;31m!!! LAKI_SKIP_MEM=1: the memory budget is NOT checked (npm run mem)\033[0m\n\n'
+  elif [ -d "$ROOT/$OUT/$HOSTMAC/Laki.app" ]; then
+    say "Memory: the $HOSTMAC build in a demo world (npm run mem: its window shows for about a minute)"
+    APP=$ROOT/$OUT/$HOSTMAC/Laki.app npm run mem || die "over the memory budget: no release. Smaller, or raised on purpose: npm run mem -- --write"
+  fi
 fi
 
 for a in arm64 x64; do

@@ -65,3 +65,15 @@ test('the window is a gate: release.sh and dmg.sh run npm run test:ui before sig
   assert.ok(dmg.indexOf('npm run check') < dmg.indexOf('npm run test:ui ||'), 'dmg.sh: after check')
   assert.ok(dmg.indexOf('npx electron-vite build') < dmg.indexOf('npm run test:ui ||'), 'dmg.sh: built before it')
 })
+
+test('memory is a gate: release.sh runs npm run mem on its own build after electron-builder, LAKI_SKIP_MEM=1 skips it loudly', () => {
+  const release = readFileSync(join(root, 'scripts/release.sh'), 'utf8')
+  const mem = release.indexOf('npm run mem ||')
+  assert.ok(mem > 0, 'release.sh runs npm run mem, its failure stopping it')
+  assert.ok(release.indexOf('npx electron-builder --mac dmg zip') < mem, 'after the build')
+  assert.match(release, /APP=\$ROOT\/\$OUT\/\$HOSTMAC\/Laki\.app npm run mem/, "this Mac's build")
+  assert.match(release, /"\$\{LAKI_SKIP_MEM:-\}" = 1 \]; then\n\s+printf '\\n\\033\[1;31m!!! LAKI_SKIP_MEM=1: the memory budget is NOT checked/, 'LAKI_SKIP_MEM=1 skips it, loudly')
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  assert.match(pkg.scripts.mem, /scripts\/mem\.ts/)
+  for (const k of ['daemon', 'renderer', 'ptyhost']) assert.ok(pkg.lakiMem?.[k] > 0, `lakiMem.${k}`)
+})

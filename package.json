@@ -31,6 +31,7 @@
     "test:cov": "node --experimental-strip-types --no-warnings scripts/cov.ts",
     "debt": "node --experimental-strip-types --no-warnings scripts/debt.ts",
     "size": "node --experimental-strip-types --no-warnings scripts/size.ts",
+    "mem": "node --experimental-strip-types --no-warnings scripts/mem.ts",
     "audit:deps": "node --experimental-strip-types --no-warnings scripts/audit.ts",
     "test:changed": "node --experimental-strip-types --no-warnings scripts/test-changed.ts",
     "eval:ai": "node --experimental-strip-types --no-warnings scripts/ai-evals.ts",
@@ -158,5 +159,10 @@
   "lakiSize": {
     "js": 584,
     "css": 358
+  },
+  "lakiMem": {
+    "daemon": 114,
+    "renderer": 197,
+    "ptyhost": 66
   }
 }
