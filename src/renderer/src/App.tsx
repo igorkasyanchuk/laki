@@ -326,7 +326,7 @@ export function App() {
   // a project's sidebar rows: rowsOf, each group's workspaces (and the ones above its first group) in its sort, a
   // group's own or the project's (manual: as dragged); last active: its agents' latest turn here, else when it was made
   const lastAts = new Map<string, number>() // this render's, by workspace
-  for (const t of view?.tabs ?? []) lastAts.set(t.workspace, Math.max(lastAts.get(t.workspace) ?? 0, active.current[t.id] ?? 0))
+  for (const t of view?.tabs ?? []) lastAts.set(t.workspace, Math.max(lastAts.get(t.workspace) ?? 0, active.current[t.id] ?? 0, t.runAt ?? 0, t.needAt ?? 0))
   const lastAt = (w: WorkspaceView) => Math.max(w.created, lastAts.get(w.id) ?? 0)
   const SORT_BY: Record<WsSort, ((a: WorkspaceView, b: WorkspaceView) => number) | null> = { manual: null, created: (a, b) => b.created - a.created, activity: (a, b) => lastAt(b) - lastAt(a), name: (a, b) => wsName(a).localeCompare(wsName(b), undefined, { numeric: true }) }
   const sortedRows = (p: Project, ws: WorkspaceView[]) => {
@@ -2431,7 +2431,7 @@ export function App() {
     setOverlapsAt, setPanelOpen, setPanelTab, setPanelW, setPeek, setPicked, setPicking, setPops, setRadarHid,
     setRead, setReply, setReveal, setRunsSeen, setSeenSecs, setSharing, setShown, setSideOpen, setStrip, setTimer,
     setTimers, settings, settingsKey, setVideo, setWatch, setWsId, sharing, shotKey, showInfo, shown, showNew,
-    shownWidgets, showPanel, sideOpen, sideW, sortedRows, sortItems, specsOn, split, stale, staleMin, start, statKey,
+    shownWidgets, showPanel, sideOpen, sideW, sortedRows, lastAt, sortItems, specsOn, split, stale, staleMin, start, statKey,
     stepItem, stepOf, stepsOn, strip, tab, tabByWs, tabsAt, targets, termIn, termsOk, termWhere, timers, tint, toast,
     todosOn, toggleArtifacts, toggleFull, togglePanel, toSettings, touch, travel, video, view, waits, watches,
     whereNow, wideBar, widgetApi, ws, wsActions, wsAt, wsHere, wsMore, zoom, cur,

@@ -380,6 +380,7 @@ export type AppBase = {
   sideOpen: boolean
   sideW: number
   sortedRows: (p: Project, ws: WorkspaceView[]) => (Sep | WorkspaceView)[]
+  lastAt: (w: WorkspaceView) => number // when it last worked: its agents' latest turn or ask (this window's, the view's), else when it was made
   sortItems: (cur: WsSort | undefined, pick: (s: WsSort | undefined) => void, inherit?: WsSort) => MenuItem[]
   specsOn: boolean
   split: (edge: "bottom" | "right", next?: string) => Promise<void>

@@ -5,7 +5,7 @@ import { ago, AUTO_LABEL, AUTO_SAYS, type AutoKey, type Check, ciText, type FixW
 import { ask, askText, choose, type Fact, type MenuItem, moveIds, type Verdict } from './ui'
 import { creatorOf, FOLD_AFTER, type Gate, jobOf, type MergeMethod, newGroupRows, PR_QUIET, PR_SCAN, PR_TRIES, prAllows, type PRLabel, rowsOf, type Settings, type View, type WorkspaceView } from '../../shared/types'
 import type { WorkflowItem } from '../../shared/workflow'
-import type { Worker } from './workers'
+import { type Worker, workerOf } from './workers'
 import { bridge, openExternal } from './api'
 import { forgeName, pendingWords, prName, prNo } from './text'
 import { hasCap } from '../../shared/caps'
@@ -199,13 +199,7 @@ export function wsActionsOf(r: WsActionsIn) {
   // the workspaces this tab's agent started (fromTab), each with its tabs and a failed Done check, for its pane's dock
   // (WorkersDock)
   const workerAsks = (tab: string): Worker[] =>
-    (view?.workspaces.filter(w => w.fromTab === tab && !w.archived) ?? []).map(w => ({
-      ws: w.id,
-      name: wsName(w),
-      tabs: (view?.tabs ?? []).filter(t => t.workspace === w.id),
-      ...(w.stat && { dirty: w.stat.dirty }),
-      ...(w.check?.status === 'over' && { failed: 'its Done check still fails' }),
-    }))
+    (view?.workspaces.filter(w => w.fromTab === tab && !w.archived) ?? []).map(w => workerOf(w, wsName(w), view?.tabs ?? []))
   const prDraft = (w: WorkspaceView) => {
     const pr = w.pr
     if (pr) call('prDraft', { ws: w.id, draft: !pr.draft }).then(() => toast(pr.draft ? `${prName(pr)} is ready for review` : `${prName(pr)} is a draft`, undefined, undefined, true), () => {})

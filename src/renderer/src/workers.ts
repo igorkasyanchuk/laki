@@ -7,6 +7,14 @@ import { bulkOk } from '../../shared/ask.ts'
 
 export type Worker = { ws: string; name: string; tabs: TabView[]; failed?: string; dirty?: number } // dirty: its uncommitted files (its stat's)
 
+export const workerOf = (w: { id: string; stat?: { dirty: number }; check?: { status?: string } }, name: string, tabs: TabView[]): Worker => ({
+  ws: w.id,
+  name,
+  tabs: tabs.filter(t => t.workspace === w.id),
+  ...(w.stat && { dirty: w.stat.dirty }),
+  ...(w.check?.status === 'over' && { failed: 'its Done check still fails' }),
+})
+
 export function dockRows(workers: Worker[], cleared: string[], roll: (tabs: TabView[]) => string) {
   return workers
     .map(w => {

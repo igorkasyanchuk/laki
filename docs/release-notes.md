@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The sidebar's Recent view: a button at its head lists every workspace by when it last worked (Running, Today, Yesterday, Last 7 days…), across projects.
+- Show › Workers off: workspaces an orchestrating agent started stay out of the sidebar, counted on their lead's row and reached through its workers dock.
 - Warn when a workspace gets expensive: past your yellow and red amounts ($5 and $20 to start) its cost turns yellow, then red, and Laki tells you once at each (Settings › Notifications; a project can set its own).
 - `laki send` to a working agent queues it for after its turn by default; `--steer` puts it into the running turn, `--interrupt` stops the turn first, and the reply says which happened.
 

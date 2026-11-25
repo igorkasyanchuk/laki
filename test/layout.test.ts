@@ -194,3 +194,22 @@ test('Move to group › New group (newGroupRows): before the first group, the mo
   assert.deepEqual(newGroupRows(['a', 'b', 'c'], isSep, ['b'], 'N'), ['a', 'c', 'N', 'b']) // no groups yet: at the end, a and c stay ungrouped
   assert.deepEqual(newGroupRows(['S1', 'a'], isSep, ['a'], 'N'), ['N', 'a', 'S1']) // its only one out: S1 left empty
 })
+
+test("#9: the sidebar's Recent view: running first, then by day, newest first, empty groups left out", async () => {
+  const { recentGroups } = await import('../src/renderer/src/fold.ts')
+  const now = new Date(2026, 10, 25, 15, 0).getTime()
+  const at = (d: number, h = 12) => new Date(2026, 10, 25 - d, h).getTime()
+  const ws = [
+    { id: 'a', at: at(0, 9) },
+    { id: 'b', at: at(0, 14), run: true },
+    { id: 'c', at: at(1, 23) },
+    { id: 'd', at: at(3) },
+    { id: 'e', at: at(6, 1) },
+    { id: 'f', at: at(7) },
+    { id: 'g', at: at(40) },
+    { id: 'h', at: at(0, 1) },
+  ]
+  const g = recentGroups(ws, w => w.at, w => !!w.run, now)
+  assert.deepEqual(g.map(x => [x.label, x.ws.map(w => w.id).join('')]), [['Running', 'b'], ['Today', 'ah'], ['Yesterday', 'c'], ['Last 7 days', 'de'], ['Last 30 days', 'f'], ['Older', 'g']])
+  assert.deepEqual(recentGroups([ws[0]], w => w.at, () => false, now).map(x => x.id), ['today'])
+})

@@ -690,6 +690,8 @@ export type Settings = {
   avatars?: boolean // GitHub's pictures of PR authors, reviewers and commenters (unset: on; off: none loaded, L7)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
   groupCount?: boolean // a sidebar group's count of workspaces after its name, on unless false: Layout › Sidebar rows › Group counts, Show ›; .group-count for Custom CSS
+  hideWorkers?: boolean // #8: Show › Workers off: workspaces an orchestrator's tab started (fromTab, that tab still here) take no row of their own; their lead's row counts them (on only if true)
+  sideView?: 'recent' | 'projects' // #9: the sidebar's Recent view, every workspace by when it last worked (unset, projects: by project)
   hideEmpty?: boolean // the sidebar leaves out a project with no row to show (none, all archived, all pinned): Appearance › Sidebar rows › Empty projects off (unset: shown)
   foldAfter?: number // the sidebar shows a project's first this many rows (unset: FOLD_AFTER; 0: all), plus any working, waiting on you or open, and Show N more
   simpleRow?: boolean // B4: Appearance › Sidebar rows › Simple row (off unless true): a row is its name and one next-step chip, the other marks on hover

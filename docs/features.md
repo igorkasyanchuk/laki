@@ -11,7 +11,10 @@ short version.
   messages sent later (in 2h, at 3pm; to Laki AI too; shown under the tab they go to, to send now, edit or cancel). *Needs you* at the top of the sidebar answers a waiting agent
   from its card (a finished turn is one line, a click opens its card), the newest finishes first (older ones fold under *Earlier*); what's queued for an agent shows under its terminal, to edit, reorder or send now. Agents resume after
   a restart or a usage limit, and a new workspace's agent can start later: at a time, or once your plan limit resets. A project with many
-  workspaces folds after its first 10 (any working, waiting on you or open stays), *Show N more* for the rest.
+  workspaces folds after its first 10 (any working, waiting on you or open stays), *Show N more* for the rest. *Recent*
+  (a button at the sidebar's head) lists every workspace across projects by when it last worked: Running, Today,
+  Yesterday, Last 7 days, Last 30 days, Older. *Show › Workers* off keeps an orchestrator's workers out of the sidebar,
+  counted on their lead's row.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.
 - **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from

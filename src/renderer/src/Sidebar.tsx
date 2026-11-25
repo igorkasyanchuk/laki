@@ -24,7 +24,8 @@ import { usualText } from '../../shared/nextStep'
 import type { SpendView } from './Spend'
 import { hasCap } from '../../shared/caps'
 import { fresh } from './motion'
-import { foldRows } from './fold'
+import { foldRows, recentGroups } from './fold'
+import { dockRows, dockSum, workerOf } from './workers'
 import { BLOCK, type Clash, portClashes } from '../../shared/isolation'
 
 const STEP_CHIP: Partial<Record<StepId, string>> = { answer: 'Answer', plan: 'Plan', check: 'Check', review: 'Changes', look: 'Review', merge: 'Merge' } // a row's: short
@@ -206,6 +207,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
   const radarTip = (w: WorkspaceView) => radarOf(w).map(c => `${c.file}: ${c.ws ? `${radarWhose(c)} changes it too` : `${c.base} changed it since this branched`} (${spanText(c.theirs)}; here ${spanText(c.mine)})`).join('\n')
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
+    // #8: Show › Workers off: the workers its tabs started, counted here as their dock counts them
+    const crew = settings.hideWorkers === true ? live.filter(x => x.fromTab && wt.some(t => t.id === x.fromTab)) : []
+    const crewSum = crew.length ? dockSum(dockRows(crew.map(x => workerOf(x, wsName(x), view.tabs)), [], rollup).map(r => r.state)) : ''
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
     const state = more ? rollup(wt) : 'idle' // the second line's
     const status = sideStyle === 'status' // an edge in its state's color, a line that fills with its agents' progress
@@ -222,7 +226,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     const needs = wt.some(needsYou)
     const cs = clashes.get(w.id)
     // drawn again only when one of these changed (its tabs by each object: viewShare keeps the unchanged ones)
-    const deps = [w, pin, settings, view.projects, view.widgets, view.flows, narrow, w.id === ws?.id, picked.includes(w.id), going[w.id], needs, dropOn === w.id && (dropAgent(w)?.name ?? null), isNew, rows.at('ws', w.id), moves, st && JSON.stringify(st), cs && clashTip(cs), mark('radar') && radarOf(w).length ? radarTip(w) : '', timers.some(t => t.then === 'remind' && t.ws === w.id), wt.length, ...wt]
+    const deps = [w, pin, crew.length, crewSum, settings, view.projects, view.widgets, view.flows, narrow, w.id === ws?.id, picked.includes(w.id), going[w.id], needs, dropOn === w.id && (dropAgent(w)?.name ?? null), isNew, rows.at('ws', w.id), moves, st && JSON.stringify(st), cs && clashTip(cs), mark('radar') && radarOf(w).length ? radarTip(w) : '', timers.some(t => t.then === 'remind' && t.ws === w.id), wt.length, ...wt]
     return <Kept key={w.id} deps={deps} render={() => (
       <div data-floor
         className={`ws ${w.id === ws?.id ? 'sel' : ''} ${picked.includes(w.id) ? 'ws-picked' : ''} ${going[w.id] ? 'going' : ''} ${needs ? 'needs' : ''} ${dropOn === w.id ? 'drop-on' : ''} ${simple ? 'ws-simple' : ''} ${isNew ? 'v-new' : ''} ${rows.at('ws', w.id)}`}
@@ -252,6 +256,12 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
         {marksAt === 'name' && yes}
         {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
+        {crew.length > 0 && (
+          <span className="ws-mark ws-crew" data-tip={`${crew.length} worker${crew.length === 1 ? '' : 's'}${crewSum ? `: ${crewSum}` : ''} · their rows are hidden (Show › Workers): its tab's workers dock has them`} aria-label={`${crew.length} workers`}>
+            <Icon name="users" size={11} />
+            {crew.length}
+          </span>
+        )}
         {queued > 0 && <span className="badge">+{queued}</span>}
         {dropOn === w.id && <span className="ws-drop">{(a => (a ? `to ${a.name}` : w.pending ? 'its agent starts later' : 'to a new agent'))(dropAgent(w))}</span>}
         <span className="spacer" />
@@ -649,10 +659,15 @@ export function Sidebar({ app }: { app: AppCtx }) {
     const stop = t.querySelector<HTMLElement>(`.ws.sel${ITEM}`) ?? t.querySelector<HTMLElement>(ITEM)
     if (stop) rove(t, stop)
   })
-  const { addMenu, busiest, dialog, find, narrow, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
+  const { addMenu, busiest, dialog, find, lastAt, view, narrow, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
   // behind a rail page or a strip: hidden but laid out where it was (styles.css [data-away]), its width given back by a
   // margin so the main area lies over it; it comes back as it was, its scroll too
   const away = listOff || !!strip
+  // #9: Recent (the head's toggle): Projects' workspaces by when they last worked, not while filtering
+  const recent = settings.sideView === 'recent' && !find && (!rail || railKind === 'projects')
+  const inRecent = (w: WorkspaceView) => !view.projects.find(p => p.id === w.project)?.kind && !hidWorker(w)
+  // #8: Show › Workers off: a workspace an orchestrator's tab started (that tab still here) takes no row; the open one does
+  const hidWorker = (w: WorkspaceView) => settings.hideWorkers === true && !!w.fromTab && w.id !== ws?.id && view.tabs.some(t => t.id === w.fromTab)
   return (
     <aside className="sidebar" hidden={!sideOpen} data-away={away ? '' : undefined} data-style={sideStyle} style={{ width: sideW, ...(away && { marginRight: -sideW }), ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...sideAttrs(settings.sideLook, settings.projectLook)}>
       <div className="side-head drag">
@@ -662,6 +677,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
         {rail && railKind !== 'projects' && !find && <IconButton icon="chevronsLeft" title="Fold the list to a strip · right click: a strip on the right" onClick={() => setStrip(railKind, 'left')} onContextMenu={e => (e.preventDefault(), setStrip(railKind, 'right'))} />}
         <ToolGroup label="Sidebar" id="side">
           <IconButton icon="filter" title={kt(find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR', 'filter')} keyId="filter" on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
+          {(!rail || railKind === 'projects') && <IconButton icon={settings.sideView === 'recent' ? 'clock' : 'folder'} title={settings.sideView === 'recent' ? 'Recent: every workspace by when it last worked · click: by project' : 'By project · click: Recent, every workspace by when it last worked'} on={settings.sideView === 'recent'} onClick={() => void app.call('settingsSet', { sideView: settings.sideView === 'recent' ? 'projects' : 'recent' }).catch(() => {})} />}
           <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
           {settings.birdView !== false && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
           {settings.devMode === true && !rail && <IconButton icon="target" className="picker-toggle" title={`Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`} on={picking} onClick={() => setPicking(p => !p)} />}
@@ -732,8 +748,24 @@ export function Sidebar({ app }: { app: AppCtx }) {
             <div className="project-ws" role="group">{pins.map(w => wsRow(w, true))}</div>
           </div>
         )}
-        {listed.map(p => {
-          const mine = live.filter(w => w.project === p.id && !w.pinned) // a pinned one is above, under Pinned
+        {recent &&
+          recentGroups(live.filter(w => !w.pinned && inRecent(w)), lastAt, w => !!w.setup || view.tabs.some(t => t.workspace === w.id && spins(t))).map(g => {
+            const shut = folded.includes(`recent:${g.id}`)
+            return (
+              <div key={g.id} className="project recent">
+                <div className="project-head" role="treeitem" aria-level={1} aria-expanded={!shut} aria-label={g.label} tabIndex={-1} onClick={() => fold(`recent:${g.id}`)}>
+                  <span className="project-chev">
+                    <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
+                  </span>
+                  <span className="project-name">{g.label}</span>
+                  {shut && <span className="project-count">{g.ws.length}</span>}
+                </div>
+                <div className="project-ws" role="group">{!shut && g.ws.map(w => wsRow(w, true))}</div>
+              </div>
+            )
+          })}
+        {!recent && listed.map(p => {
+          const mine = live.filter(w => w.project === p.id && !w.pinned && (find || !hidWorker(w))) // a pinned one is above, under Pinned; a worker under its lead (Show › Workers off)
           const hits = find && mine.filter(shows) // filtering: only those, folded or not, without the seps
           if (hits && !hits.length) return null
           if (!hits && settings.hideEmpty === true && !mine.length && ws?.project !== p.id && !making.some(m => m.project === p.id)) return null // Show › Empty projects off: one with no rows here

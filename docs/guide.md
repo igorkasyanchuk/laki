@@ -340,6 +340,14 @@ selected workspace's PR is in the status bar.
   plus any that's working, waiting on you or open, each in its place (nothing jumps as one starts or stops), and a
   *Show N more* row for the rest; *Show less* folds it again, remembered per project. A group whose rows all fold away
   hides with them. The filter and ⌘K still find every one.
+- *Workers* (the same places, on by default): off, a workspace an orchestrating agent started (`laki new` from its
+  tab) takes no row of its own while that tab is open; its lead's row counts them (a people mark and how many, its
+  tooltip how many need you, failed or work) and the tab's workers dock reaches each. The open one still shows, a
+  worker that asks you still comes up in Needs you, and the filter and ⌘K still find them.
+- *Recent* (the folder or clock button at the sidebar's head): every workspace of your projects, whatever its project,
+  under *Running*, *Today*, *Yesterday*, *Last 7 days*, *Last 30 days* and *Older* by when its agents last worked or
+  asked (else when it was made), newest first, each with its project's name in its color; groups with none are left
+  out, and each folds. Needs you and Pinned stay on top. A click goes back to *By project*; the choice is kept.
 
   | mark | meaning |
   |---|---|
