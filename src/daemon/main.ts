@@ -876,7 +876,8 @@ const remoteNo = (method: string, p: Params) =>
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
   (method === 'settingsSet' && changes(p, k => REMOTE_KEYS.test(k))) ||
   (method === 'shareStart' && Number(p?.hours ?? 0) === 0) ||
-  (method === 'projectSet' && (scriptsChange(p) || p?.allow !== undefined || p?.alwaysAsk !== undefined)) // F14: a project's auto-answer rules, F15: its Always ask for: the Mac's own
+  (method === 'projectSet' && (scriptsChange(p) || p?.allow !== undefined || p?.alwaysAsk !== undefined)) || // F14: a project's auto-answer rules, F15: its Always ask for: the Mac's own
+  (method === 'alertAnswer' && alertMacOnly(p) && BOUND_PICKS.includes(String(p?.choice))) // T13: a bound client's Revoke or Allow this program
 
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
@@ -984,8 +985,8 @@ const termAsksTo = (c: core.Conn) => apps.has(c) && (termAsks.forEach(a => c.sen
 // TERM_WAIT. Asked from your own terminal (S1's: allowed) or the app; never from a tab (an agent's is AGENT_NO, and a
 // shell tab's typing may be an agent's: #1), a client's token (not a scope: clientNo) or remote access (REMOTE_NO). No
 // window: refused at once. #TODO: Settings › Trusted clients lists them, with add, rotate and revoke (the app's own ask)
-const clientAsks = new Map<string, { msg: { ev: 'clientAsk'; req: string }; answer: (allow: boolean, never?: boolean) => void }>()
-async function clientAsk(what: 'add' | 'rotate', p: { from?: { tab?: unknown }; id?: unknown; label?: unknown; scopes?: unknown; projects?: unknown; expires?: unknown; limits?: unknown }) {
+const clientAsks = new Map<string, { msg: { ev: 'clientAsk'; req: string }; answer: (allow: boolean, never?: boolean, bind?: boolean) => void }>()
+async function clientAsk(what: 'add' | 'rotate', p: { from?: { tab?: unknown }; id?: unknown; label?: unknown; scopes?: unknown; projects?: unknown; expires?: unknown; limits?: unknown; bind?: unknown }) {
   if (p.from?.tab) throw new Error("a trusted client is added from your own terminal, not from a Laki tab (an agent may be typing there)")
   const was = what === 'rotate' ? clientsMod.clientFind(p.id) : undefined
   const label = was?.label ?? clientsMod.labelOf(p.label)
@@ -1000,29 +1001,31 @@ async function clientAsk(what: 'add' | 'rotate', p: { from?: { tab?: unknown }; 
   const limits = clientsMod.limitsOf(p.limits, was ? clientsMod.limitsFor(was) : clientsMod.LIMITS)
   const windows = [...core.clients].filter(c => apps.has(c))
   if (!windows.length) throw new Error(`Laki's window isn't open to allow ${label}: open Laki, then try again`)
-  const msg = { ev: 'clientAsk' as const, req: randomBytes(8).toString('hex'), what, label, scopes: scopes.map(s => `${s}: ${clientsMod.SCOPES[s]}`), ...(projects && { projects: projects.map(id => core.state.projects.find(x => x.id === id)?.name ?? id) }), days: asked === 'never' ? clientsMod.EXPIRE_DAYS : asked, ...(asked === 'never' && { never: true }), limits: `${limits.wsPerHour} workspaces an hour, ${limits.agentsAtOnce} agents at once, ${limits.sendsPerMinute} messages a minute`, file: clientsMod.tokenPath(was?.id ?? clientsMod.clientIdFor(label)) }
+  const msg = { ev: 'clientAsk' as const, req: randomBytes(8).toString('hex'), what, label, scopes: scopes.map(s => `${s}: ${clientsMod.SCOPES[s]}`), ...(projects && { projects: projects.map(id => core.state.projects.find(x => x.id === id)?.name ?? id) }), days: asked === 'never' ? clientsMod.EXPIRE_DAYS : asked, ...(asked === 'never' && { never: true }), limits: `${limits.wsPerHour} workspaces an hour, ${limits.agentsAtOnce} agents at once, ${limits.sendsPerMinute} messages a minute`, file: clientsMod.tokenPath(was?.id ?? clientsMod.clientIdFor(label)), ...(p.bind === true && { bind: true }) }
   log(`trusted client ${label}: ${what} asked in the window (${scopes.join(', ') || 'reads only'})`)
   let never = false
+  let bind = p.bind === true // T13: --bind, or the card's Allow, bound
   const allow = await new Promise<boolean>(ok => {
     const timer = setTimeout(() => ok(false), TERM_WAIT())
-    clientAsks.set(msg.req, { msg, answer: (a, n) => (clearTimeout(timer), (never = !!n && asked === 'never'), ok(a)) })
+    clientAsks.set(msg.req, { msg, answer: (a, n, b) => (clearTimeout(timer), (never = !!n && asked === 'never'), (bind ||= !!b), ok(a)) })
     for (const c of windows) c.send(msg)
   })
   clientAsks.delete(msg.req)
   for (const c of core.clients) if (apps.has(c)) c.send({ ev: 'clientDone', req: msg.req })
   if (!allow) throw new Error(`${label} wasn't ${what === 'add' ? 'added' : 'given a new token'}: not allowed in Laki's window`)
   if (was && !clientsMod.clientList().some(c => c.id === was.id)) throw new Error(`${label} was revoked while its new token waited for Allow: laki client add makes it again`)
-  const made = clientsMod.clientMint(label, scopes, was?.id, projects, { expires: never ? 'never' : asked === 'never' ? clientsMod.EXPIRE_DAYS : asked, limits })
+  const made = clientsMod.clientMint(label, scopes, was?.id, projects, { expires: never ? 'never' : asked === 'never' ? clientsMod.EXPIRE_DAYS : asked, limits, bind })
   log(`trusted client ${label}: ${what === 'add' ? 'added' : 'rotated'} (${scopes.join(', ') || 'reads only'}${projects ? `; projects ${projects.join(', ')}` : ''})`)
   return made
 }
-const clientAnswer = (p: { req?: unknown; allow?: unknown; never?: unknown }) => void clientAsks.get(String(p?.req))?.answer(p?.allow === true, p?.never === true) // never: the card's Allow, never expires (only offered when --expires never asked)
+const clientAnswer = (p: { req?: unknown; allow?: unknown; never?: unknown; bind?: unknown }) => void clientAsks.get(String(p?.req))?.answer(p?.allow === true, p?.never === true, p?.bind === true) // never: the card's Allow, never expires (only offered when --expires never asked)
 // T1: a trusted client's call: the tab its process runs in when it's in one (S12's rule: a token read out of a file
 // names its reader, not its owner), for what asks who; else the client, within its scopes (clientNo), as itself: what
 // its env says (from, caller) is dropped, byClient (its id) set; call() drops any byClient an RPC says. A process that
 // can't be found is refused (WHO). Each call that changed something or was refused: a line in daemon.log
 const clientPeers = new WeakMap<Socket, Promise<Tab | undefined>>()
 async function clientCalls(sock: Socket, method: string, p: unknown, c: clientsMod.Client) {
+  if (c.bind || c.bound) await clientBound(sock, method, p, c) // T13: first, whatever it calls: a process in a tab with it is another program too
   if (takesFrom(method) || CALLER.has(method)) {
     if (!clientPeers.has(sock)) clientPeers.set(sock, core.peerTab(sock.remotePort ?? 0)) // once per connection (laki mcp keeps one), as peerOf
     const tab = await clientPeers.get(sock)!.catch(() => (clientPeers.delete(sock), null))
@@ -1045,6 +1048,38 @@ async function clientCalls(sock: Socket, method: string, p: unknown, c: clientsM
     throw e
   }
   return o
+}
+// T13: a bound client's call: the program it comes from (its process by its socket, once per connection) is the one
+// its token is bound to, else refused, a line in its log and one notice per program in Laki's window: Revoke, or Allow
+// this program (it's bound to that one then; the Mac's choices, not remote access's). A caller that can't be placed:
+// refused (fails closed)
+const clientProgs = new WeakMap<Socket, Promise<clientsMod.Prog | undefined>>()
+const boundTold = new Set<string>() // client id and program: its notice sent
+const BOUND_PICKS = ['Revoke', 'Allow this program']
+async function clientBound(sock: Socket, method: string, p: unknown, c: clientsMod.Client) {
+  if (!clientProgs.has(sock)) clientProgs.set(sock, core.peerPid(sock.remotePort ?? 0).then(pid => clientsMod.progOf(pid)).catch(() => undefined))
+  const prog = await clientProgs.get(sock)!
+  const why = prog ? clientsMod.bindCheck(c, prog) : `${c.label}'s token is bound to its program, and Laki can't tell which program this call came from: refused`
+  if (!why) return
+  clientLine(method, { ...(p && typeof p === 'object' ? p : {}), byClient: c.id }, new Error(why))
+  if (prog) boundNotice(c, prog)
+  throw new Error(why)
+}
+function boundNotice(c: clientsMod.Client, prog: clientsMod.Prog) {
+  const k = `${c.id}\n${prog.path}\n${prog.team ?? ''}`
+  if (boundTold.has(k)) return
+  boundTold.add(k)
+  const name = clientsMod.progName(prog.path)
+  const text = `A call with ${c.label}'s token came from ${name} (${prog.path}${prog.team ? `, team ${prog.team}` : ''}), not ${c.bound?.name ?? 'its program'}: refused. Revoke its token if you didn't give it to ${name}.`
+  void Promise.resolve(alertShow({ title: `${c.label}: another program`, text, choices: BOUND_PICKS }, 'notice', 'Laki', undefined, BOUND_PICKS))
+    .then(a => {
+      boundTold.delete(k) // answered or gone: its next refusal tells again
+      const choice = (a as { choice?: string }).choice
+      if (!clientsMod.clientList().some(x => x.id === c.id)) return
+      if (choice === 'Revoke') clientsMod.clientRm(c.id), clientLogMod.clientLogDrop(c.id), log(`trusted client ${c.label}: revoked (another program used its token)`)
+      else if (choice === 'Allow this program') clientsMod.clientBindTo(c.id, prog), log(`trusted client ${c.label}: bound to ${name} now`)
+    })
+    .catch(() => boundTold.delete(k))
 }
 // T1: what a trusted client may call: the reads (CLIENT_READ) and its scopes' methods (CLIENT_SCOPE). Without cmd: agents
 // only (no command, terminal, command profile or none; no terminal's screen or send, no ! line, no keys without Enter);

@@ -34,7 +34,7 @@ const choices: string[] = [] // laki alert's --choice, again and again
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['why', 'withdraw', 'hook', 'hook-event', 'login', 'word', 'cap', 'after', 'project', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
-const BOOL = new Set(['any', 'reply', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'queue', 'steer', 'interrupt', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof', 'walk'])
+const BOOL = new Set(['bind', 'any', 'reply', 'dry-run', 'yes', 'data', 'worktrees', 'keep-artifacts', 'delete-artifacts', 'wrap', 'no-wrap', 'refused', 'simulate', 'bundle', 'keep', 'json', 'local', 'when-idle', 'queue', 'steer', 'interrupt', 'fresh', 'important', 'full', 'dry', 'mine', 'list', 'no-run', 'no-setup', 'merge', 'force', 'after-limit', 'uncommitted', 'fast', 'sandbox', 'no-sandbox', 'detach', 'keep-empty', 'allow-secrets', 'disk', 'proof', 'no-proof', 'walk'])
 // A4: an option the command doesn't have (USAGE's lines: usage.ts FLAGS) is refused with the nearest it has, before any
 // daemon call: \`laki new app --promt x\` would start an agent with no prompt. A command whose words are free text takes
 // options before its text only (TEXT_AFTER: the words before it); after "--" everything is text
@@ -416,7 +416,7 @@ async function main() {
         const ago = (at?: number) => (at ? `last call ${new Date(at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}` : 'no call yet')
         return out(l, l.map(c => `${c.id}  ${c.label}  ${c.scopes.join(',') || 'reads only'}  ${c.projects ? `projects ${c.projects.join(',')}  ` : ''}${c.file}\n    ${ago(c.lastAt)}, ${c.calls ?? 0} calls${c.unused ? ' (unused 30 days)' : ''} · ${c.daysLeft === undefined ? 'never ends' : `${c.daysLeft} days left`} · workspaces ${c.use.wsHour}/${c.limits.wsPerHour} an hour, agents ${c.use.agents}/${c.limits.agentsAtOnce}, messages ${c.use.sendsMinute}/${c.limits.sendsPerMinute} a minute`).join('\n') || 'no trusted clients yet: laki client add "<name>"')
       }
-      if (!name) throw new Error(`usage: laki client ${sub} <name>${sub === 'revoke' || sub === 'log' ? (sub === 'log' ? ' [--refused]' : '') : ' [--scopes create,send] [--projects a,b|all] [--expires 30d|never] [--limits ws=10,agents=3,send=50]'}`)
+      if (!name) throw new Error(`usage: laki client ${sub} <name>${sub === 'revoke' || sub === 'log' ? (sub === 'log' ? ' [--refused]' : '') : ' [--scopes create,send] [--projects a,b|all] [--expires 30d|never] [--limits ws=10,agents=3,send=50] [--bind]'}`)
       if (sub === 'log') {
         // T12: what it did, newest first: a read's line counts its calls in 5 minutes; ids and names only
         type Did = { at: number; method: string; target?: string; ok: boolean; why?: string; n?: number; last?: number }
@@ -450,7 +450,7 @@ async function main() {
       }
       if (sub !== 'add' && sub !== 'rotate') throw new Error(`laki client ${sub}? ls, add, rotate, revoke, log, show, recipes`)
       process.stderr.write("Allow it in Laki's window…\n")
-      const c = await rpc(sub === 'add' ? 'clientAdd' : 'clientRotate', { ...(sub === 'add' ? { label: name } : { id: name }), scopes: flags.scopes ?? (sub === 'add' ? recipe?.scopes : undefined), projects: flags.projects, expires: flags.expires, limits: flags.limits, from: caller() }, 90000)
+      const c = await rpc(sub === 'add' ? 'clientAdd' : 'clientRotate', { ...(sub === 'add' ? { label: name } : { id: name }), scopes: flags.scopes ?? (sub === 'add' ? recipe?.scopes : undefined), projects: flags.projects, expires: flags.expires, limits: flags.limits, ...(flags.bind === true && { bind: true }), from: caller() }, 90000)
       return out(c, `${c.label} (${c.id}): ${c.scopes.join(', ') || 'reads only'}${c.projects ? `, in ${c.projects.join(', ')} only` : ''}\nits token: ${c.file} (0600: give the app this path, never the token)\n  LAKI_CLIENT_TOKEN_FILE=${c.file} laki ls${told(c)}`)
     }
     case 'spend': {

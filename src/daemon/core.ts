@@ -5687,6 +5687,8 @@ async function ttys(pids: number[], proc: string) {
   const rows = psRows((await run('/bin/ps', ['-o', 'pid=,tty=', '-p', pids.join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout) // ps exits 1 when one's gone
   return new Map([...rows].filter(([, t]) => t && !/^\?+$/.test(t)))
 }
+// T13: a bound client's caller (main.ts' clientBound): its process id; throws WHO when it can't be found
+export const peerPid = async (port: number, proc = process.platform === 'linux' ? '/proc' : '') => (await peerInfo(port, proc)).pid
 // T1: a trusted client's process (main.ts' clientCalls): the tab it runs in, or none (in no tab: the client itself);
 // throws WHO only when it can't be found at all
 export const peerTab = async (port: number, proc = process.platform === 'linux' ? '/proc' : '') => (await peerInfo(port, proc)).tab

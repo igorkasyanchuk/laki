@@ -34,8 +34,12 @@ process that left its tab with `setsid`, a launchd job) is refused what's yours,
 fails closed), unless it brings a trusted client's token (`laki client`): a name and scopes of its own, made only after
 Allow in the app's window, stored as a hash, revoked at once; one used from inside a tab is that tab's call. Unlike daemon.json's, a client's token
 is enough on its own: any process running as you that reads its file (0600 keeps out other macOS users only) and is in
-no tab, one that left its tab with setsid too, acts as that client, within its scopes. Give a client the fewest scopes
-it needs: with cmd or yolo its token is as good as a shell. Extensions an agent
+no tab, one that left its tab with setsid too, acts as that client, within its scopes, unless the client is bound
+(`laki client add --bind`, or *Allow, bound to its program* on the card): then the first program that uses the token is
+the only one that may (its executable as the kernel reports it, and its Team ID on a Mac), a call from another is
+refused and logged, and the window offers Revoke or Allow this program; a caller Laki can't place is refused. Binding
+names a program, not a script: a client run by a shared interpreter (node, python) is bound to that interpreter, so any
+script it runs passes. Give a client the fewest scopes it needs: with cmd or yolo its token is as good as a shell. Extensions an agent
 makes, restores or links stay off until you look at what they run, and go off again as their files change.
 
 In scope:

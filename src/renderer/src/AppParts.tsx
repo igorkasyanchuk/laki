@@ -357,7 +357,7 @@ export function BarChoices({ tab, answer }: { tab: TabView; answer: (n: number, 
 }
 
 // an extension tool's asks: one dialog at a time, the others in line (tagged by req); toolOn: the one on screen
-export type ToolAsk = { req: string; title: string; text: string; picks: { label: string; allow: 'once' | 'always' | 'deny' }[]; answer: (allow: string) => void }
+export type ToolAsk = { req: string; title: string; text: string; picks: { label: string; allow: 'once' | 'always' | 'bind' | 'deny' }[]; answer: (allow: string) => void }
 export const toolLine = new Line<ToolAsk>()
 export let toolOn: string | undefined
 export const AWAY = -2 // #18: a page or dialog opened over the ask on screen: it waits, first in line, and comes back as that closes
@@ -411,9 +411,9 @@ export function askTool(m: Msg, view: View | null, settings: Settings) {
     // T1: laki client add or rotate (main.ts' clientAsk): a token an app outside Laki drives it with, until revoked. No
     // Allow on the notification: read here first
     const title = m.what === 'rotate' ? `Give ${m.label} a new token?` : `Let ${m.label} drive Laki?`
-    const picks: Pick[] = [{ label: m.what === 'rotate' ? 'New token' : 'Allow', allow: 'once' }, ...(m.never ? [{ label: 'Allow, never expires', allow: 'always' as const }] : []), { label: 'Deny', allow: 'deny' }]
+    const picks: ToolAsk['picks'] = [{ label: m.what === 'rotate' ? 'New token' : 'Allow', allow: 'once' }, ...(m.bind ? [] : [{ label: 'Allow, bound to its program', allow: 'bind' as const }]), ...(m.never ? [{ label: 'Allow, never expires', allow: 'always' as const }] : []), { label: 'Deny', allow: 'deny' }] // T13: bound, the first program that uses its token is the only one that may
     notify(title, 'Open Laki to see what it may do', '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, [])
-    toolLine.add({ req: m.req, title, text: `laki client ${m.what} asks for a token an app outside Laki uses to act as you, within:\n\n${(m.scopes ?? []).map((x: string) => `• ${x}`).join('\n') || '• reads only'}\n\n${m.projects ? `In ${m.projects.join(', ')} only.` : 'In every project.'}\n\nAt most ${m.limits}. Its token ends in ${m.days} days${m.never ? ' (or never, if you pick that)' : ''}; laki client rotate renews it.\n\nIt goes to ${m.file} (yours alone), until laki client revoke. Allow it only if you just ran laki client ${m.what} yourself.`, picks, answer: allow => void api.call('clientAnswer', { req: m.req, allow: allow === 'once' || allow === 'always', never: allow === 'always' }).catch(() => {}) })
+    toolLine.add({ req: m.req, title, text: `laki client ${m.what} asks for a token an app outside Laki uses to act as you, within:\n\n${(m.scopes ?? []).map((x: string) => `• ${x}`).join('\n') || '• reads only'}\n\n${m.projects ? `In ${m.projects.join(', ')} only.` : 'In every project.'}\n\nAt most ${m.limits}. Its token ends in ${m.days} days${m.never ? ' (or never, if you pick that)' : ''}; laki client rotate renews it.\n\nIt goes to ${m.file} (yours alone), until laki client revoke. ${m.bind ? '\n\nBound: the first program that uses its token is the only one that may.' : ''}\n\nAllow it only if you just ran laki client ${m.what} yourself.`, picks, answer: allow => void api.call('clientAnswer', { req: m.req, allow: allow !== 'deny', never: allow === 'always', bind: allow === 'bind' }).catch(() => {}) })
     return toolShow()
   }
   if (typeof m.perm === 'string') {

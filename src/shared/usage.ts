@@ -153,7 +153,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki agent log <ws> [--json]                what its agents did through Laki, newest first (refused ones marked); not from an agent's tab
   laki spend <ws> [--json]                    where a workspace's tokens went: file reads, command output, the carried conversation; hints (estimates)
   laki client [ls]                            trusted clients: apps outside Laki (an MCP server, a script) with a token of their own
-  laki client add|rotate <name> [--scopes create,send] [--projects a,b|all] [--expires 30d|never] [--limits ws=10,agents=3,send=50] [--for <recipe>] [--write <dir>]   a new one, or a new token (scopes, projects, limits; 90 days unless said) for one: asked in Laki's window; --for: a recipe's scopes, then its config and steps
+  laki client add|rotate <name> [--scopes create,send] [--projects a,b|all] [--expires 30d|never] [--limits ws=10,agents=3,send=50] [--bind] [--for <recipe>] [--write <dir>]   a new one, or a new token (scopes, projects, limits; 90 days unless said) for one: asked in Laki's window; --for: a recipe's scopes, then its config and steps
   laki client recipes                         ready-made setups (mcp, raycast, launchd, shortcuts, script), each with its scopes
   laki client show <name> --for <recipe> [--write <dir>]   a recipe's config for an existing client (its token's file, never the token)
   laki client revoke <name>                   its token stops working at once, its file goes

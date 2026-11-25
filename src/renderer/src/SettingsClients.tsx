@@ -10,7 +10,7 @@ import { Group } from './SettingsKit'
 import { ask, IconButton } from './ui'
 import { RECIPE_IDS, RECIPES } from '../../shared/clientRecipes'
 
-type Row = { id: string; label: string; scopes: string[]; projects?: string[]; at: number; lastAt?: number; calls?: number; today?: number; daysLeft?: number; unused?: boolean; file: string }
+type Row = { bind?: true; bound?: { name: string; path: string; team?: string }; id: string; label: string; scopes: string[]; projects?: string[]; at: number; lastAt?: number; calls?: number; today?: number; daysLeft?: number; unused?: boolean; file: string }
 type Did = { at: number; method: string; target?: string; ok: boolean; why?: string; n?: number }
 type Log = { lines: Did[]; unknown: { n: number; last?: number; by?: string } }
 type Term = { key: string; tty: string; cmd: string; chain: string[]; at: number; lastAt: number; start?: true }
@@ -62,6 +62,7 @@ export function TrustedClients({ showWorkspaces, copy }: { showWorkspaces: (labe
                   <button className="link" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
                     {c.label}
                   </button>
+                  {c.bound ? <span className="muted small" data-tip={`${c.bound.path}${c.bound.team ? ` · team ${c.bound.team}` : ''}: a call from any other program is refused`}> · Bound to {c.bound.name}</span> : c.bind && <span className="muted small"> · bound to the first program that uses it</span>}
                   {c.unused && <span className="muted small"> · unused 30 days</span>}
                   {c.daysLeft !== undefined && c.daysLeft <= 7 && <span className="muted small"> · ends in {c.daysLeft} days</span>}
                 </td>

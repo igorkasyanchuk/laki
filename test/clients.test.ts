@@ -3,7 +3,7 @@
 // inside a tab that tab's call, laki mcp's tools cut to its scopes
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { constants, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -464,4 +464,57 @@ test('client recipes: each names the token file, never the token; mcp is JSON; s
   const list = await rig.cli('client', 'recipes')
   assert.match(list.out, /^mcp\s+An MCP client/m)
   assert.match(list.out, /^script\s+.*\(reads only\)$/m)
+})
+
+test("T13: a bound client's token works from the first program that uses it only: another's call refused, logged once, one notice; an unbound one as before", async t => {
+  const rig = await fresh(t, { env: { LAKI_TERM_WAIT: '5000' } })
+  const app = await connect(rig)
+  const add = async (label: string, bind?: boolean) => {
+    const added = rig.rpc('clientAdd', { label, ...(bind && { bind: true }) })
+    const ask: any = await seen(app, (e: any) => e.ev === 'clientAsk' && e.label === label, `${label} asked`)
+    assert.equal(!!ask.bind, !!bind, 'the card says it binds')
+    await app.call('clientAnswer', { req: ask.req, allow: true })
+    return added
+  }
+  const bound = await add('Bound Bot', true)
+  assert.equal(bound.bind, true)
+  const free = await add('Free Bot')
+  // two programs: node's binary at two paths (an APFS clone: no copy made), each in no tab and no terminal (detached)
+  const prog = (name: string) => {
+    const at = join(rig.home, name, 'node')
+    mkdirSync(join(rig.home, name))
+    copyFileSync(process.execPath, at, constants.COPYFILE_FICLONE)
+    return at
+  }
+  const [a, b] = [prog('prog-a'), prog('prog-b')]
+  const { port } = rig.info()
+  const call = (bin: string, file: string) =>
+    new Promise<string>(ok => {
+      const js = `fetch('http://127.0.0.1:${port}/rpc', { method: 'POST', headers: { authorization: 'Bearer ' + require('fs').readFileSync(${JSON.stringify(file)}, 'utf8').trim() }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.json()).then(j => console.log(j.error ? 'error: ' + j.error : 'ok'), e => console.log('error: ' + e))`
+      const c = spawn(bin, ['-e', js], { env: { PATH: process.env.PATH ?? '' }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
+      let out = ''
+      c.stdout!.on('data', d => (out += d))
+      c.stderr!.on('data', d => (out += d))
+      c.on('exit', () => ok(out.trim()))
+    })
+  assert.equal(await call(a, bound.file), 'ok', 'the first program: allowed, and bound to it')
+  const listed = (await rig.rpc('clientList')).find((c: any) => c.id === bound.id)
+  assert.ok(listed.bound?.path.endsWith('/prog-a/node') && listed.bound.name === 'node' && !listed.bind, JSON.stringify(listed))
+  assert.equal(await call(a, bound.file), 'ok', 'it again')
+  assert.match(await call(b, bound.file), /error: Bound Bot's token is bound to node.*prog-b\/node.*refused/)
+  const refused = (await rig.rpc('clientLog', { id: bound.id, refused: true })).lines
+  assert.equal(refused.length, 1, JSON.stringify(refused))
+  const notice: any = await seen(app, (e: any) => e.ev === 'notice' && e.title === 'Bound Bot: another program', 'a notice in the window')
+  assert.deepEqual(notice.choices, ['Revoke', 'Allow this program'])
+  assert.match(await call(b, bound.file), /refused/)
+  assert.equal(app.events.filter((e: any) => e.ev === 'notice' && e.title === 'Bound Bot: another program').length, 1, 'one notice per program')
+  // Allow this program: bound to it now, the first one refused
+  await app.call('alertAnswer', { id: notice.id, choice: 'Allow this program' })
+  await until(async () => (await rig.rpc('clientList')).find((c: any) => c.id === bound.id).bound.path.endsWith('/prog-b/node'), 'bound to the other')
+  assert.equal(await call(b, bound.file), 'ok')
+  assert.match(await call(a, bound.file), /refused/)
+  // unbound: any program, as before
+  assert.equal(await call(a, free.file), 'ok')
+  assert.equal(await call(b, free.file), 'ok')
+  assert.equal((await rig.rpc('clientList')).find((c: any) => c.id === free.id).bound, undefined)
 })

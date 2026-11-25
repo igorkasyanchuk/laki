@@ -5,10 +5,14 @@
 // clients.json (0600) keeps only its SHA-256, compared in constant time. Made, rotated and rescoped only once you say yes
 // in Laki's window (main.ts' clientAsk); revoked at once: the next call with it is refused. No core import: tested alone.
 // ponytail: the file's 0600 keeps out other macOS users, not other programs running as you; the token gives a client an
-// identity and limits, not a sandbox (SECURITY.md)
+// identity and limits, not a sandbox (SECURITY.md). Bound (T13, --bind or the card's Allow, bound): the first program
+// that brings its token is kept (bound: its executable, as the kernel has it, and on a Mac its Team ID) and a call from
+// any other is refused (bindCheck; main.ts' clientBound), so a program that only read the token file can't use it
+import { execFile } from 'node:child_process'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, mkdirSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { chmodSync, mkdirSync, readlinkSync, rmSync, statSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { promisify } from 'node:util'
 import { CLIENT_GONE, readJson, writeAtomic } from '../shared/conn.ts'
 import { dir } from './dir.ts'
 
@@ -55,7 +59,8 @@ export function expiresOf(v: unknown): number | 'never' {
 }
 // expires: when its token stops (ms), 'never'; one from before T9 counts from its making. lastAt, calls: its last call and
 // how many (clientUsed, saved once a minute at most)
-export type Client = { id: string; label: string; scopes: Scope[]; hash: string; at: number; projects?: string[]; expires?: number | 'never'; limits?: Limits; lastAt?: number; calls?: number } // projects: only these (their ids); none: every one
+export type Prog = { path: string; team?: string } // a calling program: its executable and Team ID (unsigned, Linux: none)
+export type Client = { bind?: true; bound?: Prog & { name: string }; id: string; label: string; scopes: Scope[]; hash: string; at: number; projects?: string[]; expires?: number | 'never'; limits?: Limits; lastAt?: number; calls?: number } // projects: only these (their ids); none: every one
 export const expiryOf = (c: Client) => (c.expires === 'never' ? undefined : (c.expires ?? c.at + EXPIRE_DAYS * DAY))
 export const expired = (c: Client, now = Date.now()) => (e => e !== undefined && now >= e)(expiryOf(c))
 export const limitsFor = (c: Client): Limits => ({ ...LIMITS, ...c.limits })
@@ -124,7 +129,7 @@ export function clientIdFor(label: string) {
 }
 // a new token, written once to its file (only its hash is kept): a new client's, or an existing one's (id: rotated, its
 // old token dead at once)
-export function clientMint(label: string, scopes: Scope[], id?: string, projects?: string[], o: { expires?: number | 'never'; limits?: Limits } = {}) {
+export function clientMint(label: string, scopes: Scope[], id?: string, projects?: string[], o: { expires?: number | 'never'; limits?: Limits; bind?: boolean } = {}) {
   if (!id && all().some(c => c.label.toLowerCase() === label.toLowerCase())) throw new Error(`${label} is a client already: laki client rotate gives it a new token`)
   const cid = id ?? clientIdFor(label)
   const token = TOKEN_PREFIX + randomBytes(32).toString('hex')
@@ -134,10 +139,43 @@ export function clientMint(label: string, scopes: Scope[], id?: string, projects
   const was = all().find(x => x.id === cid)
   const now = Date.now()
   const days = o.expires ?? EXPIRE_DAYS
-  const c: Client = { id: cid, label, scopes, hash: sha(token).toString('hex'), at: now, ...(projects?.length && { projects }), expires: days === 'never' ? 'never' : now + days * DAY, limits: o.limits ?? was?.limits ?? { ...LIMITS }, ...(was?.lastAt && { lastAt: was.lastAt, calls: was.calls }) }
+  const c: Client = { id: cid, label, scopes, hash: sha(token).toString('hex'), at: now, ...(projects?.length && { projects }), expires: days === 'never' ? 'never' : now + days * DAY, limits: o.limits ?? was?.limits ?? { ...LIMITS }, ...(was?.lastAt && { lastAt: was.lastAt, calls: was.calls }), ...(o.bind ? { bind: true as const } : was?.bound ? { bound: was.bound } : was?.bind && { bind: true as const }) } // a rotate keeps its program, --bind binds it anew
   list = [...all().filter(x => x.id !== cid), c]
   save()
   return shown(c)
+}
+// T13: the program a call comes from (pid: main.ts' clientBound, by its socket): its executable as the kernel has it
+// (lsof's txt on a Mac, /proc/<pid>/exe on Linux; never ps' or argv's path, which a symlink swapped meanwhile could
+// make another's), and on a Mac its Team ID (codesign -dv; cached by the file's path and mtime). undefined: can't tell
+const run = promisify(execFile)
+const teams = new Map<string, string>()
+export async function progOf(pid: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Prog | undefined> {
+  let path = ''
+  if (proc) path = (() => { try { return readlinkSync(join(proc, String(pid), 'exe')) } catch { return '' } })()
+  else path = /^n(\/.+)$/m.exec((await run('/usr/sbin/lsof', ['-a', '-p', String(pid), '-d', 'txt', '-Fn']).catch(e => ({ stdout: String(e?.stdout ?? '') }))).stdout)?.[1] ?? '' // its first txt: the executable
+  if (!path.startsWith('/')) return undefined
+  let key = path
+  try {
+    key = `${path}\n${statSync(path).mtimeMs}`
+  } catch {
+    return undefined
+  }
+  if (!proc && !teams.has(key)) teams.set(key, /^TeamIdentifier=(?!not set$)(\S+)$/m.exec(String((await run('/usr/bin/codesign', ['-dv', path]).catch(e => ({ stderr: String(e?.stderr ?? '') }))).stderr))?.[1] ?? '')
+  const team = teams.get(key)
+  return { path, ...(team && { team }) }
+}
+// what Settings and the notice call it: an app's name (its .app), else the file's
+export const progName = (path: string) => /\/([^/]+)\.app\//.exec(path)?.[1] ?? basename(path)
+// '' : this program may use it (its first one: bound to it now); else why not
+export function bindCheck(c: Client, prog: Prog) {
+  if (!c.bind && !c.bound) return ''
+  if (!c.bound) return clientBindTo(c.id, prog), ''
+  if (c.bound.path === prog.path && (c.bound.team ?? '') === (prog.team ?? '')) return ''
+  return `${c.label}'s token is bound to ${c.bound.name}${c.bound.team ? ` (team ${c.bound.team})` : ''}; this call came from ${progName(prog.path)} (${prog.path}${prog.team ? `, team ${prog.team}` : ''}): refused. Allow this program in Laki's window, or laki client rotate ${c.id} --bind`
+}
+export function clientBindTo(id: string, prog: Prog) {
+  list = all().map(c => (c.id === id ? (({ bind: _, ...x }) => ({ ...x, bound: { ...prog, name: progName(prog.path) } }))(c) : c))
+  save()
 }
 // revoked: its next call is refused, and its file goes
 export function clientRm(ref: unknown) {

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- `laki client add --bind`: a trusted client's token works only from the program that first uses it; another program's call is refused, with Revoke or Allow this program in the window.
 - Fewer tooltips in the sidebar: none on projects, groups, Show more and a workspace being made, where the row says it already.
 - Secrets in the Keychain are stored encrypted with Laki's own key while its window is open, so a plain `security` call from an agent's tab can't read them.
 - A file path the terminal wrapped over two or more rows opens from any of them, not only the row with its extension.

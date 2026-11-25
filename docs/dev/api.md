@@ -754,6 +754,13 @@ such an app with a capability of its own: a token that names it and says what it
   `clients/<id>.token` (0600, the folder 0700). `clientOf` hashes the bearer and compares in constant time
   (`timingSafeEqual`); `clientMint` makes or rotates (same id, the old hash replaced), `clientRm` revokes (entry and
   file gone). Every call reads the list in memory: a revoke holds at once.
+- **Bound** (T13). `clientAdd`'s `bind` (or `clientAnswer`'s, the card's *Allow, bound to its program*) mints it with
+  `bind: true`; main.ts' `clientBound`, first in `clientCalls`, finds the caller's pid (`core.peerPid`, once per
+  connection) and `progOf` it (lsof's first `txt`, `/proc/<pid>/exe` on Linux; `codesign -dv`'s TeamIdentifier, cached
+  by path and mtime). `bindCheck`: the first program binds it (`bound { path, team?, name }`), then path and team must
+  match, else refused (`clientLine`: one line in its log) and one notice per program (`alertShow` with Revoke and Allow
+  this program, the Mac's choices: `remoteNo` refuses them over remote access). No program found: refused. A rotate keeps
+  its program; `--bind` binds it anew.
 - **Who mints.** `clientAdd` and `clientRotate` (`FROM`, `AGENT_NO`, `REMOTE_NO`, `ANSWER_NO`) refuse a `from` with a
   tab (whoCalls': any tab, a shell's too: an agent may type there), then `clientAsk`: the event `clientAsk { req, what,
   label, scopes, file }` to the app's windows only (as `termAsk`), held `TERM_WAIT`; `clientAnswer` (the app's token only,

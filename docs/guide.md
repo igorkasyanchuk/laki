@@ -3355,6 +3355,7 @@ laki client add "Grok Bot"                  # from your own terminal: Allow it i
 laki client add ci-bot --scopes create,send,remove
 laki client add ci-bot --expires 30d --limits ws=5,agents=2,send=20
 laki client add "Grok Bot" --projects candy    # in that project only (ids or names; --projects all: every one again)
+laki client add "Grok Bot" --bind           # its token works only from the first program that uses it
 laki client ls                              # name, scopes and token file of each
 laki client rotate grok-bot --scopes send   # a new token (and scopes): asked again; the old one stops at once
 laki client revoke grok-bot                 # its token stops working at once, its file goes
