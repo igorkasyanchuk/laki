@@ -1,6 +1,7 @@
 // Electron main's checks, pure (no electron import, so test/main-guards.test.ts runs them on plain node): who sent an
 // IPC message (fromApp, from), and the URLs main lets through (open-external, the webviews, the agent browser)
 import { confirmKnown } from '../shared/confirm.ts'
+export { titleOf } from '../shared/title.ts' // a window's title, cleaned (the bridge's title)
 
 // S9: the built pages' origin, a privileged standard scheme main serves out/renderer on (protocol.handle): 'self' in
 // their CSP is this origin alone, not every file:// on the disk (an agent's worktree among them)

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Every window has a real title, the workspace and project it shows (a floated tab's, the side panel's too), for Mission Control, the Window menu and screen-share pickers.
 - Telegram: 📺 Screen and 📝 Diff open in the card's place with ⬅ Back to the workspace and 🔄 Again, so the menu never starts over.
 - Hide secret-looking variables from agents also catches secrets by their value: a password in a URL or a key's shape under any name; Settings says why for each.
 - Out loud can speak only on headphones (Settings › Voice): never out of the Mac's speakers or a display's.

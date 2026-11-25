@@ -15,7 +15,7 @@ import { keyFor } from '../shared/keys.ts'
 import { veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
-import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dblClickAction, dragOk, externalOf, fromApp as senderOk, fromTokenPage, pageIs, PREVIEW, web, webviewOk, showAtLaunch  } from './guards.ts'
+import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dblClickAction, dragOk, externalOf, fromApp as senderOk, fromTokenPage, pageIs, PREVIEW, web, webviewOk, showAtLaunch, titleOf } from './guards.ts'
 import { signed, updater } from './update.ts'
 import './agentBrowser.ts' // its IPC (browse): registered as it loads
 import { guardFloat, pin, talk, voice } from './floater.ts'
@@ -632,6 +632,15 @@ ipcMain.handle('conn', async e => {
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
   const { port, token } = await daemon()
   return { port, token: appToken() ?? token } // S1: the app's; daemon.json's only when it couldn't be had (its calls that ask who are refused)
+})
+
+// a page's title for its own window only (the one its webContents is in), cleaned again here (shared/title.ts); the
+// hidden title bar stays hidden: it's for Mission Control, the Window menu, Stage Manager, screen-share pickers and
+// Linux's system title bar
+ipcMain.on('win-title', (e, text: unknown, hide: unknown) => {
+  if (!fromApp(e)) return
+  const w = BrowserWindow.fromWebContents(e.sender)
+  if (w && !w.isDestroyed()) w.setTitle(titleOf(text, Array.isArray(hide) ? hide.filter((x): x is string => typeof x === 'string').slice(0, 200) : []))
 })
 
 // the daemon's Keychain values wrapped (keychain.ts, through the app window's socket): Electron's safeStorage, whose key

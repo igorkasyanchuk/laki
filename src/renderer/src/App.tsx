@@ -65,6 +65,7 @@ import { chromeOf } from './Chrome'
 import { wsActionsOf } from './WsActions'
 import { widgetsOf } from './AppWidgets'
 import { extCfgOf } from './ExtCfg'
+import { hiddenNames, useWinTitle } from './winTitle'
 
 // E8: loaded as it first shows (the floating AI chat): not in the window's first load
 const AiPage = lazy(() => import('./Ai').then(m => ({ default: m.AiPage })))
@@ -450,12 +451,11 @@ export function App() {
   // workspace and its tab; a dialog over a page (⌘K, a rename) keeps the page's
   const titleAt = useRef<Dialog>(null)
   if (isPlace(dialog)) titleAt.current = dialog
-  // a workspace whose project has an emoji: it and the project's name first (🛒 web · fix-login)
+  // "<workspace> — <project>" (its emoji first: 🛒 fix-login — web), else the page's name (Board, Settings); none: Laki
   const hereP = projOf(ws)
   const pe = emojiOf(hereP?.icon)
-  const here = titleAt.current === null ? [pe && `${pe} ${hereP!.name}`, ws && wsName(ws), tab?.name].filter(Boolean).join(' · ') : view ? placeName({ d: titleAt.current, ws: ws?.id ?? null }) : ''
-  const winTitle = here ? `${here} — Laki` : 'Laki'
-  useEffect(() => void (document.title = winTitle), [winTitle])
+  const here = titleAt.current === null ? (ws ? `${pe ? `${pe} ` : ''}${wsName(ws)}${hereP ? ` — ${hereP.name}` : ''}` : '') : view ? placeName({ d: titleAt.current, ws: ws?.id ?? null }) : ''
+  useWinTitle(here || 'Laki', hiddenNames(view))
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
   const layoutsOn = hasCap(view, 'layouts')

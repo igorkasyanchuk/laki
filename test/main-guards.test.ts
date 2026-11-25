@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { appFile, appPage, BROWSER, confirmAsk, dockAgents, dockMenu, dragOk, recentOk, showAtLaunch, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
+import { titleOf, appFile, appPage, BROWSER, confirmAsk, dockAgents, dockMenu, dragOk, recentOk, showAtLaunch, externalOf, fromApp, handoffUrl, fromTokenPage, local, MENU_DEPTH, MENU_ITEMS, menuModelOk, pageIs, PREVIEW, tokenPage, webviewOk } from '../src/main/guards.ts'
 
 test('main guards: only the app window’s main frame on the app’s own page is the app', () => {
   const page = 'app://laki/index.html'
@@ -203,4 +203,15 @@ test("dblClickAction: a title bar's double click as macOS's setting says (Minimi
   assert.equal(dblClickAction('Minimize'), 'minimize')
   assert.equal(dblClickAction('None'), 'none')
   for (const v of ['Maximize', 'Fill', '', undefined, 42]) assert.equal(dblClickAction(v), 'zoom', String(v))
+})
+
+test("a window's title: control characters out, 120 at most, Laki when empty; Recording mode's private names as Laki", () => {
+  assert.equal(titleOf('fix-login — web'), 'fix-login — web')
+  assert.equal(titleOf('a\nb\tc\u0007d\u202eevil'), 'a b c d evil', 'control and direction characters out')
+  assert.equal(titleOf('x'.repeat(300)).length, 120)
+  assert.equal([...titleOf('🛒'.repeat(200))].length, 120, 'by character, an emoji whole')
+  for (const empty of ['', '   ', undefined, null, '\n\t']) assert.equal(titleOf(empty), 'Laki')
+  assert.equal(titleOf('launch-plan — stealth', ['launch-plan', 'stealth']), 'Laki — Laki')
+  assert.equal(titleOf('launch-plan', ['launch-plan']), 'Laki')
+  assert.equal(titleOf('shell — fix-login', ['', '  ']), 'shell — fix-login', 'a blank name hides nothing')
 })

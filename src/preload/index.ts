@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
+  title: (text: string, hide?: string[]) => ipcRenderer.send('win-title', text, hide), // this window's title (shared/title.ts): Mission Control, the Window menu, a screen share's picker
   notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[], card?: { diff?: string; ask?: boolean; alert?: string; tone?: string; origin?: string }, speak?: string) => ipcRenderer.send('notify', title, body, tab, sound, actions, card, speak), // speak: read out (shared/speak.ts spokenNote)
   onSpeak: (cb: (text: string) => void) => ipcRenderer.on('speak', (_e, t) => typeof t === 'string' && cb(t)), // notify's speak, back unless the talk key is down; '': stop
   cardGone: (key: string) => ipcRenderer.send('card-gone', key), // a laki alert over: its card goes

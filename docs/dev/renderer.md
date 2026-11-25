@@ -366,10 +366,13 @@ are tested in `test/units-more.test.ts`.
     A page's own levels: Workflows' and Specs' (`onNav`: the list, each spec or brainstorm open, its templates; the
     dialog's `of`, `kind`, `slug`, `templates`) are places; Settings' section and an extension page's tab only rewrite
     the place they're at (Dialogs.tsx' `keepHere`, a microtask after the effects), so Back comes to where you left it.
-  - The window's title (`winTitle`, `document.title`: Electron's window takes it; a screen share's picker, the Window
-    menu, a browser's tab): `placeName` of the last page (`titleAt`: a dialog over it keeps it), else the workspace · tab
-    (after `<emoji> <project>` when its project's icon is an emoji),
-    then ` — Laki`; the new-workspace, AI and floated tab windows set their own (main.tsx, `TabWindow`).
+  - The window's title (winTitle.ts `useWinTitle`: `document.title` and the bridge's `title`, main's `win-title` setting
+    it on the sender's own window, both cleaned by shared/title.ts `titleOf`: control characters out, 120 at most,
+    `Laki` when empty, Recording mode's private names (`hiddenNames`) as `Laki`; Mission Control, the Window menu, Stage
+    Manager, a screen share's picker, Linux's title bar, a browser's tab; the hidden title bar stays hidden): `placeName`
+    of the last page (`titleAt`: a dialog over it keeps it), else `<workspace> — <project>` (the project's emoji first);
+    a floated tab `<tab> — <workspace>`, the side panel `<its tab> — <workspace>` (NewWindow.tsx); the new-workspace and
+    simulator windows set their own.
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
     and no red); `archive` asks first (`peekWs`, `rmFacts` with `archive`: the storage folder kept, a codespace
     stopped), then `wsArchive` with `ifClean` unless it was dirty when asked (`loses`: uncommitted files, a
