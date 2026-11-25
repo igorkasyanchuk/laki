@@ -96,6 +96,8 @@
 [data-look='frosted'] .rail-kind { position: relative; }
 [data-look='frosted'] .rail-icon { border-radius: var(--rs, 10px); transition: background 0.14s, color 0.14s; }
 [data-look='frosted'] .rail-kind.on .rail-icon { background: var(--f-fill-up); color: var(--fg); }
+[data-look='frosted'] .rail-list.slid::before { border-radius: var(--rs, 10px); background: var(--f-fill-up); } /* its fill slides (slide.ts), the accent bar stays by the one you're on */
+[data-look='frosted'] .rail-list.slid > .rail-kind.on .rail-icon { background: none; }
 [data-look='frosted'] .rail-kind.on:not(.rail-pin)::before { content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--accent); transform: translateY(-50%); }
 [data-look='frosted'] .rail-sep { background: var(--f-edge); }
 [data-look='frosted'] .rail-count { border-color: transparent; }

@@ -349,6 +349,7 @@ html.away ::selection { background: color-mix(in srgb, var(--fg) 16%, transparen
 .hist-nav .ib { width: 24px; height: 24px; padding: 0; }
 .hist-nav .ib:disabled { opacity: 0.35; background: none; }
 .rail .hist-nav { margin-bottom: 4px; }
+.rail-list { flex: 1; min-height: 0; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); } /* the rail's buttons, one group (slide.ts: its pick's fill slides down it) */
 .rail-sep { flex: none; width: 32px; height: 1px; margin: 6px 0; background: color-mix(in srgb, var(--fg) 22%, transparent); }
 .rail-mark { font: 700 var(--fs-2)/1 var(--ui-font); letter-spacing: 0.02em; }
 .rail-emoji { font-size: var(--fs-4); line-height: 1; } /* a pin's own icon, an emoji (Rail icon) */
@@ -1119,14 +1120,17 @@ button.danger:focus-visible { outline: 2px solid var(--error); outline-offset: 2
 .seg button.on { background: color-mix(in srgb, var(--accent) 24%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 70%, var(--line)); color: var(--fg); position: relative; z-index: 1; } /* picked: an accent tint and edge (over its neighbors' shared edge); the text stays --fg, so a look's own fill still reads */
 /* the selection slides (slide.ts .slid, from a group's first change): the picked item's underline or fill is the
    group's ::before, moved with the spring; the item keeps its text color, its focus ring its own */
-:is(.reader-switch, .sp-tabs).slid { position: relative; }
-:is(.reader-switch, .sp-tabs).slid::before { content: ''; position: absolute; left: 0; top: 0; width: var(--ind-w); height: var(--ind-h); translate: var(--ind-x) var(--ind-y); pointer-events: none; transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring); }
-:is(.reader-switch, .sp-tabs)[data-still]::before { transition: none; }
+:is(.reader-switch, .sp-tabs, .rail-list).slid { position: relative; }
+:is(.reader-switch, .sp-tabs, .rail-list).slid::before { content: ''; position: absolute; left: 0; top: 0; width: var(--ind-w); height: var(--ind-h); translate: var(--ind-x) var(--ind-y); pointer-events: none; transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring); }
+:is(.reader-switch, .sp-tabs, .rail-list)[data-still]::before, html.away .rail-list.slid::before { transition: none; } /* placed at once; the window away: no slide nobody sees */
 .sp-tabs.slid::before { z-index: 2; box-shadow: inset 0 -2px 0 var(--neutral-strong); }
 .sp-tabs.slid > button.on { box-shadow: none; }
 .reader-switch.slid::before { z-index: 0; border-radius: var(--r-in); background: color-mix(in srgb, var(--fg) 20%, transparent); }
 .reader-switch.slid > button { position: relative; z-index: 1; }
 .reader-switch.capsule.slid button.on { background: none; }
+.rail-list.slid::before { z-index: 0; border-radius: var(--r-l); background: color-mix(in srgb, var(--accent) 12%, transparent); } /* the rail's pick, as .rail-kind.on .rail-icon draws it until the first change */
+.rail-list.slid > button { position: relative; z-index: 1; }
+.rail-list.slid > .rail-kind.on .rail-icon { background: none; }
 .buttons { display: flex; gap: var(--sp-4); align-items: center; margin-top: 4px; }
 .seg.wrap { flex-wrap: wrap; row-gap: var(--sp-2); }
 /* the new-workspace page: what to run, then Advanced (folded, its choices in words) */
@@ -3775,7 +3779,7 @@ html[data-motion='high'] :is(.board-card, .ach-card):hover { translate: 0 -2px; 
   html:not([data-motion='none']) .toggle-knob { transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), margin-left var(--t-spring) var(--spring); }
   html:not([data-motion='none']) .toggle:active:not(:focus-visible, :disabled) .toggle-knob { width: calc(var(--knob) * 1.5); }
   html:not([data-motion='none']) .toggle.on:active:not(:focus-visible, :disabled) .toggle-knob { margin-left: calc(var(--knob) / -2); }
-  html:not([data-motion='none']) :is(.reader-switch, .sp-tabs).slid::before { transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring), scale var(--t-fast) var(--ease-out); }
+  html:not([data-motion='none']) :is(.reader-switch, .sp-tabs, .rail-list).slid::before { transition: translate var(--t-spring) var(--spring), width var(--t-spring) var(--spring), height var(--t-spring) var(--spring), scale var(--t-fast) var(--ease-out); }
   html:not([data-motion='none']) :is(.reader-switch, .sp-tabs).slid:active::before, html:not([data-motion='none']) .seg > button.on:active { scale: 0.97; }
   .menu-item, .palette-item { transition: scale var(--t-fast) var(--ease-out); } /* the highlight moves at once, as in a native menu: a fade left the last one lit beside the new */
   :where(.side-panel) { animation: m-side var(--t-spring-soft) var(--spring-soft); }

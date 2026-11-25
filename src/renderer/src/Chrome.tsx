@@ -392,24 +392,26 @@ export function chromeOf(r: ChromeIn) {
   const railBar = railUp && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }} onContextMenu={e => !e.defaultPrevented && railMenu(e)}>
       {histNav}
-      {kindButton(RAIL[0])}
-      {railKept.map(x => ('kind' in x ? kindButton(x.kind) : railButton(x.key, x.icon, x.label, x.on, x.tip, x.run, x.n ? <span className="rail-count"><Num value={x.n} /></span> : x.mark)))}
-      {railMore.length > 0 &&
-        railButton('more', 'more', 'More', railMore.some(x => x.on), `More: ${railMore.map(x => x.label).join(', ')}`, () => {}, (n => (n ? <span className="rail-count"><Num value={n} /></span> : undefined))(railMore.reduce((a, x) => a + (x.n ?? 0), 0)), e =>
-          openMenu(e, [
-            ...railMore.map(x => ({ label: x.label, icon: x.icon, sub: x.tip, run: x.run, ...(x.on && { hint: 'ON' }), ...(x.n ? { pill: String(x.n), tone: 'warn' as const } : {}) })),
-            ...(railHide.length ? [{ label: 'Show them all on the rail', icon: 'eye' as const, foot: true, run: () => void call('settingsSet', { railHide: [] }).catch(() => {}) }] : []),
-            { label: 'Customize the rail…', icon: 'gear', foot: true, run: () => setDialog({ section: 'layout', spot: 'Rail' }) },
-          ]),
-        )}
-      {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
-      {railPins.map(pinButton)}
-      {planPins.map(planButton)}
-      <WidgetButtons widgets={ownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} colors={railColors} />
-      <span className="spacer" />
-      {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
-      {aiOn(settings) && !railHide.includes('ai') && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
-      {railButton('settings', 'gear', 'Settings', settingsOf(dialog), `${kt('Settings', 'settings')}${view?.agentUpdates?.length ? ` · an update is out: ${view.agentUpdates.join(', ')} (Agents & profiles)` : ''}`, toSettings, settings.updateDot === true && view?.agentUpdates?.length ? <span className="rail-dot" /> : undefined)}
+      <div className="rail-list">
+        {kindButton(RAIL[0])}
+        {railKept.map(x => ('kind' in x ? kindButton(x.kind) : railButton(x.key, x.icon, x.label, x.on, x.tip, x.run, x.n ? <span className="rail-count"><Num value={x.n} /></span> : x.mark)))}
+        {railMore.length > 0 &&
+          railButton('more', 'more', 'More', railMore.some(x => x.on), `More: ${railMore.map(x => x.label).join(', ')}`, () => {}, (n => (n ? <span className="rail-count"><Num value={n} /></span> : undefined))(railMore.reduce((a, x) => a + (x.n ?? 0), 0)), e =>
+            openMenu(e, [
+              ...railMore.map(x => ({ label: x.label, icon: x.icon, sub: x.tip, run: x.run, ...(x.on && { hint: 'ON' }), ...(x.n ? { pill: String(x.n), tone: 'warn' as const } : {}) })),
+              ...(railHide.length ? [{ label: 'Show them all on the rail', icon: 'eye' as const, foot: true, run: () => void call('settingsSet', { railHide: [] }).catch(() => {}) }] : []),
+              { label: 'Customize the rail…', icon: 'gear', foot: true, run: () => setDialog({ section: 'layout', spot: 'Rail' }) },
+            ]),
+          )}
+        {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
+        {railPins.map(pinButton)}
+        {planPins.map(planButton)}
+        <WidgetButtons widgets={ownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} colors={railColors} />
+        <span className="spacer" />
+        {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
+        {aiOn(settings) && !railHide.includes('ai') && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
+        {railButton('settings', 'gear', 'Settings', settingsOf(dialog), `${kt('Settings', 'settings')}${view?.agentUpdates?.length ? ` · an update is out: ${view.agentUpdates.join(', ')} (Agents & profiles)` : ''}`, toSettings, settings.updateDot === true && view?.agentUpdates?.length ? <span className="rail-dot" /> : undefined)}
+      </div>
     </nav>
   )
   // the status bar, full width (Zed's way): one bar under the sidebar and the main area, over every page too, the

@@ -1665,7 +1665,13 @@ quick bar with the words). Its IPC is ask.html's (`ask-act`, `ask-open`, `ask-si
   side panel's pick its own way (`filled`: the pick's own background, read with its transition off, not every
   button's) keeps its fill and nothing slides there: an underline over it would be a second mark. A segmented `.seg`
   group doesn't slide: its pick is a solid fill of its own (`.seg button.on`, a look's fill wins; an underline drawn
-  square over its rounded ends stuck out). Motion: Off, the catch-all.
+  square over its rounded ends stuck out). Motion: Off, the catch-all. The rail's buttons are one group too, down it
+  (`.rail-list` inside `.rail`: the rail's own `::before` is the window's edge line, its `::after` the glass grain): the
+  fill is the pick's `.rail-icon`'s box, not the whole button, `.rail-kind.on .rail-icon`'s fill until the first change
+  (then `background: none` on it); pins and extension buttons are in the list, never lit. Frosted slides its own fill
+  (looks/frosted.css), its accent bar stays by the item. A window away (`html.away`) places it without the slide. The
+  contact sheet (`npm run test:sheet`) has no rail: it was checked at rest in a browser (the fill's box, color and
+  corners those of the icon's).
 - **Edges** (`--pane-x`, the terminal's text's inset: 10px, 18px in a lineless Design or Roomy padding, 4px Tiny or a
   phone, set on `.app`; `--pane-x2` = it + `--pane-icon` (14px) + `--sp-3`, where words after a strip's leading icon
   start; `--pane-r` the strips' right): `.term`'s left inset, the queue and Done check strips' head and rows

@@ -3,14 +3,15 @@
 // group's pick is a solid fill of its own, standing still). One MutationObserver for the window (class and aria changes
 // on a group's items, read only there); a group is drawn so only from its first change on, starting where the old pick
 // was, so nothing slides as a page first draws or as a group's items come. An item come or gone, a change of its size
-// (Density, the zoom) or the window's puts them back without moving. Motion: Off / Reduce motion: styles.css' catch-all
-const GROUP = '.reader-switch, .sp-tabs'
+// (Density, the zoom) or the window's puts them back without moving. Motion: Off / Reduce motion: styles.css' catch-all.
+// The rail's list too, down it: its fill is the pick's icon's (.rail-icon), not the whole button with its word
+const GROUP = '.reader-switch, .sp-tabs, .rail-list'
 const PICKED = ':scope > :is(.on, [aria-checked="true"], [aria-pressed="true"], [aria-selected="true"])'
 
 function place(g: HTMLElement, el: Element | null | undefined, still: boolean) {
   if (!el) return g.classList.remove('slid')
   const a = g.getBoundingClientRect()
-  const b = el.getBoundingClientRect()
+  const b = ((g.matches('.rail-list') && el.querySelector(':scope > .rail-icon')) || el).getBoundingClientRect()
   if (still) g.setAttribute('data-still', '')
   g.style.setProperty('--ind-x', `${b.left - a.left - g.clientLeft + g.scrollLeft}px`)
   g.style.setProperty('--ind-y', `${b.top - a.top - g.clientTop + g.scrollTop}px`)
@@ -32,7 +33,7 @@ const bg = (e: HTMLElement) => {
   return { ...v, none: v.image === 'none' && (v.color === 'transparent' || /[,/]\s*0\)$/.test(v.color)), key: `${v.color} ${v.image}` }
 }
 function filled(g: HTMLElement, pick: Element | null) {
-  if (!(pick instanceof HTMLElement) || g.matches('.reader-switch')) return false // the Reader switch's slide is a fill itself
+  if (!(pick instanceof HTMLElement) || g.matches('.reader-switch, .rail-list')) return false // the Reader switch's slide is a fill itself; the rail's pick is styles.css' or Frosted's (looks/frosted.css: its fill slides too)
   const plain = [...g.children].find((c): c is HTMLElement => c !== pick && c instanceof HTMLElement && c.tagName === pick.tagName && !c.matches(':hover'))
   const p = bg(pick)
   return !p.none && (!plain || bg(plain).key !== p.key) // a fill of its own, not the one every button has
