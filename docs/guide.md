@@ -3573,6 +3573,9 @@ codex its last one in that folder. Any other program that was running (a dev ser
 prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught halfway doesn't run twice. A Run tab that was
 running starts again. This happens when the daemon stops properly (the yellow bar, `laki stop`, *Quit Laki Completely*,
 a log out). After a crash, shells start fresh, and nothing comes back over SSH.
+A shell tab also shows what was on its screen before, dimmed, above a line with when: Laki keeps each shell's screen
+every 5 minutes and as it stops, so a Mac's restart or a crash loses at most those minutes. Not an agent's (its chat
+comes back instead), and never a Private workspace's or project's; closing a tab removes its copy.
 
 With *Terminals outlive the daemon* on (Settings › Git & worktrees › In the background; on for a new install, and an install from before is asked once), none of that is
 needed for tabs started since: their terminals run in a small process of their own, and a daemon that crashed, was

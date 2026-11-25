@@ -669,7 +669,14 @@ folder (`lsof -d cwd`) and `rerun`'s command. An agent resumes and runs: claude 
 typed, no Enter; a node shim's line is its name again (`node /…/bin/npm run dev` is `npm run dev`). A live Run tab
 gets `again` `{ run: true }`, and `restoreAll` keeps it. `restoreAll` starts the shell in that folder, then `bringBack`
 types it once the prompt is up (it printed, then 500 ms quiet; 10 s at most) under a dim note. A crash keeps nothing,
-and neither does a host.
+and neither does a host. A shell tab's screen (#S1, `screens.ts`): `screensSave` every `LAKI_SCREEN_SAVE_MS` (5 min) for a
+shell whose `lastOutput` moved since its last save, and with `all` in `shutdown`, writes `Session.saved()` (the serialize
+addon's text, colors and scrollback, no modes; none while the alternate screen is up) to `<data>/screens/<tab>.txt`,
+0600 (the folder 0700, in `DATA_SECRETS`), its last `SCREEN_MAX` (200 KB) bytes; a Private workspace's or project's
+isn't written (one made Private since: removed), `closeTab` removes a tab's (`screenForget`), and each save prunes the
+files of tabs gone. `restoreNow` of a shell with no terminal behind it (not ptyAdopt's) writes `screenBack` into its
+mirror first (`Session.prelude`, muted: its old queries unanswered): the text dimmed (each SGR followed by `\x1b[2m`),
+then `──── before the restart, <time> ────`, then the new shell's output.
 
 A claude chat whose background commands (Bash `run_in_background`: a dev server, a watcher) or background subagents
 were running as Laki ended its process (a restart: an update, Update when idle, a crash; or sleep) is told so once

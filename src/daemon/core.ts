@@ -45,6 +45,7 @@ import { findSecrets, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
 import { envJson, envRestore, envRetry, envScrub, envStash, envUnread } from './envKeys.ts'
 import { keysWhere, onKeys } from './keychain.ts'
+import * as screensMod from './screens.ts'
 import { LOCKFILE } from '../shared/overlap.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
@@ -3346,6 +3347,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
   asleep.delete(id)
   rt.delete(id)
   typedBy.delete(id), treeAgents.delete(id)
+  screensMod.screenForget(id) // #S1: its kept screen too
   state.tabs = state.tabs.filter(x => x !== t)
   stopShares({ tab: id })
   statusGone(id)
@@ -4532,6 +4534,7 @@ export function restoreNow(id: string) {
   let ok = true
   try {
     const s = spawnTab(t, { resume: true, cwd: a?.cwd })
+    if (t.kind === 'shell') (b => b && s.prelude(b))(screensMod.screenBack(t.id)) // #S1: its last screen first, dimmed (no terminal kept it)
     restoredAt.set(t.id, Date.now())
     if (a?.cmd) bringBack(s, a.cmd, !!a.run)
     bgTell(t, s, 'restart') // what its chat still ran as the daemon went

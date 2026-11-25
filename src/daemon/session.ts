@@ -169,6 +169,19 @@ export class Session {
     this.settle = setTimeout(() => this.onProgram(), PROGRAM_SETTLE)
   }
 
+  // #S1: a shell tab's last screen from before a restart (screens.ts), dimmed, ahead of its new shell's: the mirror's
+  // (what a window attaches to), its old queries unanswered
+  prelude(d: string) {
+    this.muted = true
+    this.term.write(d, () => (this.muted = false))
+  }
+  // #S1: its screen to keep (screens.ts): the text, its colors and the scrollback, no modes (a mouse mode would stay on
+  // in the next shell); none while an app holds the alternate screen (vim's: not a shell's screen)
+  saved(): string | undefined {
+    if (this.term.buffer.active.type === 'alternate') return undefined
+    return this.ser.serialize({ scrollback: SCROLLBACK, excludeModes: true, excludeAltBuffer: true })
+  }
+
   // R6: what a terminal that outlived the daemon printed before (the pty host's buffer), into the mirror only
   replay(d: string) {
     this.begin() // it runs already

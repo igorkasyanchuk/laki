@@ -29,6 +29,7 @@ import { artBlocked, artCsp, artHostOk } from '../shared/artHosts.ts'
 import * as core from './core.ts'
 import * as agentCliMod from './agentCli.ts'
 import * as uninstallMod from './uninstall.ts'
+import * as screensMod from './screens.ts'
 import * as backupMod from './dataBackup.ts'
 import * as gitTidyMod from './gitTidy.ts'
 import * as askStreak from './askStreak.ts'
@@ -2378,6 +2379,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('dndTick', 20_000, () => core.dndTick(), { idle: 'keep' }) // U8: Do not disturb ends on time, its digest shown
   ticks.register('logTick', 3_600_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep' }) // R3: past 10 MB while it runs too, not only at its start
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
+  ticks.register('screensSave', screensMod.SCREEN_EVERY(), () => screensMod.screensSave(), { idle: 'slow' }) // #S1: shell tabs' screens whose output changed, kept for a restart
   ticks.register('backupTick', Number(process.env.LAKI_BACKUP_MS) || 3_600_000, () => void backupMod.backupTick(), { idle: 'keep' }) // #B2: the weekly backup, when it's due (tests: LAKI_BACKUP_MS, both the tick and the week)
   ticks.register('sweepRunning', Number(process.env.LAKI_SWEEP_MS) || 2000, core.sweepRunning, { idle: 'slow' }) // tests' shorter
   ticks.register('hookTick', 30000, () => core.hookTick(), { idle: 'slow' }) // hooks not heard: a tab's strip says so
@@ -2443,6 +2445,11 @@ function shutdown(keep: unknown = false) {
     core.keepShells() // what the shells run, for the next start
   } catch (e) {
     log('keeping shells', e) // the stop goes on
+  }
+  try {
+    screensMod.screensSave(true) // #S1: each shell tab's screen, for the next start
+  } catch (e) {
+    log('keeping screens', e)
   }
   const ends: Promise<unknown>[] = [] // what the exit waits for, 300 ms at most: the terminals' ends, the host's frames written out, the last log lines
   for (const s of core.sessions.values()) if (!kept || !(s.pty instanceof HostPty)) (s.exited || ends.push(new Promise(r => s.pty.onExit(r))), s.kill())

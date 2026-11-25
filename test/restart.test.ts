@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { get } from 'node:http'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -421,4 +421,47 @@ test('U1, U2: a new install starts small (Labs off, no achievements game); one f
   await assert.rejects(rig.rpc('noteList', {}), /Notes are off/)
   await rig.rpc('settingsSet', { notes: true }) // each its own switch still
   await rig.rpc('noteList', {})
+})
+
+test("#S1: a shell tab's last screen comes back after a restart, dimmed, above a line with when; a Private workspace's isn't kept; a closed tab's file goes", async t => {
+  const rig = await fresh(t, { env: { LAKI_SCREEN_SAVE_MS: '400' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const hidden = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  await rig.rpc('wsSet', { id: hidden.id, private: true })
+  const one = await until(() => rig.tab(ws.id, 'shell'), 'a shell')
+  const two = await until(() => rig.tab(hidden.id, 'shell'), "the Private one's shell")
+  const gone = await rig.rpc('tabNew', { ws: ws.id })
+  for (const s of [one, two, gone]) await until(async () => (await rig.screen(s.id)).includes('$'), 'a prompt')
+  await rig.rpc('input', { tab: one.id, data: 'echo MARK-$((40+2))\r' })
+  await rig.rpc('input', { tab: two.id, data: 'echo SECRET-$((40+2))\r' })
+  await until(async () => (await rig.screen(one.id)).includes('MARK-42'), 'the marker')
+  const file = (id: string) => join(rig.data, 'screens', `${id}.txt`)
+  await until(() => existsSync(file(one.id)) && readFileSync(file(one.id), 'utf8').includes('MARK-42'), 'kept on the tick', 10000)
+  assert.equal(statSync(file(one.id)).mode & 0o777, 0o600)
+  assert.equal(statSync(join(rig.data, 'screens')).mode & 0o777, 0o700)
+  await until(() => existsSync(file(gone.id)), "the other tab's", 10000)
+  await rig.rpc('tabClose', { id: gone.id })
+  await until(() => !existsSync(file(gone.id)), 'a closed tab takes its file')
+  await sleep(1000) // ticks past the Private one's echo
+  assert.ok(!existsSync(file(two.id)), "a Private workspace's never kept")
+  await rig.stop()
+  await rig.start()
+  await until(async () => /MARK-42[\s\S]*──── before the restart, [^\n]+ ────[\s\S]*\$/.test(await rig.screen(one.id)), 'the old screen, the line, a new prompt', 15000)
+  const after = await rig.screen(two.id)
+  assert.ok(!after.includes('SECRET-42'), after)
+  assert.ok(!after.includes('before the restart'))
+})
+
+test('#S1: a stop keeps the screens too, between ticks', async t => {
+  const rig = await fresh(t) // the tick: 5 minutes, not reached
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const one = await until(() => rig.tab(ws.id, 'shell'), 'a shell')
+  await until(async () => (await rig.screen(one.id)).includes('$'), 'a prompt')
+  await rig.rpc('input', { tab: one.id, data: 'echo STOP-$((40+2))\r' })
+  await until(async () => (await rig.screen(one.id)).includes('STOP-42'), 'the marker')
+  assert.ok(!existsSync(join(rig.data, 'screens', `${one.id}.txt`)))
+  await rig.stop()
+  assert.match(readFileSync(join(rig.data, 'screens', `${one.id}.txt`), 'utf8'), /STOP-42/)
 })

@@ -56,6 +56,7 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/daemon/tickets.ts` | linked tickets: a project's Ticket script per workspace, its key, title and status |
 | `src/daemon/policy.ts` | a managed policy for teams: locked settings, remote access off, approvals required, which agents |
 | `src/daemon/program.ts` | OSC 7501, an agent's status through its terminal: reports parsed, one terminal's records; in shadow, only compared with hooks (`docs/dev/agents.md`) |
+| `src/daemon/screens.ts` | #S1: shell tabs' screens kept in `<data>/screens` every 5 min and at a stop, written back dimmed into a restored shell |
 | `src/daemon/sees.ts` | F6: what an agent sees in a project, read only: its rule files (CLAUDE.md and @imports, AGENTS.md), Laki's memory, its MCP servers from its own config (`tomlServers`), masked; `agentContextOpen` |
 | `src/daemon/hookHealth.ts` | hooks not heard: `hookCause`, why an agent's hooks likely don't reach Laki (no core import: tested directly) |
 | `src/daemon/notes.ts` | notes and To-dos: one JSON file each, their pasted files, the list with search |
