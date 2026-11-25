@@ -226,7 +226,7 @@ export const AUTO_SAYS: Record<AutoKey, string> = { autoFix: 'Failing CI goes to
 // the status bar's PR: number, CI, then its ⋯ (refresh, merge, the switches: what Laki does on its own); resting on its
 // number: PrCard above it. onMenu: the ⋯ and a right click
 // conflicts: where merging its base in conflicts (the stat's, #C1): the chip says how many files and places, its click onConflicts (a list)
-export const conflictWords = (c: { places: number }[], more = 0) => (n => `${n} file${n === 1 ? '' : 's'}, ${(p => `${p} place${p === 1 ? '' : 's'}`)(c.reduce((a, x) => a + x.places, 0))}`)(c.length + more)
+export const conflictWords = (c: { places: number }[], more = 0) => (n => `${n} file${n === 1 ? '' : 's'}, ${(p => `${p}${more ? '+' : ''} place${p === 1 && !more ? '' : 's'}`)(c.reduce((a, x) => a + x.places, 0))}`)(c.length + more) // more: files past the listed ones, their places not counted
 export function PRStatus({ w, face, onOpen, onToggle, onMenu, conflicts, conflictsMore, onConflicts }: { w: WsInfo; face?: boolean; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onMenu?: (e: MouseEvent<HTMLElement>) => void; conflicts?: { path: string; places: number }[]; conflictsMore?: number; onConflicts?: (e: MouseEvent<HTMLElement>) => void }) {
   const pr = w.pr
   const [card, setCard] = useState<{ left: number; bottom: number } | null>(null)

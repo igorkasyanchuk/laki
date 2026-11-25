@@ -628,7 +628,7 @@ General's `UpdatesField`. ponytail: no Linux self-update (no new dependency), no
 
 Go back (#G1, `src/main/back.ts`; pure parts in `src/shared/update.ts`: `keepWhy`, `backRefused`, `backOf`, in
 `test/update.test.ts`): on `update-downloaded`, `keepNow` copies the running bundle with `ditto` to
-`userData/previous/next/Laki.app`, then in place of `previous/Laki.app` (one kept), and writes `previous.json`
+`userData/previous.noindex/next/Laki.app`, then in place of `previous.noindex/Laki.app` (one kept; `.noindex`: Spotlight leaves it out, so no second Laki shows there to open by mistake), and writes `previous.json`
 (`{ version, stateV }`: `STATE_V`, moved to shared/update.ts, core re-exports it); none under `BACK_FREE` (1 GB) free or
 off the packaged Mac app. `install` waits for it 5 s at most (`keepWait`: a copy still going is killed, none kept). The
 first `update` state ask looks at it 10 s later (`lookBack`): `refused` (the Info.plist's

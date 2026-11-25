@@ -62,11 +62,27 @@ let newest: { at: number; v: Record<string, Newest | undefined> } = { at: 0, v: 
 async function latest(pkg: string): Promise<Newest | undefined> {
   const registry = process.env.LAKI_NPM_REGISTRY || (inRig() ? '' : 'https://registry.npmjs.org')
   if (!registry) return undefined
-  const r = await fetch(`${registry}/${pkg.replace('/', '%2f')}`, { signal: AbortSignal.timeout(45000), redirect: 'error' }).catch(() => null) // the whole document (its versions' times): a few MB for a busy package
-  const d = (r?.ok ? await r.json().catch(() => ({})) : {}) as { 'dist-tags'?: { latest?: unknown }; time?: Record<string, unknown> }
-  const v = d['dist-tags']?.latest
+  const r = await fetch(`${registry}/${pkg.replace('/', '%2f')}`, { signal: AbortSignal.timeout(45000), redirect: 'error' }).catch(() => null) // the whole document (its versions' times)
+  return newestOf(r?.ok ? await r.text().catch(() => '') : '')
+}
+// its latest tag and that version's time out of the document's text, without parsing all of it: codex's and
+// opencode's are 20 MB and more (every version's manifest), a parse of them a pause and a heap that size each 6 hours.
+// dist-tags comes before the versions, time after them (the last "time" object: a version's own package.json could
+// have one; a readme's quotes are escaped)
+export function newestOf(text: string): Newest | undefined {
+  const json = (s?: string) => {
+    try {
+      return s ? (JSON.parse(s) as Record<string, unknown>) : undefined
+    } catch {
+      return undefined
+    }
+  }
+  const v = json(/"dist-tags"\s*:\s*(\{[^{}]*\})/.exec(text)?.[1])?.latest
   if (!(typeof v === 'string' && /^\d+\.\d+\.\d+[\w.+-]*$/.test(v) && v.length < 40)) return undefined
-  const at = Date.parse(String(d.time?.[v] ?? ''))
+  const t = [...text.matchAll(/"time"\s*:\s*(?=\{)/g)].at(-1)
+  const from = t ? t.index + t[0].length : -1
+  const time = from < 0 ? undefined : json(text.slice(from, text.indexOf('}', from) + 1))
+  const at = Date.parse(String(time?.[v] ?? ''))
   return { version: v, ...(Number.isFinite(at) && { at }) }
 }
 // #A9b: Settings › General's Update delay for the agents' CLIs too: a version is offered once it's that many days old

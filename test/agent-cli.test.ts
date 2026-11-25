@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { howOf, older } from '../src/daemon/agentCli.ts'
+import { howOf, newestOf, older } from '../src/daemon/agentCli.ts'
 import { fresh, until } from './helpers.ts'
 
 test('A9: how an agent CLI was installed, from where its command really is; versions compared', () => {
@@ -22,6 +22,22 @@ test('A9: how an agent CLI was installed, from where its command really is; vers
   assert.equal(older('2.1.10', '2.1.9'), false)
   assert.equal(older('1.0.0', '1.0.0'), false)
   assert.equal(older('0.9.0-beta.1', '0.9.1'), true)
+})
+
+test('A9b: the registry document read without a full parse: latest and its time; a version manifest\'s own time and a readme\'s are not it', () => {
+  const doc = {
+    _id: 'x',
+    'dist-tags': { latest: '2.0.0', next: '3.0.0-beta.1' },
+    versions: { '1.0.0': { name: 'x', time: { '2.0.0': '1999-01-01T00:00:00.000Z' } }, '2.0.0': { name: 'x' } },
+    time: { created: '2020-01-01T00:00:00.000Z', '1.0.0': '2020-01-02T00:00:00.000Z', '2.0.0': '2026-11-20T10:00:00.000Z' },
+    readme: 'see "time":{"2.0.0":"1990-01-01T00:00:00.000Z"}',
+  }
+  assert.deepEqual(newestOf(JSON.stringify(doc)), { version: '2.0.0', at: Date.parse('2026-11-20T10:00:00.000Z') })
+  assert.deepEqual(newestOf(JSON.stringify(doc, null, 2)), { version: '2.0.0', at: Date.parse('2026-11-20T10:00:00.000Z') }, "a mirror's pretty JSON")
+  assert.deepEqual(newestOf(JSON.stringify({ 'dist-tags': { latest: '1.2.3' } })), { version: '1.2.3' }, 'no time: no date')
+  assert.equal(newestOf(JSON.stringify({ 'dist-tags': { latest: 'not a version' } })), undefined)
+  assert.equal(newestOf(''), undefined)
+  assert.deepEqual(newestOf('{"dist-tags":{"latest":"1.0.0"},"time":{"1.0.0":"20'), { version: '1.0.0' }, 'cut short: no date, no throw')
 })
 
 test('A9: Settings › Versions: each CLI, the newest from the registry, a dot in the view; Update in a script tab, a failed one says its code', async t => {

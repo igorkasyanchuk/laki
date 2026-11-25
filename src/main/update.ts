@@ -114,7 +114,11 @@ export function updater(send: (s: UpdateState) => void) {
     if (s.status !== 'ready' || installing) return s
     installing = true // a second click while the copy finishes: nothing more
     await keepWait() // #G1: the copy of this version, a few seconds at most
-    autoUpdater.quitAndInstall()
+    try {
+      autoUpdater.quitAndInstall()
+    } finally {
+      installing = false // it quits now; one that failed (Squirrel's error event) may be tried again after a new download
+    }
     return s
   }
 

@@ -21,7 +21,7 @@ export type UpdateState = {
 }
 
 // #G1: Go back. Before an update installs, main (src/main/back.ts) copies the running bundle to
-// userData/previous/Laki.app (ditto, one kept) with previous.json: its version and the state.json schema it knows. Go
+// userData/previous.noindex/Laki.app (ditto, one kept; out of Spotlight) with previous.json: its version and the state.json schema it knows. Go
 // back checks it again (its Info.plist's version, codesign --verify --deep --strict, the same Developer ID's Team ID as
 // this copy), swaps it in and relaunches. The packaged Mac app only
 export const STATE_V = 2 // state.json's schema (daemon/core.ts; 2: secret values out of it, envKeys.ts)

@@ -45,6 +45,12 @@ test('T1: the store keeps only a hash; rotate and revoke kill the old token at o
   assert.equal(c.clientOf(left), undefined, 'revoked')
   assert.ok(!existsSync(again.file))
   assert.throws(() => c.clientRm('grok-bot'), /no client grok-bot/)
+  // T13: two first calls at once, each with the client as it was before it waited for its program: only the first binds
+  const b = c.clientMint('Race Bot', ['send'], undefined, undefined, { bind: true })
+  const snap = c.clientOf(readFileSync(b.file, 'utf8').trim())!
+  assert.equal(c.bindCheck(snap, { path: '/apps/a' }), '')
+  assert.match(c.bindCheck(snap, { path: '/apps/b' }), /bound to a; this call came from b .*refused/, 'the later one: refused, not bound in its place')
+  assert.equal(c.clientList().find(x => x.id === b.id)?.bound?.path, '/apps/a')
   rmSync(home, { recursive: true, force: true })
 })
 

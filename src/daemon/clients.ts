@@ -180,8 +180,10 @@ export async function progBehind(pid: number, own: string, proc?: string): Promi
 }
 // what Settings and the notice call it: an app's name (its .app), else the file's
 export const progName = (path: string) => /\/([^/]+)\.app\//.exec(path)?.[1] ?? basename(path)
-// '' : this program may use it (its first one: bound to it now); else why not
-export function bindCheck(c: Client, prog: Prog) {
+// '' : this program may use it (its first one: bound to it now); else why not. Read again here: c is the call's, from
+// before it waited for its program, and two first calls at once must not both bind (the later one winning)
+export function bindCheck(c0: Client, prog: Prog) {
+  const c = all().find(x => x.id === c0.id) ?? c0
   if (!c.bind && !c.bound) return ''
   if (!c.bound) return clientBindTo(c.id, prog), ''
   if (c.bound.path === prog.path && (c.bound.team ?? '') === (prog.team ?? '')) return ''

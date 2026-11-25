@@ -114,11 +114,12 @@ let failedAt = -Infinity
 let backing = false
 export async function backupTick(now = Date.now()) {
   const st = state.settings
-  if (st?.backupEvery !== 'weekly' || !st.backupDir || backing || pending) return
+  if (st?.backupEvery !== 'weekly' || backing || pending) return
   backing = true
-  const folder = folderOf(st.backupDir)
+  const at = st.backupDir || BACKUP_DIR // the field emptied: its placeholder's, the default
+  const folder = folderOf(at)
   try {
-    if (!existsSync(folder) && st.backupDir === BACKUP_DIR && existsSync(dirname(folder))) mkdirSync(folder) // the default one, made the first time
+    if (!existsSync(folder) && at === BACKUP_DIR && existsSync(dirname(folder))) mkdirSync(folder) // the default one, made the first time
     if (!existsSync(folder) || !statSync(folder).isDirectory()) throw new Error(`${folder} isn't there`)
     const newest = Math.max(-Infinity, ...readdirSync(folder).filter(n => n.endsWith('.tgz')).map(n => (s => (s?.isFile() ? s.mtimeMs : -Infinity))(statSync(join(folder, n), { throwIfNoEntry: false }))))
     if (now - newest < every()) return

@@ -58,10 +58,10 @@ test("#B2: off unless you turn it on, offered once after your first backup; an a
   assert.equal(app.events.filter((e: any) => e.ev === 'notice' && e.title === 'Back up every week?').length, 1, 'offered once')
 })
 
-test('#B2: the default folder (~/Documents/Laki backups) is made the first time, when ~/Documents is there', async t => {
+test('#B2: the default folder (~/Documents/Laki backups) is made the first time, when ~/Documents is there; no folder set: that one', async t => {
   const rig = await fresh(t, { env: { LAKI_BACKUP_MS: '1000' } })
   mkdirSync(join(rig.home, 'Documents'))
-  await rig.rpc('settingsSet', { backupEvery: 'weekly', backupDir: '~/Documents/Laki backups' })
+  await rig.rpc('settingsSet', { backupEvery: 'weekly', backupDir: '' }) // the field emptied: its placeholder's folder, not none
   const folder = join(rig.home, 'Documents', 'Laki backups')
   await until(() => existsSync(folder) && readdirSync(folder).some(n => /^laki-weekly-.*\.tgz$/.test(n)), 'a backup in the folder it made', 20000)
 })

@@ -1,5 +1,5 @@
 // #G1: Go back (Settings › General › Updates): the version before an update, kept by keepNow as its download finishes
-// (ditto to userData/previous/Laki.app; one only, under 1 GB free none) and installing waits for it a few seconds at
+// (ditto to userData/previous.noindex/Laki.app; one only, under 1 GB free none) and installing waits for it a few seconds at
 // most (keepWait: a copy not done by then is stopped, none kept). goBack checks it (shared/update.ts backRefused:
 // its Info.plist's version, codesign --verify --deep --strict, the same Developer ID's Team ID as this copy), swaps it
 // in for this bundle and relaunches; the version it leaves is skipped (update.json's pass: Offer it again undoes it).
@@ -12,7 +12,7 @@ import { backRefused, type Kept, keepWhy, STATE_V } from '../shared/update.ts'
 
 const mac = process.platform === 'darwin'
 const bundle = () => join(app.getPath('exe'), '..', '..', '..') // Laki.app/Contents/MacOS/Laki
-const folder = () => join(app.getPath('userData'), 'previous')
+const folder = () => join(app.getPath('userData'), 'previous.noindex') // .noindex: Spotlight leaves it out (no second Laki to open by mistake, from another path)
 const keptApp = () => join(folder(), 'Laki.app')
 const keptFile = () => join(folder(), 'previous.json')
 const sh = (cmd: string, args: string[]) => new Promise<{ ok: boolean; err: string }>(r => execFile(cmd, args, { timeout: 120_000 }, (e, _o, err) => r({ ok: !e, err: String(err) })))
