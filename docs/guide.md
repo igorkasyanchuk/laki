@@ -2986,6 +2986,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   just gets the text. *Word fixes*: names the model keeps getting wrong, a line each, what it writes → what you
   meant (`lucky, lakey → Laki`, `work tree → worktree`); whole words in any case, done in Laki after the transcript
   comes back (nothing more goes to OpenRouter), and the bar says what it changed (⌘Z in the field takes it back).
+  *Your project's words* (on): workspace, tab, branch and project names, your profiles and the files the focused
+  workspace changed go to the model as a hint, and where the transcript has their words (*checkout flow*, *use
+  session*) they become the name (*checkout-flow*, *useSession*); only whole runs of words, never a guess by sound. The
+  bar underlines each for a moment, and a click on one puts back what it heard. A private workspace's names stay out
+  while Recording mode is on.
   *Remove filler words* (on) drops standalone hesitations (um, uh, hmm, äh, euh, えーと, 嗯, эээ…) the same way; words that
   mean something stay. *Talk key* (Cloud, or *On this Mac* where the build has it: Apple's speech recognition on this
   Mac, one language you pick, nothing leaves it; off until set; ⌃⌥⌘M suggested): from any app, press it and talk: a pill

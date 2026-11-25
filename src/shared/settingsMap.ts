@@ -40,6 +40,7 @@ export const SECTIONS: { id: string; label: string; icon: IconName; group: strin
 export const FIND: [string, string, string?][] = [
   ['general', 'New workspaces start', 'default agent profile preset'],
   ['general', 'Back up every week', 'backup weekly automatic folder restore copies'],
+  ['voice', "Your project's words", 'vocabulary names transcript speech dictation terms'],
   ['git', 'Branch prefix', 'git worktree'],
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['notifications', 'macOS notifications', 'notify waiting done limit mute'],

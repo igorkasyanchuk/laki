@@ -501,6 +501,11 @@ export function VoiceBar() {
           {v.phase === 'idle' ? (
             <>
               <span>{v.said}</span>
+              {v.swaps?.map((s, i) => (
+                <button key={`${s.term}-${i}`} type="button" className="link voice-swap" data-tip={`Heard “${s.heard}”: click to put that back`} onClick={() => v.unswap?.(i)}>
+                  {s.term}
+                </button>
+              ))}
               {v.undo && <button type="button" className="link" onClick={v.undo}>Undo</button>}
               {h.list.length > 0 && <button type="button" className="link" data-tip="The last transcripts (⌥Fn)" onClick={() => historyOpen(!h.open)}>Earlier</button>}
             </>

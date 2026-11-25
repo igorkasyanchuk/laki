@@ -140,7 +140,9 @@ test("voice: the cloud's recording goes to OpenRouter's speech-to-text with the 
   await rig.rpc('aiKey', { key: 'sk-or-v1-voice' })
   assert.deepEqual(await rig.rpc('voiceText', { audio: wav }), { text: 'make the button blue' })
   assert.equal(or.hits[0].auth, 'Bearer sk-or-v1-voice')
-  assert.deepEqual(or.hits[0].body, { model: 'microsoft/mai-transcribe-2', input_audio: { data: wav, format: 'wav' } })
+  const { prompt, ...body } = or.hits[0].body
+  assert.deepEqual(body, { model: 'microsoft/mai-transcribe-2', input_audio: { data: wav, format: 'wav' } })
+  assert.match(prompt, /^claude, codex/, "#V1: the project's words (here only the profiles) as its prompt")
   await rig.rpc('settingsSet', { voice: { on: true, engine: 'cloud', model: 'openai/whisper-large-v3-turbo', fixes: 'hi → Hello' } })
   assert.deepEqual(await rig.rpc('voiceText', { audio: wav }), { text: 'Hello', fixed: ['hi → Hello'] }) // Word fixes, after the transcript
   assert.equal(or.hits[1].body.model, 'openai/whisper-large-v3-turbo')

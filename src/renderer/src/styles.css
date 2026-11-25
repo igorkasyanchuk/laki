@@ -4341,6 +4341,7 @@ html[data-motion='none'] .num-roll .num-out { visibility: hidden; }
 /* a toolbar right under a blurred head (the side panel's tabs over its Changes, Files, Preview bars) isn't content that
    scrolls under it: drawn over the head's fade, so its top edge isn't fogged */
 .side-panel > .sp-tools { position: relative; z-index: 4; }
+.voice-bar .voice-swap { text-decoration: underline; text-underline-offset: 0.15em; } /* #V1: a project's word put in: a click puts back what was heard */
 .sp-change > .sp-row.edge-blur, .sp-change > .sp-row.edge-blur:hover { background: none; } .sp-change > .sp-row.edge-blur:hover::before { background: linear-gradient(var(--hover), transparent), linear-gradient(var(--edge-tint), transparent); }
 html:is(.opaque, .glass-full) .edge-blur, html:is(.opaque, .glass-full) .sp-change > .sp-row.edge-blur { background: var(--panel); border-bottom-color: var(--line); }
 html:is(.opaque, .glass-full) .edge-blur::before, html:is(.opaque, .glass-full) .edge-blur::after { display: none; }

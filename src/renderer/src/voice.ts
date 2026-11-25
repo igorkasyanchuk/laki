@@ -27,7 +27,7 @@ const WARN_MS = 20000 // Q6: the bar counts down this long before the cap
 // what the bar and the mic show: listening, writing it down, and a line to say (a failure, or where the text went).
 // Q6: locked (a double tap: Fn again stops it), ends (the cap is near: when), quiet (nothing heard: why), undo (what
 // it typed taken back)
-export type VoicePhase = { phase: 'idle' | 'listening' | 'writing'; said?: string; locked?: boolean; held?: boolean; enter?: 'send' | 'insert'; ends?: number; quiet?: string; undo?: () => void }
+export type VoicePhase = { swaps?: { term: string; heard: string }[] /* #V1: the project's words put in: underlined, a click puts back what was heard */; unswap?: (i: number) => void; phase: 'idle' | 'listening' | 'writing'; said?: string; locked?: boolean; held?: boolean; enter?: 'send' | 'insert'; ends?: number; quiet?: string; undo?: () => void }
 let now: VoicePhase = { phase: 'idle' }
 const subs = new Set<() => void>()
 const set = (v: VoicePhase) => ((now = v), subs.forEach(f => f()))
@@ -190,20 +190,31 @@ let writing = 0
 async function write(audio: Blob, target: HTMLElement | null, may: boolean, force = false) {
   const mine = ++writing
   try {
-    const { text, fixed, fillers } = await api.call<{ text: string; fixed?: string[]; fillers?: number }>('voiceText', { audio: await wavB64(audio) })
+    const { text, fixed, fillers, swaps } = await api.call<{ text: string; fixed?: string[]; fillers?: number; swaps?: { term: string; heard: string }[] }>('voiceText', { audio: await wavB64(audio) })
     if (mine !== writing) return
     set({ phase: 'idle' })
     if (text) remember(text)
     const typed = !!text && (await insert(text, target, may, force))
     // Q6: typed into a field: Undo takes it back (as ⌘Z there would)
-    if (text && (typed || fixed?.length || fillers) && now.phase === 'idle') say([now.said, typed && 'Typed', fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · '), typed ? () => typedIn && undoIn(typedIn) : undefined)
+    const back = typed && typedIn && (typedIn instanceof HTMLTextAreaElement || typedIn instanceof HTMLInputElement) ? swaps : undefined // a terminal's typing can't be taken back a word at a time
+    if (text && (typed || fixed?.length || fillers) && now.phase === 'idle') say([now.said, typed && 'Typed', fixed?.length && `Word fixes: ${fixed.join(', ')}`, fillers && `${fillers} filler word${fillers > 1 ? 's' : ''} removed`].filter(Boolean).join(' · '), typed ? () => typedIn && undoIn(typedIn) : undefined, back?.length ? back : undefined)
   } catch (e) {
     if (mine === writing) say((e as Error).message)
   }
 }
 
-function say(said: string, undo?: () => void) {
-  set({ phase: 'idle', said, undo })
+// #V1: what was heard back in place of a term (the last one in the field it was typed into), as a typed edit (⌘Z undoes it)
+const unswapIn = (el: HTMLElement | null, s: { term: string; heard: string }) => {
+  if (!(el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) || !el.isConnected) return
+  const i = el.value.lastIndexOf(s.term)
+  if (i < 0) return
+  el.focus()
+  el.setSelectionRange(i, i + s.term.length)
+  document.execCommand('insertText', false, s.heard)
+}
+function say(said: string, undo?: () => void, swaps?: { term: string; heard: string }[]) {
+  const unswap = (i: number) => (swaps && unswapIn(typedIn, swaps[i]), set({ ...now, swaps: now.swaps?.filter((_, j) => j !== i) }))
+  set({ phase: 'idle', said, undo, ...(swaps && { swaps, unswap }) })
   clearTimeout(saidT)
   saidT = setTimeout(() => now.said === said && set({ phase: 'idle' }), 6000)
 }

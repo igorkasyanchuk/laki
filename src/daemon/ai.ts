@@ -17,7 +17,9 @@ import { device, screenShot } from './device.ts'
 import { aiRpc, groupRule, type Rpc, skillTools, SKILL, type Tool, tools, wsLose } from '../shared/tools.ts'
 import { type AskExplained, endpointOk, AGENTS, AI_ACTS, AI_ITEMS, type AiItem, AI_PERM, AI_MODEL, PERMS, aiOn, tgBackend, VOICE_MODEL, type VoiceModel, voiceFillers, voiceFix, voiceOn, voicePrice, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type GateHeld, type AiCall, type AiCredits, type AiFrom, aiFromOf, type AiLook, type AiMsg, type AiPast, aiTotals, type StudioChat, type View, EFFORTS, type Preset, type Agent, SANDBOX, SANDBOX_NO, sandboxOff } from '../shared/types.ts'
 import { BRAINSTORM_METHOD, PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, exec, findWs, memoryOf, modelCheck, presets, prs, rt, sessions, state } from './core.ts'
+import { broadcast, cliArgv, clients, exec, findWs, git, memoryOf, modelCheck, presets, prs, rt, sessions, state } from './core.ts'
+import { hidden } from './phone.ts'
+import { vocabFix, vocabOf } from '../shared/vocab.ts'
 import { diff } from './files.ts'
 import { type HunkRef, hunksOf, type Walk, walkCheck, walkFold, walkInput, walkPrompt, WALK_SYSTEM } from '../shared/walk.ts'
 import { dir, walkFile } from './dir.ts'
@@ -239,7 +241,8 @@ const MAX_AUDIO = 24 << 20 // OpenRouter's 25 MB: about 9 minutes of the rendere
 const AUDIO_FORMATS = ['wav', 'mp3', 'ogg', 'oga', 'm4a', 'webm', 'flac']
 export async function voiceText(o: { audio?: unknown; text?: unknown; format?: unknown }) {
   if (!voiceOn(state.settings)) throw new Error('Voice is off: turn it on in Settings › Voice')
-  if (typeof o.text === 'string') return voiceClean(o.text.slice(0, 20000)) // the talk key's on-device engine wrote it down (main's laki-speech): Cloud's cleanup only
+  const terms = state.settings?.voice?.vocab === false ? [] : await voiceVocab().catch(() => []) // #V1: this project's words
+  if (typeof o.text === 'string') return voiceClean(o.text.slice(0, 20000), terms) // the talk key's on-device engine wrote it down (main's laki-speech): Cloud's cleanup only
   const audio = typeof o.audio === 'string' ? o.audio : ''
   if (!audio) throw new Error('no audio')
   if (audio.length > MAX_AUDIO) throw new Error('a recording up to 9 minutes')
@@ -249,18 +252,26 @@ export async function voiceText(o: { audio?: unknown; text?: unknown; format?: u
   const model = (typeof m === 'string' && m.trim()) || VOICE_MODEL
   // rate-limited (429) or the provider busy (5xx): tried again after VOICE_AGAIN, then said so with OpenRouter's words
   // ponytail: fixed waits, not Retry-After (OpenRouter's STT sends none)
+  // #V1: the terms as its prompt (OpenRouter's STT takes a prompt, context such as vocabulary, that a provider may
+  // ignore); a 400 about it: once more without
+  let prompt = terms.length ? terms.join(', ').slice(0, 1000) : ''
   for (let n = 0; ; n++) {
     const res = await fetch(`${api()}/audio/transcriptions`, {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
-      body: JSON.stringify({ model, input_audio: { data: audio, format: (f => (f === 'oga' ? 'ogg' : f))(AUDIO_FORMATS.includes(String(o.format)) ? String(o.format) : 'wav') } }),
+      body: JSON.stringify({ model, input_audio: { data: audio, format: (f => (f === 'oga' ? 'ogg' : f))(AUDIO_FORMATS.includes(String(o.format)) ? String(o.format) : 'wav') }, ...(prompt && { prompt }) }),
       signal: AbortSignal.timeout(90000),
     }).catch((e: Error) => {
       throw new Error(`Can't reach OpenRouter: ${e.name === 'TimeoutError' ? 'no answer in 90 seconds' : e.message}`)
     })
     const j: Reply = await res.json().catch(() => ({}))
     if (res.ok && !j.error) {
-      return voiceClean(String(j.text ?? ''))
+      return voiceClean(String(j.text ?? ''), terms)
+    }
+    if (res.status === 400 && prompt && /prompt/i.test(JSON.stringify(j.error ?? ''))) { // the provider won't take a prompt: without it
+      prompt = ''
+      n--
+      continue
     }
     const busy = res.status === 429 || res.status >= 500
     if (busy && n < VOICE_AGAIN.length) {
@@ -273,11 +284,28 @@ export async function voiceText(o: { audio?: unknown; text?: unknown; format?: u
   }
 }
 // a transcript's fillers out (unless Settings › Voice keeps them) and its word fixes in; what changed, for the bar
-function voiceClean(text: string) {
+function voiceClean(text: string, terms: string[] = []) {
   const said = text.trim()
   const c = state.settings?.voice?.fillers === false ? { text: said, n: 0 } : voiceFillers(said)
   const f = voiceFix(c.text, state.settings?.voice?.fixes)
-  return { text: f.text, ...(f.fixed.length && { fixed: f.fixed }), ...(c.n && { fillers: c.n }) }
+  const v = vocabFix(f.text, terms) // #V1: after your own fixes
+  return { text: v.text, ...(f.fixed.length && { fixed: f.fixed }), ...(v.swaps.length && { swaps: v.swaps }), ...(c.n && { fillers: c.n }) }
+}
+// #V1: the vocabulary, from what the app's window shows: the focused workspace first (its files changed against its
+// base), the rest after; none of what Recording mode hides
+async function voiceVocab() {
+  const c = [...clients].find(x => !x.remote && x.view?.focused) ?? [...clients].find(x => !x.remote && x.view)
+  const id = c?.view?.ws ?? state.tabs.find(t => t.id === c?.view?.tab)?.workspace
+  const w = state.workspaces.find(x => x.id === id && !x.archived && !hidden(x))
+  const files = w?.kind === 'worktree' && w.base && !w.host ? (await git(w, '--no-optional-locks', 'diff', '--name-only', '-z', w.base).catch(() => '')).split('\0').filter(Boolean).slice(0, 200) : []
+  const live = state.workspaces.filter(x => !x.archived)
+  return vocabOf({
+    focused: w?.id,
+    files,
+    workspaces: live.map(x => ({ id: x.id, name: x.name, branch: x.branch, project: x.project, hidden: hidden(x), tabs: state.tabs.filter(t => t.workspace === x.id).map(t => t.name) })),
+    projects: state.projects.map(p => ({ id: p.id, name: p.name, hidden: !!state.settings?.recording && !!p.private })),
+    agents: presets().map(p => p.name),
+  })
 }
 const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map(Number) // ms before each try again (tests: shorter)
 

@@ -436,6 +436,14 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   microsoft/mai-transcribe-2), returns `{ text }` after `voice.fixes` (Word fixes: types.ts `voiceFix`, `heard → meant`
   lines, `VOICE_FIXES` at most, whole words in any case, the longest first; `fixed`: what changed, for the bar); a 429 or 5xx is tried again after `VOICE_AGAIN` (1 s, 2.5 s;
   `LAKI_VOICE_AGAIN`: tests' shorter waits), then refused with OpenRouter's message and the provider's `raw`; nothing kept. `LAKI_AI_API` is tests' fake, as for Laki AI.
+  **Project words** (#V1, `voice.vocab` unless false; shared/vocab.ts): ai.ts `voiceVocab` builds at most 100 terms
+  from the app window's focused workspace first (its name, branch, tabs, and the base names of `git diff --name-only -z
+  <base>`), then the other live workspaces, the projects and the profiles; none Recording mode hides (phone.ts
+  `hidden`, a private project's). Sent as the request's top-level `prompt` (OpenRouter's STT docs list one, context
+  such as vocabulary that a provider may ignore; a newer page lists only `language`, so a 400 that names the prompt is
+  tried once without it), then `vocabFix` after the Word fixes: a term with a hyphen, underscore, dot or camelCase has
+  a spoken form (`spokenOf`), and that exact run of whole words becomes the term; `swaps { term, heard }[]` for the
+  voice bar (voice.ts: underlined, a click puts `heard` back as a typed edit in the field it went into; not a terminal's).
   `voiceModels` (Q11, OPEN, no params): OpenRouter's public `GET /models?output_modalities=transcription` (no key sent),
   each `{ id, name, price }` (types.ts `voicePrice`: per second said an hour's, MAI's per hour as given, by the token
   $/M in / out; no price or an odd id: left out), kept an hour (`STT_KEEP`); Settings › Voice's Model shows them, its

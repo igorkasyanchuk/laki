@@ -325,6 +325,9 @@ export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi
               <Switch className="switch-row" on={v.fillers !== false} onChange={fillers => onChange({ ...v, fillers })}>
                 <Says title="Remove filler words" hint="Um, uh, hmm and the like, in the languages it knows; words that mean something (like, so) stay. The bar says how many went" />
               </Switch>
+              <Switch className="switch-row" on={v.vocab !== false} onChange={vocab => onChange({ ...v, vocab })}>
+                <Says title="Your project's words" hint="Workspace, tab, branch and project names, agents and the files you changed, sent to the model as a hint, and put in the text where it heard their words: “checkout flow” becomes checkout-flow. The bar underlines them; a click puts back what it heard. None of a private workspace's while Recording mode is on" />
+              </Switch>
             </div>
           </Group>
           <Group title="When you stop talking">
