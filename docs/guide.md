@@ -3104,8 +3104,13 @@ tab). Saved as you type:
 - Name.
 - *Memory*: how many items are yours and how many agents learned; *Manage* opens the project page's *Memory* tab.
 - *MCP servers*: tools for this project's agents, each a command (its arguments one per line, its env) or a URL, on for
-  every profile or the ones you switch on. Claude Code and Codex get them by flags as a tab starts, never in their own
-  config; Antigravity, Grok and OpenCode not yet. Their env shows as •••• once saved; agents can't add or change one.
+  every profile or the ones you switch on, on top of Settings › Agents & profiles › *MCP servers* (for every project; a
+  project's of the same name wins). Claude Code and Codex get them by flags as a tab starts, OpenCode in its inline
+  config, never in their own config files; Antigravity and Grok not yet. Their env shows as •••• once saved; agents
+  can't add or change one. *Import from your agents…* (Settings' list) shows the servers Claude Code, Codex, Antigravity
+  and OpenCode have in their own configs: the ones you tick are copied in, theirs left as they are; a secret's value is
+  kept in the Keychain. A Claude Code profile's *Only Laki's MCP servers* starts it with `--strict-mcp-config`: none
+  from its own config, only Laki's (and Laki's own tools).
 - *Notes*: yours, in Markdown (links, how to run it, who to ask). ⋯ on the project › *Notes* shows them rendered, with
   *Edit*; agents never see them (not in `laki ls --json` or MCP).
 - *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:

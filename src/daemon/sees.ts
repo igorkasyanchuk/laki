@@ -3,12 +3,12 @@
 // its own config files give it (env values and tokens masked). Nothing here writes: a change goes through the agent's
 // own CLI, typed in a terminal for the user to run (the page's Add a server… and Remove…). Never ~/.claude or ~/.codex
 // written (AGENTS.md)
-import { mcpFor } from '../shared/mcp.ts'
+import { type McpServer, mcpAll, mcpFor, mcpFrom } from '../shared/mcp.ts'
 import { closeSync, constants, existsSync, fstatSync, openSync, readdirSync, readFileSync, readSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { type AgentContext, type AgentRule, type AgentServer, type AgentSkill, HOME_ACCOUNT, type Memory } from '../shared/types.ts'
-import { findProject, memoryNote, memoryOf, openPath, rt, state, heldFrom, presets } from './core.ts'
+import { findProject, memoryNote, memoryOf, openPath, rt, state, heldFrom, presets, settingsSet } from './core.ts'
 import { accountNamed, accountUsed, homeDir } from './accounts.ts'
 import { redact } from './share.ts'
 
@@ -265,10 +265,45 @@ export function agentContext(p: { agent?: string; project?: string; profile?: st
     ...(proj && { project: proj.id, path: tilde(proj.path) }),
     rules: agent === 'claude' ? claudeRules(path) : codexRules(path),
     memory: { global: mem(state.settings?.memory, false), mine: mem(list, false), learned: mem(list, true), bytes: Buffer.byteLength(note) },
-    servers: [...mcpFor(proj?.config?.mcp, p.profile ?? agent).map(s => server(s.name, s, 'laki', "Laki: the project's settings")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))].map(s => (waiting.has(s.name) ? { ...s, signIn: true as const } : s)), // Laki's: passed by flags (shared/mcp.ts); waiting: mcpAuth.ts'
+    servers: [...mcpFor(mcpAll(state.settings?.mcp, proj?.config?.mcp), p.profile ?? agent).map(s => server(s.name, s, 'laki', proj?.config?.mcp?.some(o => o.name === s.name) ? "Laki: the project's settings" : "Laki: Settings' MCP servers")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))].map(s => (waiting.has(s.name) ? { ...s, signIn: true as const } : s)), // Laki's: passed by flags (shared/mcp.ts); waiting: mcpAuth.ts'
     ...(prof => ({ ...(prof && { profile: prof, envAllow: presets().find(x => x.name === prof)?.envAllow ?? [] }), held: heldFrom(agent, prof) }))(p.profile ?? presets().find(x => x.agent === agent)?.name),
     skills: skillsAudit(path),
   }
+}
+
+// #6: Import: the servers the agents' own configs have for every project (Claude Code's ~/.claude.json user ones, Codex's
+// config.toml, Antigravity's ~/.gemini/settings.json, OpenCode's opencode.json), read only: copied into Settings' MCP
+// servers, never moved or written back (AGENTS.md: ~/.claude/settings.json and ~/.codex are never written). Listed first
+// as the view would show them (masked: sees' server), then the picked ones (agent:name) copied whole by the daemon, so
+// their env values never reach a window; envKeys.ts keeps a secret's out of state.json
+type Found = { agent: string; name: string; server: McpServer; file: string }
+function agentServers(): Found[] {
+  const from = (agent: string, file: string, o: unknown): Found[] => {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return []
+    return Object.entries(o as Record<string, unknown>).flatMap(([n, c]) => {
+      const server = c && typeof c === 'object' ? mcpFrom(n, c as Record<string, unknown>) : undefined
+      return server ? [{ agent, name: n, server, file }] : []
+    })
+  }
+  const cfg = configDir('claude')
+  const claude = cfg === join(homedir(), '.claude') && !process.env.CLAUDE_CONFIG_DIR ? join(homedir(), '.claude.json') : join(cfg, '.claude.json')
+  const codex = join(configDir('codex'), 'config.toml')
+  let toml = ''
+  try {
+    toml = readFileSync(codex, 'utf8')
+  } catch {}
+  const oc = join(isAbsolute(process.env.XDG_CONFIG_HOME ?? '') ? process.env.XDG_CONFIG_HOME! : join(homedir(), '.config'), 'opencode', 'opencode.json')
+  const agy = join(homedir(), '.gemini', 'settings.json')
+  return [...from('claude', claude, json(claude)?.mcpServers), ...from('codex', codex, tomlServers(toml)), ...from('gemini', agy, json(agy)?.mcpServers), ...from('opencode', oc, json(oc)?.mcp)].filter(f => f.name !== 'laki') // Laki's own: every agent gets it from Laki already
+}
+export function mcpImport(p: { pick?: unknown }) {
+  const found = agentServers()
+  const have = new Set((state.settings?.mcp ?? []).map(s => s.name))
+  if (!Array.isArray(p.pick)) return { found: found.map(f => ({ agent: f.agent, name: f.name, file: tilde(f.file), what: (s => s.url ?? [s.command, ...(s.args ?? [])].join(' '))(server(f.name, f.server, 'user', f.file)), env: Object.keys(f.server.env ?? {}), has: have.has(f.name) })) }
+  const picked = found.filter(f => (p.pick as unknown[]).includes(`${f.agent}:${f.name}`) && !have.has(f.name))
+  const add = picked.filter((f, i) => picked.findIndex(x => x.name === f.name) === i).map(f => f.server) // two agents' of one name: the first
+  if (add.length) settingsSet({ mcp: [...(state.settings?.mcp ?? []), ...add] })
+  return { added: add.map(s => s.name) }
 }
 
 // Open file: one of the rule files agentContext lists for it (no other path), in the user's editor

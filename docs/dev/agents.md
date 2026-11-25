@@ -460,6 +460,15 @@ status bar *.laki.json waits for you* and `cfgSheet`, also after the new-workspa
 daemon.log. `load` trusts projects from before (no `state.cfgTrust`) as their file is (a host's `as-read`: at its first
 read). Tests: the rig's `projectAdd` trusts (`rig.trust`) unless `untrusted: true`.
 
+Settings' MCP servers (#6, `settings.mcp`: every project's; `mcpAll` puts a project's after them, the same name the
+project's; `settingsSet` keeps them through `mcpOk` too, `maskSettings` masks their env, `envKeys.ts` keeps a secret's
+value out of state.json, and an agent or remote access can't change them: `AGENT_SETTINGS_NO`, `REMOTE_KEYS`). OpenCode
+gets them in `OPENCODE_CONFIG_CONTENT`'s `mcp` (`openCodeMcp`; env as `environment`, in its environment, never argv).
+`mcpImport` (sees.ts, the user's: AGENT_NO, REMOTE_NO) lists the agents' own (claude's `~/.claude.json` user servers,
+codex's `config.toml`, agy's `~/.gemini/settings.json`, opencode's `opencode.json`; `mcpFrom` in Laki's shape) masked,
+then copies the picked ones (`pick`: `agent:name`) whole, daemon side; theirs are never written. A claude profile's
+`mcpOnly`: `--strict-mcp-config`, Laki's own server (`lakiMcp`) in a file of its own unless one is named `laki`.
+
 A project's MCP servers (`config.mcp`, `shared/mcp.ts`; Settings › the project › *MCP servers*): each a name
 (`MCP_NAME`), a command with its args and env or an http(s) URL, and the profiles it's on for (`presets`: none is all).
 `projectSet` keeps them through `mcpOk` (a masked env value back is the same-named server's; refused whole otherwise);

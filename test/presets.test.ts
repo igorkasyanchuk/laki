@@ -598,3 +598,39 @@ test("a wrapped claude reads its own MCP file, no other; a deleted workspace's t
   await rig.rpc('wsRm', { id: ws.id })
   await until(() => !existsSync(c.mcp.path), 'its MCP file gone with the workspace')
 })
+
+test("#6: Settings' MCP servers go to every project's agents (a project's of the same name wins), opencode's too; Import copies the agents' own, never theirs changed; Only Laki's", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('settingsSet', { mcp: [{ name: 'a b', command: 'x' }] }), /a name of letters, digits, _ and -/)
+  await rig.rpc('settingsSet', { mcp: [{ name: 'docs', command: 'all-docs' }, { name: 'search', command: 'npx', args: ['search-mcp'], env: { SEARCH_TOKEN: 'fake-secret' } }] })
+  const shown = (await rig.rpc('state')).settings.mcp
+  assert.notEqual(shown[1].env.SEARCH_TOKEN, 'fake-secret', 'masked in the view')
+  await rig.rpc('settingsSet', { mcp: shown }) // Settings sends it back masked: the value stays
+  await rig.rpc('projectSet', { id: p.id, config: { mcp: [{ name: 'docs', command: 'project-docs' }] } })
+  await rig.rpc('presetSave', { name: 'claude-only', add: true, set: { agent: 'claude', mcpOnly: true } })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const c = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find(l => l.bin === 'claude'), 'claude')
+  assert.deepEqual(c.mcp.cfg, { mcpServers: { search: { command: 'npx', args: ['search-mcp'], env: { SEARCH_TOKEN: 'fake-secret' } }, docs: { command: 'project-docs' } } })
+  assert.ok(!c.args.includes('--strict-mcp-config'))
+  await rig.rpc('tabNew', { ws: ws.id, kind: 'agent', preset: 'opencode' })
+  const oc = await until(() => rig.fakeLog().find(l => l.bin === 'opencode'), 'opencode')
+  assert.deepEqual(JSON.parse(oc.config).mcp, { search: { type: 'local', command: ['npx', 'search-mcp'], environment: { SEARCH_TOKEN: 'fake-secret' } }, docs: { type: 'local', command: ['project-docs'] } })
+  // Only Laki's MCP servers: none of claude's own config's, Laki's own kept
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'claude-only' })
+  const only = await until(() => rig.fakeLog().filter(l => l.bin === 'claude' && l.args?.includes('--strict-mcp-config'))[0], 'claude-only')
+  assert.equal(only.args.filter((a: string) => a === '--mcp-config').length, 2, "the servers' file and Laki's own")
+  // Import: listed (no values), then the picked ones copied; the agents' own files as they were
+  writeFileSync(join(rig.home, '.claude.json'), JSON.stringify({ mcpServers: { linear: { type: 'http', url: 'https://mcp.linear.test/mcp' }, docs: { command: 'x' } } }))
+  mkdirSync(join(rig.home, '.codex'), { recursive: true })
+  const toml = '[mcp_servers.pg]\ncommand = "pg-mcp"\nargs = ["--ro"]\n[mcp_servers.pg.env]\nPG_PASSWORD = "fake-pass"\n'
+  writeFileSync(join(rig.home, '.codex', 'config.toml'), toml)
+  const { found } = await rig.rpc('mcpImport', {})
+  assert.deepEqual(found.map((f: any) => [f.agent, f.name, f.has, f.env]), [['claude', 'linear', false, []], ['claude', 'docs', true, []], ['codex', 'pg', false, ['PG_PASSWORD']]])
+  assert.ok(!JSON.stringify(found).includes('fake-pass'), 'its values never listed')
+  await assert.rejects(rig.rpc('mcpImport', { pick: ['codex:pg'], from: { tab: c.tab } }), /read the agents' own MCP servers/)
+  assert.deepEqual((await rig.rpc('mcpImport', { pick: ['codex:pg', 'claude:linear', 'claude:docs'] })).added, ['linear', 'pg'])
+  assert.deepEqual((await rig.rpc('state')).settings.mcp.map((s: any) => s.name), ['docs', 'search', 'linear', 'pg'])
+  assert.equal(readFileSync(join(rig.home, '.codex', 'config.toml'), 'utf8'), toml, "codex's own as it was")
+  await until(() => !readFileSync(join(rig.data, 'state.json'), 'utf8').includes('fake-pass'), 'a secret value kept out of state.json')
+})

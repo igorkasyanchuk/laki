@@ -32,7 +32,8 @@ import { version } from '../../../package.json'
 import { Fresh, Group, HelpQ, Says, Scope, Shown } from './SettingsKit'
 import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from './SettingsLook'
 import type { AllowRule } from '../../shared/ask'
-import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, KeptSecrets, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
+import type { McpServer } from '../../shared/mcp'
+import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, KeptSecrets, type McpFound, McpServers, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
 import { type AccountsApi, AccountsBlock, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, TelegramSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
@@ -175,6 +176,7 @@ export type AppSettings = Paint & {
   quietMinutes?: number // U8: Quiet's default length in minutes (unset: 60)
   longTurn?: number // minutes: a turn working that long notifies (unset, 0: off)
   costWarn?: CostWarn // #3: a workspace's cost past these dollars: colored, told once each (on only if true)
+  mcp?: McpServer[] // #6: MCP servers for every project's agents (shared/mcp.ts)
   continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
@@ -3369,6 +3371,11 @@ export function SettingsPage(p: {
                             <Says title="Send into the running turn" hint="What you send while it works goes in at once, not into the queue" />
                           </Switch>
                         )}
+                        {pr.agent === 'claude' && (
+                          <Switch className="switch-row" on={pr.mcpOnly === true} onChange={on => setPreset(i, { mcpOnly: on || undefined })}>
+                            <Says title="Only Laki's MCP servers" hint="None from Claude Code's own config (~/.claude.json, a repo's .mcp.json): only the ones in Settings and the project's, and Laki's own" />
+                          </Switch>
+                        )}
                         {(pr.agent === 'claude' || pr.agent === 'codex') && (
                           <Switch className="switch-row" on={pr.laki !== false} onChange={on => setPreset(i, { laki: on ? undefined : false })}>
                             <Says title="Tell it about Laki" hint="A note at each start: it runs in Laki, can name its workspace, attach a PR, start another workspace, and keep files for you in $LAKI_STORAGE_FOLDER" />
@@ -3403,6 +3410,14 @@ export function SettingsPage(p: {
                   </button>
                 )}
               </div>
+              <McpServers
+                title="MCP servers"
+                hint="For every project's agents, given as they start (a project's own add to these; the same name: the project's); never written into the agents' own config"
+                list={s.mcp}
+                profiles={presets.filter(x => !x.off)}
+                onChange={mcp => set({ mcp: mcp.length ? mcp : undefined })}
+                onImport={p.call && { find: () => p.call!<{ found: McpFound[] }>('mcpImport', {}).then(r => r.found), copy: pick => p.call!<{ added: string[] }>('mcpImport', { pick }).then(r => r.added) }}
+              />
             </>
           )}
         </div>

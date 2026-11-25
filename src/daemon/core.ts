@@ -77,7 +77,7 @@ import { alertShow } from './alerts.ts'
 import { hookCause, type HookWhy, nativeAgrees } from './hookHealth.ts'
 import { spotlightSet, tmSet } from './backup.ts'
 import { ownBoxOn, WRAP_NET, wrapProfile, wrapRefused } from '../shared/wrap.ts'
-import { claudeMcpConfig, codexMcpArgs, type McpServer, mcpFor, mcpOk } from '../shared/mcp.ts'
+import { claudeMcpConfig, codexMcpArgs, type McpServer, mcpAll, mcpFor, mcpOk, openCodeMcp } from '../shared/mcp.ts'
 import { SHELL_DIRS, SHELL_KINDS, shellKind, shellWord } from '../shared/shells.ts'
 import { proxyDrop, proxyFor, proxyUp } from './netProxy.ts'
 import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
@@ -2136,7 +2136,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path, tab.preset === 'codex') : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
   // the project's MCP servers on for this profile (shared/mcp.ts): by flags as it starts; a host's tab none (the file is
   // this Mac's). claude's in a 0600 file; codex's by -c, an env's values in its own environment (codexMcpArgs)
-  const mcp = h === localHooks ? mcpFor(state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.config?.mcp, tab.profile ?? tab.preset ?? '') : []
+  const mcp = h === localHooks ? mcpFor(mcpAll(state.settings?.mcp, state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.config?.mcp), tab.profile ?? tab.preset ?? '') : [] // #6: every project's, then its own
   if (tab.preset === 'claude') {
     const gated = existsSync(toolFlag())
     gated ? ungated.delete(tab.id) : ungated.add(tab.id) // S8: a gate turned on later doesn't reach it until it starts again
@@ -2145,6 +2145,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
     if (mcp.length) argv.push('--mcp-config', mcpFile(tab, mcp)) // one more: a profile's own --mcp-config stays
+    if (pr?.mcpOnly && h === localHooks) argv.push('--strict-mcp-config', ...(mcp.some(s => s.name === 'laki') ? [] : ['--mcp-config', mcpFile({ ...tab, id: `${tab.id}-laki` }, [lakiMcp()])])) // #6: Only Laki's MCP servers: none of claude's own config's, Laki's own tools kept
   } else if (tab.preset === 'codex') {
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
@@ -2188,13 +2189,14 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   // its instructions too: Laki's note in a 0600 file of the tab's (<data>/opencode/notes), named in the config's
   // instructions with a preset's own (OpenCode reads them as rules, every start)
   const ocNote = tab.preset === 'opencode' && told && h === localHooks ? memoryFile(tab, told) : undefined
-  if ((model || ocNote) && tab.preset === 'opencode') {
+  if ((model || ocNote || mcp.length) && tab.preset === 'opencode') {
     let own: unknown = {}
     try {
       own = JSON.parse(pr?.env?.OPENCODE_CONFIG_CONTENT ?? '{}')
     } catch {}
     const o = (own && typeof own === 'object' && !Array.isArray(own) ? own : {}) as Record<string, unknown>
-    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...o, ...(model && { model }), ...(ocNote && { instructions: [...(Array.isArray(o.instructions) ? o.instructions : []), ocNote] }) })
+    const ownMcp = o.mcp && typeof o.mcp === 'object' && !Array.isArray(o.mcp) ? o.mcp : {}
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...o, ...(model && { model }), ...(ocNote && { instructions: [...(Array.isArray(o.instructions) ? o.instructions : []), ocNote] }), ...(mcp.length && { mcp: { ...ownMcp, ...openCodeMcp(mcp) } }) }) // #6: its MCP servers too (env: its environment, never argv)
   }
   const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' || tab.preset === 'gemini' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' || tab.preset === 'gemini' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs, pr?.net) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
@@ -2300,6 +2302,8 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
 // sandbox.network.allowedDomains, netList's for its project, as <data>/net/<tab>.json (0600, written at each start; the
 // data folder is out of its sandbox's reach). Anything else: none (the variant as it is). ponytail: this Mac's tabs only
 // S13: a claude tab's project MCP servers (their env too) in a 0600 file of its own, the path in argv
+// Laki's own MCP server (skill.ts' mcpArgv, which core can't import): a profile with Only Laki's MCP servers keeps it (#6)
+const lakiMcp = (): McpServer => ({ name: 'laki', command: '/usr/bin/env', args: [...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp'] })
 function mcpFile(tab: Tab, list: McpServer[]): string {
   const file = join(dir, 'mcp', `${tab.id}.json`)
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
@@ -3152,6 +3156,7 @@ export function settingsSet(o: Settings, own = false) {
   if ('termShell' in o && o.termShell !== state.settings?.termShell) o = { ...o, termShell: termShellOk(o.termShell) } // checked only as it changes: Settings sends every setting back, a shell gone since too
   if ('artifactHosts' in o) o = { ...o, artifactHosts: Array.isArray(o.artifactHosts) ? [...new Set(o.artifactHosts.filter(artHostOk).map(h => h.toLowerCase()))].slice(0, 200) : undefined } // S18: names on the internet only
   if ('costWarn' in o) o = { ...o, costWarn: costWarnParse(o.costWarn) } // #3: dollars, or refused
+  if ('mcp' in o) o = { ...o, mcp: mcpOk(o.mcp, state.settings?.mcp, MASK, ENV_KEY) } // #6: every project's MCP servers (a value sent back masked: the one kept)
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)
@@ -3192,7 +3197,7 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   for (const [k, v] of Object.entries(set)) {
     if (v === '' || v === null) delete next[k]
     else if ((PRESET_TEXT as readonly string[]).includes(k) || k === 'agent' || k === 'name') next[k] = String(v).trim()
-    else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer' || k === 'acp') next[k] = !!v
+    else if (k === 'fast' || k === 'sandbox' || k === 'off' || k === 'laki' || k === 'steer' || k === 'acp' || k === 'mcpOnly') next[k] = !!v
     else if (k === 'net') next.net = String(v)
     else if (k === 'cap') (c => (c.usd || c.tokens ? (next.cap = c) : delete next.cap))(capParse(v)) // its workspaces' spend cap (cap.ts)
     else if (k === 'wrap') v === false ? delete next.wrap : (next.wrap = 'macos') // the macOS wrapper sandbox (shared/wrap.ts)

@@ -183,4 +183,7 @@ time and AI money per run (`budget: 60 min, $5`).
   it tells you where a setting is, with a link that opens it;
   on OpenRouter, claude -p / codex exec or your own OpenAI-compatible endpoint (a local server too), every ask's cost logged (shown or hidden).
 - **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything (a preview of the highlighted item beside the list), ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server: its core tools, more a group at a time; a workspace's diff and plan and a project's memory as resources, your templates as prompts) drives it all, agents included, with tab completion (`laki completion zsh|bash|fish`). Menus can be macOS's own (Settings › Layout).
+- **MCP servers**: one list for every project's agents (Settings › Agents & profiles), a project's own on top; *Import*
+  copies what Claude Code, Codex, Antigravity and OpenCode already have, never changing their configs. Claude Code,
+  Codex and OpenCode get them as they start.
 - **Trusted clients**: an app outside Laki (a desktop app's MCP server, a script) drives it with a token of its own (`laki client add "Grok Bot"`, allowed in Laki's window): a name on what it starts, scopes (new workspaces and messages to agents unless you add more), revoked at once. Ready-made setups (`--for mcp`, `raycast`, `launchd`, `shortcuts`, `script`): the narrowest scopes and the config to paste, naming the token's file.

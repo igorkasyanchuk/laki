@@ -15,7 +15,7 @@ import { keyRead, keyWrite } from './keychain.ts'
 
 type Holder = Record<string, unknown>
 type Spot = { key: string; at: Holder; field: string }
-type S = { settings?: { env?: Holder; presets?: { name: string; env?: Holder }[] | null; webhook?: Holder }; projects?: { id: string; config?: { env?: Holder; mcp?: { name: string; env?: Holder }[] } }[] }
+type S = { settings?: { env?: Holder; presets?: { name: string; env?: Holder }[] | null; webhook?: Holder; mcp?: { name: string; env?: Holder }[] }; projects?: { id: string; config?: { env?: Holder; mcp?: { name: string; env?: Holder }[] } }[] }
 
 // every place a secret can sit, by its key-store name; a value of any kind (null: kept, its value in the store)
 function spots(s: S): Spot[] {
@@ -31,6 +31,7 @@ function spots(s: S): Spot[] {
   }
   env('env', s.settings?.env)
   for (const p of s.settings?.presets ?? []) env(`env:profile:${p?.name}`, p?.env)
+  for (const m of s.settings?.mcp ?? []) env(`env:mcp:${m?.name}`, m?.env) // #6: every project's MCP servers'
   for (const p of s.projects ?? []) {
     env(`env:project:${p.id}`, p.config?.env)
     for (const m of p.config?.mcp ?? []) env(`env:project:${p.id}:mcp:${m?.name}`, m?.env)

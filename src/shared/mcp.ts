@@ -1,10 +1,31 @@
-// A project's MCP servers (Settings › the project › MCP servers: the user's alone; main.ts refuses them to agents and
-// remote access's page): passed to an agent tab by flags as it starts, never written into the agent's own config.
-// claude: a 0600 file of { mcpServers } for one more --mcp-config (core.ts mcpFile); codex: -c mcp_servers.<name>.…
-// overrides (codexMcpArgs, its TOML values quoted here); the others take none yet. Pure: test/units-more.test.ts
+// MCP servers for every project (#6: Settings › Agents & profiles › MCP servers, settings.mcp) and a project's own
+// (Settings › the project › MCP servers), the project's adding to them (the same name: the project's): the user's alone
+// (main.ts refuses them to agents and remote access's page); passed to an agent tab as it starts, never written into
+// the agent's own config. claude: a 0600 file of { mcpServers } for one more --mcp-config (core.ts mcpFile); codex: -c
+// mcp_servers.<name>.… overrides (codexMcpArgs, its TOML values quoted here); opencode: its inline config's mcp
+// (OPENCODE_CONFIG_CONTENT, openCodeMcp); the others take none yet. Pure: test/units-more.test.ts
 export type McpServer = { name: string; command?: string; args?: string[]; url?: string; env?: Record<string, string>; presets?: string[] }
 export const MCP_NAME = /^[\w-]{1,40}$/
-export const MCP_AGENTS = ['claude', 'codex'] // the ones that take them
+export const MCP_AGENTS = ['claude', 'codex', 'opencode'] // the ones that take them
+// every project's, then the project's own: one of the same name is the project's
+export const mcpAll = (all?: McpServer[], own?: McpServer[]) => [...(all ?? []).filter(s => !own?.some(o => o.name === s.name)), ...(own ?? [])]
+// opencode's config's mcp: a local server's command and args as one list, its env as environment; a URL's remote
+export const openCodeMcp = (list: McpServer[]) =>
+  Object.fromEntries(list.map(s => [s.name, s.url ? { type: 'remote', url: s.url } : { type: 'local', command: [s.command ?? '', ...(s.args ?? [])], ...(s.env && Object.keys(s.env).length && { environment: s.env }) }]))
+// #6's Import: a server as an agent's own config has it (claude's and Antigravity's mcpServers, codex's [mcp_servers],
+// opencode's mcp), in Laki's shape; one Laki can't take (no command or URL, a name it refuses): none
+export function mcpFrom(name: string, c: Record<string, unknown>): McpServer | undefined {
+  if (!MCP_NAME.test(name)) return
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+  const words = (v: unknown) => (Array.isArray(v) ? v.filter((a): a is string => typeof a === 'string') : [])
+  const vars = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string')) : {})
+  const url = str(c.url) || str(c.httpUrl) || str(c.serverUrl)
+  const cmd = Array.isArray(c.command) ? words(c.command) : [str(c.command), ...words(c.args)].filter((x, i) => i || x)
+  const env = vars(c.env ?? c.environment)
+  if (url && /^https?:\/\//i.test(url)) return { name, url }
+  if (!cmd[0]) return
+  return { name, command: cmd[0], ...(cmd.length > 1 && { args: cmd.slice(1) }), ...(Object.keys(env).length && { env }) }
+}
 
 // a server is on for a profile when it names none, or names it
 export const mcpFor = (list: McpServer[] | undefined, preset: string) => (list ?? []).filter(s => !s.presets?.length || s.presets.includes(preset))

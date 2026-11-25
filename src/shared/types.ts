@@ -626,7 +626,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; cap?: Cap /* its workspaces' spend cap, unless the workspace has its own (cap.ts) */; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; wrap?: 'macos' /* the macOS wrapper sandbox (shared/wrap.ts): its tabs under sandbox-exec, where its own sandbox is off or none */; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[] } // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
+export type Preset = { name: string; agent: Agent | 'command'; cap?: Cap /* its workspaces' spend cap, unless the workspace has its own (cap.ts) */; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; wrap?: 'macos' /* the macOS wrapper sandbox (shared/wrap.ts): its tabs under sandbox-exec, where its own sandbox is off or none */; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[]; mcpOnly?: boolean } // mcpOnly (#6): claude's --strict-mcp-config, only Laki's MCP servers (Settings' and the project's, and Laki's own) // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not
@@ -850,6 +850,7 @@ export type Settings = {
   continueOnError?: boolean // a turn ended on an API error is continued by itself, once, after a minute (unset: off)
   longTurn?: number // minutes: a turn working that long notifies, once (unset, 0: off)
   costWarn?: CostWarn // #3: a workspace's agents past yellow or red dollars: its cost colored, told once each (unset: off)
+  mcp?: McpServer[] // #6: MCP servers for every project's agents (shared/mcp.ts), a project's own added to them
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   archiveIdle?: number // days: a worktree nobody touched for so long is archived when it loses nothing, with Undo (unset, 0: off)
   archiveIdleKeepPR?: boolean // archiveIdle leaves one with an open PR alone (unset: on)
@@ -1551,7 +1552,7 @@ const maskUrl = (u: string) => {
 const maskEnv = <T extends { env?: Record<string, string> }>(x: T): T => (x.env && Object.keys(x.env).length ? { ...x, env: Object.fromEntries(Object.keys(x.env).map(k => [k, MASK])) } : x)
 export function maskSettings(s: Settings): Settings {
   const w = s.webhook
-  return { ...maskEnv(s), ...(w && (w.url || w.replyTopic) && { webhook: { ...w, ...(w.url && { url: maskUrl(w.url) }), ...(w.replyTopic && { replyTopic: MASK }) } }), ...(s.presets && { presets: s.presets.map(maskEnv) }) }
+  return { ...maskEnv(s), ...(w && (w.url || w.replyTopic) && { webhook: { ...w, ...(w.url && { url: maskUrl(w.url) }), ...(w.replyTopic && { replyTopic: MASK }) } }), ...(s.presets && { presets: s.presets.map(maskEnv) }), ...(s.mcp && { mcp: s.mcp.map(maskEnv) }) }
 }
 export function masked(v: View): View {
   const { link: _, ...remote } = v.remote ?? ({} as Remote)

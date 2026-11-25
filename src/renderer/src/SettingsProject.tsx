@@ -130,7 +130,14 @@ export type ProjectInfo = { id: string; name: string; path: string; git: boolean
 // a project's MCP servers (shared/mcp.ts): each a name, a command (its args one per line) or a URL, its env, and the
 // profiles it's on for (all when none is picked); Claude Code and Codex take them by flags as a tab starts, the others
 // not yet. A name that isn't one yet (typing) is kept here and saved once it is: projectSet refuses the list otherwise
-function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; profiles: { name: string; agent: string }[]; onChange: (l: McpServer[]) => void }) {
+// #6: Settings' own (every project's): its title and hint, and Import, which lists the agents' own servers to copy in
+export type McpFound = { agent: string; name: string; file: string; what: string; env: string[]; has: boolean }
+export function McpServers({ list = [], profiles, onChange, title = 'MCP servers', hint, onImport }: { list?: McpServer[]; profiles: { name: string; agent: string }[]; onChange: (l: McpServer[]) => void; title?: string; hint?: string; onImport?: { find: () => Promise<McpFound[]>; copy: (pick: string[]) => Promise<string[]> } }) {
+  const [found, setFound] = useState<McpFound[] | null>(null) // Import's list, once read
+  const [pick, setPick] = useState<string[]>([])
+  const [said, setSaid] = useState('')
+  const synced = useRef(false) // Import copied some: the list as the daemon has it now, once it comes (typing never resets it)
+  useEffect(() => void (synced.current && ((synced.current = false), setRows(list))), [JSON.stringify(list)])
   const [rows, setRows] = useState<McpServer[]>(list)
   // a key per card that survives removing one above it (EnvField keeps its own text: an index would hand it the next one)
   const keys = useRef<number[]>([])
@@ -139,7 +146,7 @@ function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; pro
   const set = (i: number, x: Partial<McpServer>) => put(rows.map((s, n) => (n === i ? { ...s, ...x } : s)))
   const not = [...new Set(profiles.filter(x => !MCP_AGENTS.includes(x.agent) && x.agent !== 'command').map(x => AGENT_NAMES[x.agent as Agent] ?? x.agent))]
   return (
-    <Group title="MCP servers" hint={`Tools for this project's agents, given as they start; never written into their own config${not.length ? ` · not supported by ${not.join(', ')} yet` : ''}`}>
+    <Group title={title} hint={`${hint ?? "Tools for this project's agents, given as they start; never written into their own config"}${not.length ? ` · not supported by ${not.join(', ')} yet` : ''}`}>
       {rows.map((s, i) => (
         <div key={keys.current[i]} className="setting-box mcp-server">
           <div className="row">
@@ -165,9 +172,41 @@ function McpServers({ list = [], profiles, onChange }: { list?: McpServer[]; pro
           )}
         </div>
       ))}
-      <button type="button" onClick={() => setRows(l => [...l, { name: `server${l.length + 1}`, command: '' }])}>
-        <Icon name="plus" size={12} /> Add a server
-      </button>
+      <div className="row">
+        <button type="button" onClick={() => setRows(l => [...l, { name: `server${l.length + 1}`, command: '' }])}>
+          <Icon name="plus" size={12} /> Add a server
+        </button>
+        {onImport && (
+          <button type="button" data-tip="Lists the servers Claude Code, Codex, Antigravity and OpenCode have in their own configs: the ones you pick are copied here, their configs left as they are" onClick={() => void onImport.find().then(f => (setFound(f), setPick([]), setSaid(f.length ? '' : 'None of your agents has a server of its own')), e => setSaid(String(e?.message ?? e)))}>
+            <Icon name="download" size={12} /> Import from your agents…
+          </button>
+        )}
+        {said && <span className="muted small">{said}</span>}
+      </div>
+      {found && found.length > 0 && (
+        <div className="setting-box mcp-import">
+          {found.map(f => {
+            const k = `${f.agent}:${f.name}`
+            return (
+              <label key={k} className="switch-row">
+                <input type="checkbox" disabled={f.has} checked={f.has || pick.includes(k)} onChange={e => setPick(l => (e.target.checked ? [...l, k] : l.filter(x => x !== k)))} />
+                <span className="grow">
+                  <b>{f.name}</b> <span className="muted small">{AGENT_NAMES[f.agent as Agent] ?? f.agent} · {f.has ? 'here already' : f.file}</span>
+                  <div className="mono small muted">{f.what}{f.env.length ? ` · env ${f.env.join(', ')}` : ''}</div>
+                </span>
+              </label>
+            )
+          })}
+          <div className="row">
+            <button type="button" className="primary" disabled={!pick.length} onClick={() => void onImport!.copy(pick).then(added => ((synced.current = added.length > 0), setFound(null), setSaid(added.length ? `Copied ${added.join(', ')}` : 'Nothing new to copy')), e => setSaid(String(e?.message ?? e)))}>
+              Copy {pick.length || ''} here
+            </button>
+            <button type="button" className="link" onClick={() => setFound(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </Group>
   )
 }

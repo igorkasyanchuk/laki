@@ -70,7 +70,7 @@ import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flow
 import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetFromTerm, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetAnnotations, widgetStore, widgetTerm, termStop, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetFull, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device, sim } from './device.ts'
-import { agentContext, agentContextOpen } from './sees.ts'
+import { agentContext, agentContextOpen, mcpImport } from './sees.ts'
 import { AGENT_NO, AGENT_OK, AGENT_OWN, AGENT_SETTINGS_OK, CLIENT_READ, CLIENT_SCOPE, CLIENT_WS, clientMethod, REMOTE_KEYS, REMOTE_NO, REMOTE_OK, TELEGRAM_OK } from './gates.ts'
 import * as clientsMod from './clients.ts'
 
@@ -587,6 +587,7 @@ const api = {
   fileNew: p => filesMod.fileNew(p),
   fileRead: p => filesMod.fileRead(p),
   dbRead: p => filesMod.dbRead(p), // #1: a SQLite database's tables, a table's rows, a read-only query (db.ts)
+  mcpImport: p => mcpImport(p), // #6: the agents' own MCP servers, listed, then the picked ones copied into Settings' (sees.ts)
   sourceGuess: p => filesMod.sourceGuess(p), // F5: the Preview's picked element's likely files
   imageRead: p => filesMod.imageRead(p), // a terminal link's picture anywhere on this Mac (its hover card)
   artifactList: p => artifactsMod.artifactList(p.ws),
@@ -883,7 +884,7 @@ const remoteNo = (method: string, p: Params) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['suggest', 'suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
+const FROM = new Set(['mcpImport', 'suggest', 'suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
   'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
   'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
@@ -1379,7 +1380,7 @@ chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookL
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
   alertAnswer: p => (alertMacOnly(p) ? 'raise or remove a spend cap' : ''), // cap.ts' choices that raise it: the Mac's
 }
-const ANSWER_NO = new Set(['suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
+const ANSWER_NO = new Set(['mcpImport', 'suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
   'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
   'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy',
   'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext',
