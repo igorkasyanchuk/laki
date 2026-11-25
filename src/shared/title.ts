@@ -10,3 +10,10 @@ export function titleOf(raw: unknown, hide: readonly string[] = []): string {
   s = s.replace(/\s+/g, ' ').trim()
   return [...s].slice(0, TITLE_MAX).join('').trim() || 'Laki'
 }
+type Veiled = { settings?: { recording?: boolean }; workspaces?: { name?: string; private?: boolean; project?: string; pr?: { title?: string } }[]; projects?: { id?: string; name?: string; private?: boolean }[] }
+// the private names Recording mode hides, from a view: its workspaces' and projects', and a private workspace's PR title
+// (a workspace named pr-42 shows it)
+export const hiddenNames = (v?: Veiled | null) =>
+  v?.settings?.recording ? [...(v.workspaces ?? []), ...(v.projects ?? [])].filter(x => x.private).flatMap(x => [x.name, 'pr' in x ? x.pr?.title : undefined]).filter((n): n is string => !!n) : []
+// a workspace Recording mode hides (it or its project Private): its window's title is Laki's alone
+export const veiledWs = (v: Veiled | null | undefined, w?: { private?: boolean; project?: string } | null) => !!v?.settings?.recording && !!w && (!!w.private || !!v.projects?.find(p => p.id === w.project)?.private)

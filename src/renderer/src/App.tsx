@@ -65,7 +65,7 @@ import { chromeOf } from './Chrome'
 import { wsActionsOf } from './WsActions'
 import { widgetsOf } from './AppWidgets'
 import { extCfgOf } from './ExtCfg'
-import { hiddenNames, useWinTitle } from './winTitle'
+import { hiddenNames, useWinTitle, veiledWs } from './winTitle'
 
 // E8: loaded as it first shows (the floating AI chat): not in the window's first load
 const AiPage = lazy(() => import('./Ai').then(m => ({ default: m.AiPage })))
@@ -455,7 +455,7 @@ export function App() {
   const hereP = projOf(ws)
   const pe = emojiOf(hereP?.icon)
   const here = titleAt.current === null ? (ws ? `${pe ? `${pe} ` : ''}${wsName(ws)}${hereP ? ` — ${hereP.name}` : ''}` : '') : view ? placeName({ d: titleAt.current, ws: ws?.id ?? null }) : ''
-  useWinTitle(here || 'Laki', hiddenNames(view))
+  useWinTitle(veiledWs(view, ws) ? 'Laki' : here || 'Laki', hiddenNames(view)) // Recording mode: a private one's, Laki alone
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
   const layoutsOn = hasCap(view, 'layouts')

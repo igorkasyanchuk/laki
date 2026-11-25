@@ -30,7 +30,7 @@ import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, WidgetPanel } from './
 import type { WidgetApi } from './Widgets'
 import { placesOf } from '../../shared/types'
 import { whenOk } from '../../shared/widgetSchema'
-import { hiddenNames, useWinTitle } from './winTitle'
+import { hiddenNames, useWinTitle, veiledWs } from './winTitle'
 const PANEL_NAME: Record<string, string> = { info: 'Info', files: 'Files', changes: 'Changes', commits: 'Commits', review: 'Review', preview: 'Preview', device: 'Simulator', side: 'Side panel' }
 
 // no glass, no see-through sidebar: the window has no blur behind it
@@ -74,7 +74,7 @@ export function TabWindow() {
   useEffect(() => void (view && !t && window.close()), [view, t]) // closed in the app (or gone): the window goes too
   // on screen here: no ● while you look. No tab: the app's pane keeps the keyboard's
   useEffect(() => (id ? reportView(() => ({ tab: null, tabs: [id] })) : undefined), [id])
-  useWinTitle(t ? `${t.name}${ws ? ` — ${ws.name || ws.id}` : ''}` : 'Laki', hiddenNames(view)) // "<tab> — <workspace>"
+  useWinTitle(t && !veiledWs(view, ws) ? `${t.name}${ws ? ` — ${ws.name || ws.id}` : ''}` : 'Laki', hiddenNames(view)) // "<tab> — <workspace>"; Recording mode: a private one's, Laki
   if (!view || !t) return null
   const s = view.settings
   const zoom = Number(load<Record<string, unknown> | null>('laki.zoom', {})?.[t.id]) || 0 // the tab's ⌘± in the app (App's sizeOf)
@@ -385,7 +385,7 @@ export function PanelWindow() {
   const [menu, openMenu] = useMenu()
   const { notes, setNotes, toast, done, fail } = useToasts()
   const w = says?.ws ? view?.workspaces.find(x => x.id === says.ws && !x.archived) : undefined
-  useWinTitle(`${PANEL_NAME[tab] ?? (tab.startsWith('ext:') ? 'Extension' : 'Side panel')}${w ? ` — ${w.name || w.id}` : ''}`, hiddenNames(view)) // "<its tab> — <workspace>"
+  useWinTitle(`${PANEL_NAME[tab] ?? (String(tab).startsWith('ext:') ? 'Extension' : 'Side panel')}${w && !veiledWs(view, w) ? ` — ${w.name || w.id}` : ''}`, hiddenNames(view)) // "<its tab> — <workspace>"
   useEffect(() => setShown(null), [says?.ws])
   if (!view) return null
   const head = (

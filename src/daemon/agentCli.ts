@@ -62,7 +62,7 @@ let newest: { at: number; v: Record<string, Newest | undefined> } = { at: 0, v: 
 async function latest(pkg: string): Promise<Newest | undefined> {
   const registry = process.env.LAKI_NPM_REGISTRY || (inRig() ? '' : 'https://registry.npmjs.org')
   if (!registry) return undefined
-  const r = await fetch(`${registry}/${pkg.replace('/', '%2f')}`, { signal: AbortSignal.timeout(15000), redirect: 'error' }).catch(() => null)
+  const r = await fetch(`${registry}/${pkg.replace('/', '%2f')}`, { signal: AbortSignal.timeout(45000), redirect: 'error' }).catch(() => null) // the whole document (its versions' times): a few MB for a busy package
   const d = (r?.ok ? await r.json().catch(() => ({})) : {}) as { 'dist-tags'?: { latest?: unknown }; time?: Record<string, unknown> }
   const v = d['dist-tags']?.latest
   if (!(typeof v === 'string' && /^\d+\.\d+\.\d+[\w.+-]*$/.test(v) && v.length < 40)) return undefined

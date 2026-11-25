@@ -227,3 +227,13 @@ test("#G1 Go back's IPC: the app window's own page only, and main's handler chec
   const main = readFileSync(new URL('../src/main/index.ts', import.meta.url), 'utf8')
   assert.match(main, /ipcMain\.handle\('update-back', async e => \(backAsk\(sender\(e\), !!win && e\.sender === win\.webContents, devOrigin\)/)
 })
+
+test("a window's title in Recording mode: a private workspace's (or its project's) is Laki's alone; a private one's PR title hidden too", async () => {
+  const { hiddenNames, veiledWs } = await import('../src/shared/title.ts')
+  const v = { settings: { recording: true }, workspaces: [{ name: 'pr-42', private: true, project: 'p', pr: { title: 'Secret launch' } }, { name: 'open-one', project: 'q' }], projects: [{ id: 'p', name: 'web' }, { id: 'q', name: 'hidden-proj', private: true }] }
+  assert.deepEqual(hiddenNames(v).sort(), ['Secret launch', 'hidden-proj', 'pr-42'].sort())
+  assert.equal(veiledWs(v, v.workspaces[0]), true, 'private itself')
+  assert.equal(veiledWs(v, v.workspaces[1]), true, 'its project private')
+  assert.equal(veiledWs({ ...v, settings: { recording: false } }, v.workspaces[0]), false, 'Recording mode off')
+  assert.equal(veiledWs(v, { project: 'p' }), false)
+})

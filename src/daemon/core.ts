@@ -361,14 +361,14 @@ export const diskFullNow = () => diskFull
 // secret env values the Keychain didn't give as Laki started (envKeys.ts): asked again as an app window connects or
 // comes to the front (main.ts), a minute apart at most; the view's envUnread while any still waits
 let envTried = 0
-export function envAgain(now = Date.now()) {
-  if (!envUnread() || now - envTried < ENV_AGAIN) return
+export function envAgain(now = Date.now(), force = false) {
+  if (!envUnread() || (!force && now - envTried < ENV_AGAIN)) return
   envTried = now
   const r = envRetry(state)
   if (r.got) log(`env: ${r.got} secret value${r.got > 1 ? 's' : ''} read from the Keychain now${r.left ? `, ${r.left} still not` : ''}`), changed()
 }
 const ENV_AGAIN = Number(process.env.LAKI_ENV_AGAIN_MS) || 60_000
-onKeys(() => envAgain(Infinity)) // a wrapped value the app unwrapped now (keychain.ts): its tabs' env filled at once
+onKeys(() => envAgain(Date.now(), true)) // a wrapped value the app unwrapped now (keychain.ts): its tabs' env filled at once
 export const freeBytes = (at: string) => {
   try {
     while (!existsSync(at) && dirname(at) !== at) at = dirname(at) // a folder not made yet: its volume is its nearest one's

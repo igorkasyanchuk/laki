@@ -11,6 +11,4 @@ export function useWinTitle(text: string, hide: string[] = []) {
     bridge?.title?.(t, hide)
   }, [t])
 }
-// the private names Recording mode hides, from a view (its workspaces' and projects')
-export const hiddenNames = (v?: { settings?: { recording?: boolean }; workspaces?: { name?: string; private?: boolean }[]; projects?: { name?: string; private?: boolean }[] } | null) =>
-  v?.settings?.recording ? [...(v.workspaces ?? []), ...(v.projects ?? [])].filter(x => x.private && x.name).map(x => x.name!) : []
+export { hiddenNames, veiledWs } from '../../shared/title' // Recording mode's (pure: test/main-guards.test.ts)

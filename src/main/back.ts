@@ -93,6 +93,7 @@ export async function goBack(skip: (version: string) => void): Promise<string | 
   const gone = `${b}.gone`
   const first = await refused(keptApp(), k) // before anything moves
   if (first) return first
+  let copied = false // another disk: a copy beside it, the kept one left where it was
   try {
     rmSync(back, { recursive: true, force: true })
     rmSync(gone, { recursive: true, force: true })
@@ -100,12 +101,13 @@ export async function goBack(skip: (version: string) => void): Promise<string | 
       renameSync(keptApp(), back)
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
-      if (!(await sh('/usr/bin/ditto', [keptApp(), back])).ok) throw new Error("couldn't copy it beside this one")
+      if (!(await sh('/usr/bin/ditto', [keptApp(), back])).ok) throw (rmSync(back, { recursive: true, force: true }), new Error("couldn't copy it beside this one"))
+      copied = true
     }
   } catch (e) {
     return `Couldn't go back: ${(e as Error).message}`
   }
-  const put = () => existsSync(back) && !existsSync(keptApp()) && renameSync(back, keptApp()) // as it was
+  const put = () => (copied ? rmSync(back, { recursive: true, force: true }) : existsSync(back) && !existsSync(keptApp()) && renameSync(back, keptApp())) // as it was
   const again = await refused(back, k) // where it runs from: nothing swapped it meanwhile
   if (again) return (put(), again)
   try {
@@ -117,8 +119,9 @@ export async function goBack(skip: (version: string) => void): Promise<string | 
     return `Couldn't go back: ${(e as Error).message}`
   }
   rmSync(keptFile(), { force: true })
+  if (copied) rmSync(keptApp(), { recursive: true, force: true }) // in use now: no copy of it kept
   skip(app.getVersion())
-  spawn('/bin/rm', ['-rf', gone], { detached: true, stdio: 'ignore' }).unref()
+  spawn('/bin/sh', ['-c', 'sleep 10; rm -rf "$0"', gone], { detached: true, stdio: 'ignore' }).unref() // once this app (and its helpers, still running from it) are gone
   app.relaunch()
   app.exit(0)
   return undefined
