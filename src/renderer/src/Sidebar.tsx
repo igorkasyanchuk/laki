@@ -321,8 +321,8 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
           </span>
         )}
         {!more && wt.some(t => t.compacting) && (
-          <span className="ws-sched ws-compact" data-tip="Claude Code is compacting its chat: summing up a long one takes a few seconds">
-            compacting…
+          <span className="ws-mark ws-compact" data-tip="Claude Code is compacting its chat: summing up a long one takes a few seconds" aria-label="Compacting its chat">
+            <Icon name="hourglass" size={11} />
           </span>
         )}
         {w.capOver && (

@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A file path the terminal wrapped over two or more rows opens from any of them, not only the row with its extension.
 - One MCP server list for every project's agents (Settings › Agents & profiles), with Import from Claude Code, Codex, Antigravity and OpenCode's own configs; OpenCode gets them too, and a Claude Code profile can take only Laki's.
 - A SQLite database in Files opens as its tables: each table's rows (sort, filter), its schema, and a read-only SQL query with Copy as CSV.
 - Agents suggest a task they noticed (a flaky test, a bug next door) instead of starting it: a card under their tab to Start, Edit first or Dismiss (`laki suggest`).

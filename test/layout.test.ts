@@ -224,3 +224,21 @@ test('#10: a long paste kept as a file: over 40 lines or 4,000 characters, never
   plainKey({ metaKey: true, ctrlKey: false, shiftKey: true, key: 'V' })
   assert.equal(longPaste('a\n'.repeat(41)), false)
 })
+
+test("a terminal's links over a wrapped line: the path broken over rows is one link on each of them", async () => {
+  const { cellRange, wrappedLine, WRAP_ROWS } = await import('../src/renderer/src/termLines.ts')
+  const cols = 10
+  // "see src/components/Button.tsx:12 ok" wrapped at 10 columns, under a row of its own
+  const rows = ['$ ls', 'see src/co', 'mponents/B', 'utton.tsx:', '12 ok'].map((t, i) => ({ isWrapped: i > 1, translateToString: (trim?: boolean) => (trim ? t.trimEnd() : t.padEnd(cols)) }))
+  const row = (i: number) => rows[i]
+  for (const y of [1, 2, 3, 4]) assert.deepEqual(wrappedLine(row, y), { top: 1, text: 'see src/components/Button.tsx:12 ok' }) // from any of its rows
+  assert.deepEqual(wrappedLine(row, 0), { top: 0, text: '$ ls' })
+  const at = 'see src/components/Button.tsx:12 ok'.indexOf('src/')
+  assert.deepEqual(cellRange(at, 'src/components/Button.tsx:12'.length, cols, 1), { start: { x: 5, y: 2 }, end: { x: 2, y: 5 } }) // 1-based, end inclusive
+  assert.deepEqual(cellRange(0, 4, cols, 0), { start: { x: 1, y: 1 }, end: { x: 4, y: 1 } }) // one row: as before
+  // a line of thousands of rows: read WRAP_ROWS each way only
+  const long = Array.from({ length: 500 }, (_, i) => ({ isWrapped: i > 0, translateToString: () => 'x'.repeat(cols) }))
+  const got = wrappedLine(i => long[i], 250)
+  assert.equal(got.top, 250 - WRAP_ROWS)
+  assert.equal(got.text.length, (2 * WRAP_ROWS + 1) * cols)
+})

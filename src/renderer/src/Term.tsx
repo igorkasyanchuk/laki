@@ -17,6 +17,7 @@ import { FONT_SIZE, fontStack, termLook } from './settingsBase'
 import { wordTrim } from './text'
 import { termTheme, transparent } from './themes'
 import { closeTo, Icon, type IconName, openFrom } from './ui'
+import { cellRange, wrappedLine } from './termLines'
 
 export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
 // K1: two views of one terminal in a window (an extension's cell and its full view) share the window's socket: it
@@ -181,17 +182,20 @@ export function Term({
     term.loadAddon(new WebLinksAddon((e, uri) => ours(e) && openExternal(uri), { hover: (e, uri) => ((over = true), !peekOn(e, uri) && box.current && (box.current.title = uri)), leave: () => ((over = false), peekOff(), box.current && (box.current.title = '')) }))
     term.registerLinkProvider({
       provideLinks: (y, cb) => {
-        const line = term.buffer.active.getLine(y - 1)?.translateToString(true) ?? ''
-        const found = /\.(png|jpe?g|gif|webp|svg|bmp|avif)\b/i.test(line) ? [...line.matchAll(PIC)].filter(m => absOf(m[0])) : []
+        // the whole line row y is in: a path wrapped over rows is one link on each of them (termLines.ts)
+        const { top, text: line } = wrappedLine(i => term.buffer.active.getLine(i), y - 1)
+        const at = (m: RegExpMatchArray) => cellRange(m.index!, m[0].length, term.cols, top)
+        const here = (m: RegExpMatchArray) => (r => r.start.y <= y && y <= r.end.y)(at(m)) // the ones on this row
+        const found = /\.(png|jpe?g|gif|webp|svg|bmp|avif)\b/i.test(line) ? [...line.matchAll(PIC)].filter(m => here(m) && absOf(m[0])) : []
         // a file's: ⌘-click (⌃ too, unless an app has the mouse), as a picture's and a file:// link's: a plain click, or a
         // double-click's first, would open it as you select a path. It opens where Settings says, ⌥ the other way
-        const code = props.current.onCode && props.current.cwd && /\.[A-Za-z]/.test(line) ? [...line.matchAll(CODE)].filter(m => !PICTURE.test(m[0]) && !found.some(p => p.index < m.index + m[0].length && m.index < p.index + p[0].length)) : []
+        const code = props.current.onCode && props.current.cwd && /\.[A-Za-z]/.test(line) ? [...line.matchAll(CODE)].filter(m => here(m) && !PICTURE.test(m[0]) && !found.some(p => p.index < m.index + m[0].length && m.index < p.index + p[0].length)) : []
         const to = (alt: boolean) => ((props.current.codeTo === 'editor') !== alt ? 'your editor' : "Laki's preview")
         cb(
           found.length || code.length
             ? [
                 ...found.map(m => ({
-                  range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
+                  range: at(m),
                   text: m[0],
                   // ⌘-click (⌃ too, unless an app has the mouse) opens it as a file:// link's
                   activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(absOf(t)),
@@ -199,7 +203,7 @@ export function Term({
                   leave: () => ((over = false), peekOff()),
                 })),
                 ...code.map(m => ({
-                  range: { start: { x: m.index + 1, y }, end: { x: m.index + m[0].length, y } },
+                  range: at(m),
                   text: m[0],
                   activate: (e: MouseEvent, t: string) => (e.metaKey || (e.ctrlKey && !tracked())) && props.current.onCode?.(absOf(t.replace(/(:\d+)+$/, '')), m[1] ? Number(m[1]) : undefined, e.altKey),
                   hover: (e: MouseEvent, t: string) => ((over = true), ((MD.test(t) || TEXT.test(t)) && peekOn(e, t)) || (box.current && (box.current.title = `${m[0]}\n⌘-click: ${to(false)} · ⌘⌥-click: ${to(true)}`))), // a Markdown file's: its card
