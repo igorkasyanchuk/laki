@@ -25,7 +25,7 @@ const keep = (o: { told?: string; skip?: string; pass?: string }) => {
 }
 // Squirrel.Mac replaces only a signed app: a Developer ID one (an ad-hoc build, a dev run: Download instead)
 const bundle = () => join(app.getPath('exe'), '..', '..', '..') // Laki.app/Contents/MacOS/Laki
-const signed = (): Promise<boolean> =>
+export const signed = (): Promise<boolean> =>
   !app.isPackaged || process.platform !== 'darwin'
     ? Promise.resolve(false)
     : new Promise(r => execFile('/usr/bin/codesign', ['-dv', '--verbose=2', bundle()], (_e, _out, err) => r(/Authority=Developer ID Application:/.test(String(err)))))

@@ -101,7 +101,10 @@ export function useDaemon(a: DaemonCtx) {
         setProblem(undefined)
         setPinAsk(null)
         api.call<AppInfo[]>('apps').then(setApps, () => {})
+        void bridge?.kcWrapOk?.().then(on => void (on && api.call('kcWrapper', { on: true }).catch(() => {})), () => {}) // keychain.ts: this window wraps the Keychain's values
       }
+      // a Keychain value to wrap or unwrap (keychain.ts): main's safeStorage does it, the answer goes back; never kept here
+      else if (m.ev === 'kcWrap') void (bridge?.kcWrap?.(m.op, String(m.value)) ?? Promise.resolve(null)).then(v => api.call('kcWrapped', v === null ? { req: m.req, error: "the app couldn't" } : { req: m.req, value: v }), () => api.call('kcWrapped', { req: m.req, error: "the app couldn't" })).catch(() => {})
       else if (m.ev === 'close') setConnected(false)
       else if (m.ev === 'turn') {
         if (m.kind === 'waiting') waits.current.set(m.tab, m.text ?? '')

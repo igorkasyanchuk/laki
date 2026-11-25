@@ -61,7 +61,7 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/daemon/notes.ts` | notes and To-dos: one JSON file each, their pasted files, the list with search |
 | `src/daemon/plans.ts` | specs and brainstorms: their folders, the editor's save, files, agents' output, a prototype's page |
 | `src/daemon/workflow.ts` | workflows: the sources, the engine (runs, decisions, asks, agents' turns, commands, PR waits), resume |
-| `src/daemon/keychain.ts` | Laki AI's keys in the macOS Keychain (`/usr/bin/security`, a signed release, the default data folder), else their 0600 files; a file moved in once it reads back the same; `keysWhere` for the diagnostics |
+| `src/daemon/keychain.ts` | Laki AI's keys in the macOS Keychain (`/usr/bin/security`, a signed release, the default data folder), else their 0600 files; a file moved in once it reads back the same; wrapped (`v10:`, main's safeStorage) through an app window that can (`setWrapper`: main.ts' `kcWrap`), plain without one; `keysWhere` for the diagnostics |
 | `src/daemon/envKeys.ts` | secret-looking env values (Settings', a profile's, a project's, its MCP servers') and the phone push's URL kept by keychain.ts, state.json with their names only (null): restored as it loads, stored and stripped as it saves, a v1 state's moved in; `laki backup`'s manifest names them |
 | `src/daemon/ai.ts` | Laki AI: OpenRouter's tool loop, claude -p and codex exec with `laki mcp`, the conversation, the key, the call log |
 | `src/daemon/acp.ts` | ACP agents (Labs): a command profile with `acp`, spoken to over the Agent Client Protocol v1 on its stdio; `AcpPty` is its Session's pty (prompts, permission menus, Stop), its words the Reader's (`acpChat`), its turns hooks (`docs/dev/agents.md`) |

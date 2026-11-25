@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { fresh, until } from './helpers.ts'
+import { connect, fresh, until } from './helpers.ts'
 
 const SECURITY = readFileSync(new URL('./fakes/keychain-security', import.meta.url), 'utf8')
 const SECRETS = ['ghp_fake_secret_one', 'proj_fake_secret_two', 'profile_fake_secret_three', 'push_fake_token_four']
@@ -163,4 +163,46 @@ test('a secret by its value (DATABASE_URL with a password) leaves state.json too
   await rig.rpc('send', { target: sh.id, text: 'echo "[$GH_TOKEN|$DATABASE_URL]"' })
   await until(async () => (await rig.screen(sh.id)).includes(`[${SECRETS[0]}|${db}]`), 'a tab with both')
   assert.ok(!onDisk(rig.data).includes('fake_db_pass'), 'still not in state.json')
+})
+
+test("the app's window wraps the Keychain's values (keychain.ts): the item holds the wrapped one, a tab still gets the secret; with no window, plain, and diagnostics say so", async t => {
+  const rig = await fresh(t, { env: { LAKI_KEYCHAIN: '1' } })
+  writeFileSync(join(rig.home, 'bin', 'security'), SECURITY, { mode: 0o755 })
+  const item = join(rig.home, 'keychain', 'Laki AI__env:GH_TOKEN')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  // no window wraps: plain, as before
+  await rig.rpc('settingsSet', { env: { GH_TOKEN: SECRETS[0] } })
+  assert.equal(readFileSync(item, 'utf8'), SECRETS[0])
+  assert.match(await rig.rpc('diagnostics'), /not wrapped: no app window/)
+  // a window that wraps (a fake of main's safeStorage: the text reversed, in base64)
+  const fake = (op: string, v: string) => (op === 'wrap' ? Buffer.from([...v].reverse().join('')).toString('base64') : [...Buffer.from(v, 'base64').toString()].reverse().join(''))
+  const wrapper = async () => {
+    const app = await connect(rig)
+    app.ws.on('message', raw => {
+      const m = JSON.parse(String(raw))
+      if (m.ev === 'kcWrap') void app.call('kcWrapped', { req: m.req, value: fake(m.op, m.value) })
+    })
+    assert.deepEqual(await app.call('kcWrapper', { on: true }), { on: true })
+    return app
+  }
+  await wrapper()
+  // the plain one is wrapped now, and a new value goes in wrapped
+  await until(() => readFileSync(item, 'utf8').startsWith('v10:'), 'the plain one wrapped')
+  assert.ok(!readFileSync(item, 'utf8').includes(SECRETS[0]))
+  assert.equal(fake('unwrap', readFileSync(item, 'utf8').slice(4)), SECRETS[0])
+  await rig.rpc('settingsSet', { env: { GH_TOKEN: 'ghp_fake_rewrapped' } })
+  await until(() => (v => v.startsWith('v10:') && fake('unwrap', v.slice(4)) === 'ghp_fake_rewrapped')(readFileSync(item, 'utf8')), 'the new one wrapped')
+  assert.match(await rig.rpc('diagnostics'), /wrapped by the app.*env:GH_TOKEN in Keychain \(wrapped\)/)
+  // read back as it was: after a restart, once a window unwraps it, a tab gets the secret
+  await rig.stop()
+  await rig.start()
+  await wrapper()
+  await until(async () => /env:GH_TOKEN in Keychain \(wrapped\)/.test(await rig.rpc('diagnostics')), 'unwrapped')
+  await echoed(rig, ws.id, '[ghp_fake_rewrapped|]')
+  // not an app window: refused
+  const { port, token } = rig.info()
+  const r = await fetch(`http://127.0.0.1:${port}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ method: 'kcWrapper', params: { on: true } }) }).then(x => x.json())
+  assert.match(String(r.error), /only Laki's window/)
+  for (const s of [SECRETS[0], 'ghp_fake_rewrapped']) assert.ok(!rig.out.includes(s), 'in no log')
 })

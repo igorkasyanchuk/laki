@@ -35,6 +35,7 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
   mergeQueueStop: 'stop a merge queue (the user does, from the Board)', reviewMark: "mark the user's review (Since I reviewed is theirs)",
   reviewNotesGet: "read or change the user's unsent review comments", reviewNotesSet: "read or change the user's unsent review comments",
   archivedKeep: "keep an archived workspace from being deleted (the user does, on Laki's notice)",
+  kcWrapper: "wrap the Keychain's values (Laki's window does)", kcWrapped: "answer a Keychain value's wrap (Laki's window does)",
   termAnswer: 'allow a terminal to act as the user (they do, in Laki\'s window)', termList: "list the terminals the user allowed",
   termRevoke: "revoke a terminal the user allowed (they do, in Settings › Security)", screenLock: 'say the Mac locked (remote access follows it)',
   remoteLog: "read what was done over remote access", agentLog: "read what agents did through Laki (the user's to look back at)",
@@ -117,7 +118,7 @@ export const TELEGRAM_OK: Record<string, 'answer' | 'control'> = { answer: 'answ
 // devices, secrets and keys, accounts, webhooks, extensions' files, what runs outside a workspace (a clone, the CLI's
 // install, apps' windows: device's and Laki AI's aiShot, an app opened: aiOpenApp), the clock. hookAdd: a new webhook and its secret; presetSave: a profile's args and env, as
 // REMOTE_KEYS' presets; hook: agents' own (hookWho); tunnelStart, scheduleSet: S11
-export const REMOTE_NO = new Set(['mcpImport', 'suggest', 'scheduleCopy', 'secretForget', 'gitTidy', 'goalSet', 'flowImportSave', 'dataBackup', 'dataRestore', 'keptOpen', 'keptRm', 'uninstall',
+export const REMOTE_NO = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'scheduleCopy', 'secretForget', 'gitTidy', 'goalSet', 'flowImportSave', 'dataBackup', 'dataRestore', 'keptOpen', 'keptRm', 'uninstall',
   'skillOpen', 'wsRepair', 'events', 'clientLog', 'tabUnbox', 'projectNetAllow', 'ticketMint', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'clientWho', 'diskTidy', 'proofShot', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics', 'agentContext',
   'agentContextOpen', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'stateOwn', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'imageRead', 'remoteStart',

@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('laki', {
   reveal: (path: string): Promise<boolean> => ipcRenderer.invoke('reveal', path), // a file in Finder (a terminal's recent picture)
   dragOut: (path: string, root: string) => ipcRenderer.send('drag-out', path, root), // C10: a file's row dragged to Finder or any app
   uninstalled: (cask: boolean) => ipcRenderer.send('uninstalled', cask), // B3: the daemon's uninstalled: the app quits (to the Trash on a yes)
+  ...(process.platform === 'darwin' && { kcWrapOk: (): Promise<boolean> => ipcRenderer.invoke('kc-wrap-ok'), kcWrap: (op: 'wrap' | 'unwrap', value: string): Promise<string | null> => ipcRenderer.invoke('kc-wrap', op, value) }), // keychain.ts' values wrapped with safeStorage (main's: a Developer ID build); null: it couldn't
   ...(process.platform === 'darwin' && { touchId: (): Promise<boolean> => ipcRenderer.invoke('touch-id'), confirm: (what: string): Promise<string | null> => ipcRenderer.invoke('confirm', what) }), // Touch ID (shared/confirm.ts): can this Mac ask; ask for one action, its ticket
   ...(process.platform === 'darwin' && { quickLook: (path: string) => ipcRenderer.send('quick-look', path), share: (url: string) => ipcRenderer.send('share-menu', url), bounce: () => ipcRenderer.send('dock-bounce') }), // U14: Space on a file row; U15: Share…, the Dock's bounce
   copyFile: (path: string): Promise<'image' | 'file' | 'missing'> => ipcRenderer.invoke('copy-file', path), // an artifact to the clipboard

@@ -264,8 +264,15 @@ a turn or a revert starts the count over. Only you change the globs; a phone can
   build using the default data folder: out of the data folder, so out of its backups and copies. They're written
   through `/usr/bin/security -i` on its stdin (never on a command line) and read back before a file of them is
   removed; Keychain trouble keeps the 0600 file, and Copy diagnostics says which. The item trusts `/usr/bin/security`,
-  so a program running as you can read it with that tool, as it could the file: the Keychain keeps it off the disk's
-  plain files, not from your own programs. An ad-hoc build, a custom `LAKI_HOME` and Linux keep the files.
+  so a program running as you can read it with that tool. While Laki's window is open, each value is stored wrapped:
+  `v10:` and Electron's safeStorage encryption of it, whose key is the app's own Keychain item (another program reading
+  that item is asked about), so `security find-generic-password` from an agent's tab gets the wrapped value, not the
+  secret. A new value goes in plain first and is wrapped once the window gives it back (a few hundred milliseconds), and
+  a plain one from before is wrapped the first time it's read with the window open. Not wrapped: a daemon with no window
+  (headless, one the CLI started and the app never opened), a build that isn't Developer ID signed, and any value
+  written while the window was closed, until it opens; Copy diagnostics says *not wrapped* then. A wrapped value needs
+  the window to be read: with the app closed, a new tab doesn't get it until it opens. An ad-hoc build, a custom
+  `LAKI_HOME` and Linux keep the files.
 - Secret-looking environment values (a name like `*_TOKEN`, `*_KEY`, `*_SECRET`, or a value that is one: a URL with a
   password such as `DATABASE_URL`, a token's shape; Settings' env, a profile's, a project's and its MCP servers') and the phone push's URL and reply topic are kept the same way (else a 0600 file each
   in `env-keys/`); `state.json`, its dated copies and `laki backup`'s archive keep only their names. A backup's manifest

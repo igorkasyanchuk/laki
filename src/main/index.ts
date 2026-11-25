@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, autoUpdater, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, ShareMenu, shell, systemPreferences, Tray, webContents } from 'electron'
+import { app, autoUpdater, BrowserWindow, safeStorage, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, ShareMenu, shell, systemPreferences, Tray, webContents } from 'electron'
 import { execFile, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -16,7 +16,7 @@ import { veiled, type View } from '../shared/types.ts'
 import { bulkPick, hotkeyAnswer } from '../shared/ask.ts'
 import { CONFIRM, type ConfirmWhat } from '../shared/confirm.ts'
 import { AGENT_BROWSER, APP_ORIGIN, APP_SCHEME, appFile, appPage as isAppPage, BROWSER, confirmAsk, dblClickAction, dragOk, externalOf, fromApp as senderOk, fromTokenPage, pageIs, PREVIEW, web, webviewOk, showAtLaunch  } from './guards.ts'
-import { updater } from './update.ts'
+import { signed, updater } from './update.ts'
 import './agentBrowser.ts' // its IPC (browse): registered as it loads
 import { guardFloat, pin, talk, voice } from './floater.ts'
 import { annotate, screenshot } from './shots.ts'
@@ -632,6 +632,22 @@ ipcMain.handle('conn', async e => {
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
   const { port, token } = await daemon()
   return { port, token: appToken() ?? token } // S1: the app's; daemon.json's only when it couldn't be had (its calls that ask who are refused)
+})
+
+// the daemon's Keychain values wrapped (keychain.ts, through the app window's socket): Electron's safeStorage, whose key
+// is the app's own Keychain item (a program other than Laki reading it is asked about: a plain `security` call from an
+// agent's tab gets the wrapped value, not the secret). Only a Developer ID build (update.ts' signed: an ad-hoc one's
+// signature changes with each build, and the Keychain would ask every time) and only the app's main window. base64
+let wrapOk: Promise<boolean> | undefined
+const canWrap = () => (wrapOk ??= signed().then(s => s && safeStorage.isEncryptionAvailable(), () => false))
+ipcMain.handle('kc-wrap-ok', e => fromApp(e) && !!win && e.sender === win.webContents && canWrap())
+ipcMain.handle('kc-wrap', async (e, op: unknown, value: unknown) => {
+  if (!fromApp(e) || !win || e.sender !== win.webContents || typeof value !== 'string' || !(await canWrap())) return null
+  try {
+    return op === 'wrap' ? safeStorage.encryptString(value).toString('base64') : op === 'unwrap' ? safeStorage.decryptString(Buffer.from(value, 'base64')) : null
+  } catch {
+    return null // not ours (another app's key, a broken value): the daemon keeps it as it is
+  }
 })
 
 // Touch ID (shared/confirm.ts, Settings › General): the app window asks for one of CONFIRM's actions; main prompts with

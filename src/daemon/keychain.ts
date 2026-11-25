@@ -10,6 +10,14 @@
 // Keychain didn't answer: asked again after a minute). A name or value with a line break or a NUL never goes in: on
 // security -i's stdin it would end the command there and run the rest as more commands (kcSet false: its file keeps
 // it). Widget secrets are kept here too (widgets.ts, one item: their JSON).
+// Wrapped (WRAP): with the app's window open, a value goes into the Keychain as "v10:" and Electron's safeStorage of it
+// (main's kc-wrap, a Developer ID build only: its key is the app's own Keychain item, which another program reading it
+// is asked about), so a plain `security find-generic-password` from an agent's tab gets that and not the secret. The
+// app's window does it for the daemon (setWrapper: main.ts' kcWrap over the window's socket, 3 s each, else the plain
+// way). A write goes in plain first, then wrapped once the app gives it back (never lost to a crash in between; the
+// plain one is there that long); a plain one read is wrapped then too. A wrapped one read with no app open: unread
+// until the app is (keyUnread; onKeys tells core, which fills what it missed). Headless (no window ever): plain, as
+// before, and keysWhere says so
 // ponytail: the first read is a sync spawn (a few ms; 5 s at worst) on the event loop
 import { spawnSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
@@ -39,6 +47,44 @@ const ONE_LINE = /^[^\r\n\0]*$/ // security -i reads a command a line
 export const kcSet = (name: string, value: string) => ONE_LINE.test(name) && ONE_LINE.test(value) && sec(['-i'], `add-generic-password -U -s ${q(SERVICE)} -a ${q(name)} -w ${q(value)}\n`).status === 0 && kcGet(name) === value
 export const kcRm = (name: string) => (s => s === 0 || s === 44)(sec(['delete-generic-password', '-s', SERVICE, '-a', name]).status)
 
+export const WRAP = 'v10:'
+type Wrapper = (op: 'wrap' | 'unwrap', value: string) => Promise<string> // rejects: no window, 3 s, refused
+let wrapper: Wrapper | undefined
+let told = () => {}
+export const onKeys = (f: () => void) => void (told = f) // core: a wrapped value read now (envAgain)
+const wrappedRaw = new Map<string, string>() // read wrapped, not unwrapped yet: by name
+const plain = new Set<string>() // read or written plain: wrapped once there's a wrapper
+export function setWrapper(w?: Wrapper) {
+  wrapper = w
+  if (!w) return
+  for (const [name, raw] of wrappedRaw) unwrapNow(name, raw)
+  for (const name of plain) wrapNow(name, kept.get(name) ?? '')
+}
+export const wrapping = () => !!wrapper
+function unwrapNow(name: string, raw: string) {
+  void wrapper?.('unwrap', raw.slice(WRAP.length)).then(
+    v => {
+      if (wrappedRaw.get(name) !== raw) return // written meanwhile
+      wrappedRaw.delete(name)
+      kept.set(name, v)
+      retry.delete(name)
+      where.set(name, 'Keychain (wrapped)')
+      told()
+    },
+    () => {}, // the app couldn't: still unread, asked again as it connects
+  )
+}
+function wrapNow(name: string, value: string) {
+  if (!value || !keychainOn()) return void plain.delete(name)
+  if (!wrapper) return // kept in plain: wrapped as the app connects (setWrapper)
+  void wrapper('wrap', value).then(
+    w => {
+      if (kept.get(name) !== value) return // a newer value meanwhile: its own wrap
+      if (ONE_LINE.test(w) && kcSet(name, WRAP + w)) plain.delete(name), where.set(name, 'Keychain (wrapped)')
+    },
+    () => {}, // stays plain, wrapped as the app connects again
+  )
+}
 const kept = new Map<string, string>()
 const retry = new Map<string, number>() // a read the Keychain didn't answer: when to ask it again
 const where = new Map<string, string>() // name → Keychain, or file (and why, when the Keychain failed)
@@ -58,9 +104,16 @@ export function keyRead(name: string, path: string): string {
   else if (v) kcSet(name, v) ? (rmSync(path, { force: true }), where.set(name, 'Keychain')) : where.set(name, "file (the Keychain didn't take it)")
   else {
     const got = kcGet(name)
-    if (got === undefined) where.set(name, "file (the Keychain didn't answer)"), retry.set(name, Date.now() + (Number(process.env.LAKI_KEYCHAIN_RETRY_MS) || 60_000))
-    else (v = got), where.set(name, 'Keychain')
+    if (got === undefined) where.set(name, "file (the Keychain didn't answer)"), retry.set(name, Date.now() + RETRY())
+    else if (got.startsWith(WRAP)) {
+      // wrapped: '' until the app unwraps it (now, if its window is open)
+      wrappedRaw.set(name, got)
+      retry.set(name, Date.now() + RETRY())
+      where.set(name, "Keychain (wrapped; Laki's window isn't open to read it)")
+      unwrapNow(name, got)
+    } else (v = got), where.set(name, 'Keychain (not wrapped)'), got && (plain.add(name), wrapNow(name, got))
   }
+  if (v && where.get(name) === 'Keychain' && keychainOn()) where.set(name, 'Keychain (not wrapped)'), plain.add(name), wrapNow(name, v) // moved in from its file
   kept.set(name, v)
   return v
 }
@@ -69,9 +122,13 @@ export function keyRead(name: string, path: string): string {
 export const keyUnread = (name: string) => retry.has(name)
 // '': none (removed)
 export function keyWrite(name: string, path: string, key: string) {
+  wrappedRaw.delete(name)
   if (keychainOn() && (key ? kcSet(name, key) : kcRm(name))) {
     rmSync(path, { force: true })
-    where.set(name, 'Keychain')
+    where.set(name, key ? 'Keychain (not wrapped)' : 'Keychain')
+    kept.set(name, key)
+    if (key) plain.add(name), wrapNow(name, key)
+    else plain.delete(name)
   } else {
     if (key) writeAtomic(path, `${key}\n`, 0o600) // never half written: a crash keeps the one before
     else rmSync(path, { force: true })
@@ -81,4 +138,5 @@ export function keyWrite(name: string, path: string, key: string) {
   retry.delete(name)
 }
 // the diagnostics' line: where each key read or written so far is kept
-export const keysWhere = () => (keychainOn() ? `the Keychain${where.size ? `: ${[...where].map(([k, w]) => `${k} in ${w}`).join(', ')}` : ''}` : 'files (0600)')
+export const keysWhere = () => (keychainOn() ? `the Keychain${wrapper ? ' (wrapped by the app)' : ' (not wrapped: no app window)'}${where.size ? `: ${[...where].map(([k, w]) => `${k} in ${w}`).join(', ')}` : ''}` : 'files (0600)')
+const RETRY = () => Number(process.env.LAKI_KEYCHAIN_RETRY_MS) || 60_000

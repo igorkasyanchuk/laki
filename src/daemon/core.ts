@@ -44,7 +44,7 @@ import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersi
 import { findSecrets, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
 import { envJson, envRestore, envRetry, envScrub, envStash, envUnread } from './envKeys.ts'
-import { keysWhere } from './keychain.ts'
+import { keysWhere, onKeys } from './keychain.ts'
 import * as cs from './codespace.ts'
 import * as gitlab from './gitlab.ts'
 import { limitReset } from './limits.ts'
@@ -365,6 +365,7 @@ export function envAgain(now = Date.now()) {
   if (r.got) log(`env: ${r.got} secret value${r.got > 1 ? 's' : ''} read from the Keychain now${r.left ? `, ${r.left} still not` : ''}`), changed()
 }
 const ENV_AGAIN = Number(process.env.LAKI_ENV_AGAIN_MS) || 60_000
+onKeys(() => envAgain(Infinity)) // a wrapped value the app unwrapped now (keychain.ts): its tabs' env filled at once
 export const freeBytes = (at: string) => {
   try {
     while (!existsSync(at) && dirname(at) !== at) at = dirname(at) // a folder not made yet: its volume is its nearest one's

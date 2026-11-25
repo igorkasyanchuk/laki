@@ -16,6 +16,8 @@ import { baseKey, type Channel, channel, fromB64, keyGet, keyPut } from './e2e'
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
 export type NotifyAction = { text: string; scope?: string /* a standing permission's choice in full (shared/ask.ts askScope): the on-screen card draws its rule */; reply?: boolean /* U15: a free-text question's Reply field (macOS), not a button */; stop?: boolean; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' }; alert?: { id: string; choice: string } } // tool: an extension's tool call's answer (widgetToolAnswer)
 type Bridge = {
+  kcWrapOk?: () => Promise<boolean> // keychain.ts: main wraps the Keychain's values (safeStorage, a Developer ID build)
+  kcWrap?: (op: 'wrap' | 'unwrap', value: string) => Promise<string | null>
   menuPopup?(model: unknown, x: number, y: number): Promise<string | undefined> // Menus: macOS (main's menu-popup): the picked item's id
   conn(): Promise<{ port: number; token: string }>
   restartDaemon?(hung?: boolean): Promise<boolean> // main stops the daemon by its pid and starts one from this bundle (one that refused this app's shutdown; hung: one that doesn't answer)

@@ -65,6 +65,7 @@ import { reviewDiff, reviewMark, longStop, longTurnTick, sideAsk, sideNew, sideS
 import { alertAnswer, alertMacOnly, alertShow, alertsSeen, noticesTo } from './alerts.ts'
 import { capRaises, capTick } from './cap.ts'
 import { suggest, suggestAnswer } from './suggest.ts'
+import { setWrapper, wrapping } from './keychain.ts'
 import { secretAsk, secretForget, secretGive, secretKeep, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowHold, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust, flowTrustDiff, flowWaitEnd, flowExport, flowImport, flowImportSave } from './workflow.ts'
 import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetFromTerm, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetAnnotations, widgetStore, widgetTerm, termStop, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetFull, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -847,6 +848,8 @@ const api = {
   remoteKeep: p => remoteMod.remoteKeep(typeof p?.now === 'number' ? p.now : undefined), // T10: its idle clock starts over (the window's line, the push's Keep)
   clientLog: (p: { id?: string; refused?: boolean }) => ({ lines: p.id ? clientLogMod.clientLogOf(clientsMod.clientFind(p.id).id, p.refused === true).slice(0, 2000) : [], unknown: clientLogMod.unknownTokens() }), // T12: { id, refused? }: what it did, newest first; calls with a token nobody has today // T9, T11: last call, calls, days left, unused; its limits and what it uses of them now
   clientAnswer: (p: In<typeof clientAnswer>) => clientAnswer(p), // the window's Allow / Deny (call's check: the app's token only)
+  kcWrapper: (p: { on?: boolean }, c) => (wrapperSet(c, p?.on === true), { on: wrapping() }), // keychain.ts: this window wraps the Keychain's values (main's safeStorage), or no longer (the app's token only)
+  kcWrapped: (p: { req?: string; value?: unknown; error?: unknown }) => void (w => w && (typeof p?.value === 'string' ? w.ok(p.value) : w.no(new Error(String(p?.error ?? 'refused')))))(wraps.get(String(p?.req))), // its answer to a kcWrap
   clientWho: (p: { byClient?: string }) => (p.byClient ? clientsMod.clientWho(p.byClient) : null), // laki mcp's: the calling client's scopes (call() sets byClient)
   shutdown: p => void setTimeout(() => shutdown(p?.keep === true), 50), // keep: R6, the pty host's terminals go on (laki stop --keep)
 } satisfies Record<string, Handler>
@@ -884,7 +887,7 @@ const remoteNo = (method: string, p: Params) =>
 // double fork out of its tab, launchctl submit): only the app's token (appToken), a terminal of yours or the daemon's
 // own children are you (core.tabOfPeer); an agent tab's token is that agent whatever its tree (S12: LAKI_TAB_TOKEN).
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['mcpImport', 'suggest', 'suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
+const FROM = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
   'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
   'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
@@ -1178,6 +1181,28 @@ function clientLine(method: string, p: Record<string, unknown>, e?: unknown) {
   if (e === undefined && CLIENT_READ.has(method)) return // reads aren't in daemon.log (as agentLog's)
   log(`client ${clientsMod.clientName(p.byClient)}: ${method}${(w => (w ? ` (${w})` : ''))(agentWhat(p))}${e === undefined ? '' : ` refused: ${core.firstLine(e)}`}`)
 }
+// keychain.ts' wrapping, by an app window that can (kcWrapper: main's safeStorage, a Developer ID build): a kcWrap
+// event each over its socket, answered by kcWrapped; WRAP_WAIT (3 s) at most, else keychain.ts keeps the value plain, or
+// unread. The value goes to the window and back only (its socket is the app's, on 127.0.0.1); never logged
+const wrappers = new Set<core.Conn>()
+const wraps = new Map<string, { ok: (v: string) => void; no: (e: Error) => void }>()
+const WRAP_WAIT = () => Number(process.env.LAKI_WRAP_WAIT_MS) || 3000
+function wrapVia(op: 'wrap' | 'unwrap', value: string) {
+  const c = [...wrappers].find(w => core.clients.has(w))
+  if (!c) return Promise.reject(new Error('no app window'))
+  const req = randomBytes(8).toString('hex')
+  return new Promise<string>((ok, no) => {
+    const done = () => (clearTimeout(timer), wraps.delete(req))
+    const timer = setTimeout(() => (done(), no(new Error('the app took too long'))), WRAP_WAIT())
+    wraps.set(req, { ok: v => (done(), ok(v)), no: e => (done(), no(e)) })
+    c.send({ ev: 'kcWrap', req, op, value })
+  })
+}
+function wrapperSet(c: core.Conn | undefined, on: boolean) {
+  if (c) on ? wrappers.add(c) : wrappers.delete(c)
+  for (const w of wrappers) if (!core.clients.has(w)) wrappers.delete(w)
+  setWrapper(wrappers.size ? wrapVia : undefined)
+}
 // the app's answer (its token only: call() checks before anyone is looked up)
 const termAnswer = (p: Params) => void [...termAsks.values()].find(a => a.msg.req === p?.req)?.answer(p?.allow === true)
 // the CLI's own question while its call waits (not a method of api: it reads the socket, as appPair does)
@@ -1380,7 +1405,7 @@ chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookL
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
   alertAnswer: p => (alertMacOnly(p) ? 'raise or remove a spend cap' : ''), // cap.ts' choices that raise it: the Mac's
 }
-const ANSWER_NO = new Set(['mcpImport', 'suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
+const ANSWER_NO = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
   'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
   'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy',
   'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext',
@@ -1821,6 +1846,7 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   if (remote && remoteMod.levelOf(c?.device) === 'answer') answerNo(method, params) // D7
   if ((method === 'termAnswer' || method === 'termList' || method === 'termRevoke') && !app) throw new Error("only Laki's window allows a terminal") // before whoCalls: an unapproved terminal's would ask about itself
   if (method === 'clientAnswer' && !app) throw new Error("only Laki's window allows a trusted client") // T1: as termAnswer's
+  if ((method === 'kcWrapper' || method === 'kcWrapped') && !app) throw new Error("only Laki's window wraps the Keychain's values") // its token only
   if (client && sock) params = await clientCalls(sock, method, params, client)
   else if (sock) params = await whoCalls(sock, method, params, known, app)
   let r
@@ -2243,6 +2269,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     })
     ws.on('close', () => {
       core.clients.delete(c)
+      if (wrappers.has(c)) wrapperSet(c, false) // the last wrapping window gone: plain from now (keychain.ts)
       for (const s of core.sessions.values()) s.detach(c)
     })
   }

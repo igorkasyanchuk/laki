@@ -288,6 +288,16 @@ read the Keychain didn't answer is asked again after a minute.
 name (never a value). aiKey's API and the view are as before (the view only says whether there's a key).
 `test/fakes/keychain-security` fakes `security` (`test/ai.test.ts`, `test/env-keys.test.ts` link it as `$HOME/bin/security`).
 
+**Wrapped** (`WRAP`, `v10:`): an app window that can (main's `kc-wrap-ok`: update.ts' `signed` and
+`safeStorage.isEncryptionAvailable()`) says so as it connects (`kcWrapper { on: true }`, the app's token only); main.ts'
+`wrapVia` then sends that window `kcWrap { req, op: wrap | unwrap, value }`, which the window hands to main's `kc-wrap`
+(safeStorage, base64) and answers with `kcWrapped { req, value }` (or `error`), `LAKI_WRAP_WAIT_MS` (3 s) at most.
+keychain.ts' `setWrapper` gets it while any such window is connected. A write: `kcSet` plain as before, then wrapped and
+`kcSet` again as `v10:<wrapped>` unless a newer value came meanwhile; a plain one read (or moved in from its file) is
+wrapped the same way, at once or as a wrapper comes (`plain`). A wrapped one read: `''` and unread (`keyUnread`, retried)
+until the wrapper unwraps it (now, or as a window connects: `wrappedRaw`), then kept and `onKeys` (core: `envAgain`,
+unthrottled) fills what the tabs missed. No window: plain, and `keysWhere` says *not wrapped: no app window*.
+
 **Secret values out of state.json** (`envKeys.ts`, STATE_V 2): a secret-looking variable (env.ts `secretLooking`), or a
 value that is one whatever its name (env.ts `secretValue`: `URL_CREDS`, a URL with a password like `DATABASE_URL`, or
 secrets.ts' `secretsIn` shapes; a null already kept, or one the store has or couldn't give, stays its) in
