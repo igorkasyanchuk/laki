@@ -3,7 +3,7 @@
   {
    "id": "<project>",
    "name": "<project>",
-   "path": "/private<home>/<project>",
+   "path": "<home>/<project>",
    "git": true
   }
  ],

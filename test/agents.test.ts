@@ -283,7 +283,7 @@ test("F6: agentContext lists an agent's rule files and MCP servers, masked; an a
   w(join(rig.home, '.codex', 'config.toml'), 'model = "gpt-5"\n\n[mcp_servers.docs]\ncommand = "npx" # the runner\nargs = [\n  "-y",\n  "docs-mcp",\n]\n\n[mcp_servers.docs.env]\nDOCS_KEY = "sekret-2"\n\n[mcp_servers."web search"]\nurl = "https://search.example/mcp"\nenabled = false\n')
 
   const c = await rig.rpc('agentContext', { agent: 'claude', project: p.id })
-  const repo = (x?: string) => x?.replace(realpathSync(rig.repo), '<repo>')
+  const repo = (x?: string) => x?.replace(realpathSync(rig.repo), '<repo>').replace(`~${realpathSync(rig.repo).slice(realpathSync(rig.home).length)}`, '<repo>') // a Mac's tmp is /private/var (no ~ there); Linux's has none: ~/repo
   const size = (f: string) => readFileSync(f).length
   assert.deepEqual(c.rules.map((r: any) => [repo(r.at), r.scope, r.size, repo(r.from)]), [
     ['~/.claude/CLAUDE.md', 'user', size(join(rig.home, '.claude', 'CLAUDE.md')), undefined],

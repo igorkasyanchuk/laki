@@ -3,7 +3,7 @@
 // (ports, processes, git's numbers) normalized. A refactor of view() must leave it byte-equal; a change on purpose
 // writes it again with UPDATE_SNAPSHOT=1
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until, sleep } from './helpers.ts'
@@ -31,7 +31,7 @@ test('view: tabs in each state, their workspace and project, as pinned', async t
   await rig.rpc('tabSleep', { tab: sleepy })
   await until(async () => (await tab(wait)).status === 'waiting' && (await tab(gone)).status === 'exited' && (await tab(sleepy)).asleep && (await tab(first.id)).status === 'running', 'each in its state')
 
-  const names = new Map<string, string>([[rig.home, '<home>'], [rig.data, '<data>'], [ws.id, '<ws>'], [p.id, '<project>'], [first.id, '<t-run>'], [wait, '<t-wait>'], [done, '<t-done>'], [gone, '<t-gone>'], [sleepy, '<t-sleep>']])
+  const names = new Map<string, string>([[realpathSync(rig.home), '<home>'], [rig.home, '<home>'], [rig.data, '<data>'], [ws.id, '<ws>'], [p.id, '<project>'], [first.id, '<t-run>'], [wait, '<t-wait>'], [done, '<t-done>'], [gone, '<t-gone>'], [sleepy, '<t-sleep>']])
   const norm = (s: string) => [...names].reduce((x, [a, b]) => x.split(a).join(b), s).replace(/\b[0-9a-f]{32,}\b/g, '<key>')
   const snap = async () => {
     const v = await rig.rpc('state')
