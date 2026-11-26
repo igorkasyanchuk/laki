@@ -139,7 +139,9 @@ safeStart() // safe mode after three young deaths in a row (safe.ts)
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
 if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
-await kcWarm([...envNames(readJson(join(dir, 'state.json'))), 'openrouter', 'endpoint', 'widget-secrets', 'telegram']) // the Keychain's values read together, not one sync spawn each as the state loads
+// the Keychain's values read together, not one sync spawn each as the state loads; the state only parsed here (readJson
+// would set an unreadable one aside before core.load's own handling of it)
+await kcWarm([...envNames((() => { try { return JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')) } catch {} })()), 'openrouter', 'endpoint', 'widget-secrets', 'telegram'])
 core.load()
 policyTick() // a managed policy: before any tab starts again (spawnTab checks it), then every 5 minutes
 core.writeHooks()
