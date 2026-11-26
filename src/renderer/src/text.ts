@@ -1202,7 +1202,7 @@ export const wholePage = (s: string) => /^\s*(<!doctype html|<html[\s>])/i.test(
 // the page with a CSP first in its head: nothing loaded (no fetch, no picture, no font from the web) but what it holds;
 // the frame's sandbox runs no script, follows no link. The parser puts a <meta> after a doctype or <html> in a head
 export const sealed = (s: string) =>
-  s.replace(/<!doctype html[^>]*>|<html[^>]*>|<head[^>]*>/i, m => `${m}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">`)
+  s.replace(/http-equiv\s*=\s*(["']?)refresh\1/gi, 'data-refresh').replace(/<!doctype html[^>]*>|<html[^>]*>|<head[^>]*>/i, m => `${m}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">`)
 
 // #8: a file's path as an agent writes it: src/app.ts, ./a/b.md, src/app.ts:42 (:42:7), src/app.ts#L42; a bare name
 // only with an extension (app.ts). Not a URL, a flag or a sentence

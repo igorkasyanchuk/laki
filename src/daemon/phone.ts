@@ -32,6 +32,7 @@ export function presenceSet(p: { idle?: unknown; locked?: unknown }) {
 export const atMac = (now = Date.now()) => !!presence && now - presence.at < 60_000 && !presence.locked && presence.idle + (now - presence.at) / 1000 < (state.settings?.pushIdle ?? 120)
 // Settings › Phone pushes › When I'm at the Mac: Hold pushes (unset) or Push anyway
 const holding = () => state.settings?.pushAtMac !== 'push' && atMac()
+const waits = new Map<string, number>() // each tab's latest wait: a held push for an earlier one is dropped, not sent for this one
 // U8: Do not disturb holds every push but an important workspace's ask (ask: a wait for you)
 const quiet = (ws?: Workspace, ask = false) => (state.dnd?.until ?? 0) > Date.now() && !(ask && ws?.important)
 // where a push goes: the webhook (Settings › Phone pushes) and Telegram (Settings › Telegram), each by its own When
@@ -71,13 +72,15 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
   // #1: at the Mac a turn's end shows there only; an ask goes to the phone only if it still waits after pushAfter (you
   // answered it on the Mac meanwhile: dropped, never sent late). A bell (T16) is pushed anyway
   const hold = !bell && holding()
+  const wait = kind === 'waiting' ? (waits.get(tab.id) ?? 0) + 1 : 0
+  if (wait) waits.set(tab.id, wait)
   if (hold && kind === 'done') return void log(`push held: ${tab.name} is done, you're at the Mac`)
   // a wait's message; a done turn's last line that asks something
   const question = (kind === 'waiting' ? text : text.split('\n').reverse().find(l => l.trim().endsWith('?')) ?? '').trim().slice(0, 500)
   // a wait goes a moment later, with its menu (drawn after the hook, often), unless it's over by then
   const go = () => {
     const s = sessions.get(tab.id)
-    if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited)) return
+    if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited || waits.get(tab.id) !== wait)) return
     const ask = kind === 'waiting' ? s!.ask() : undefined
     // a permission ask's command or file (claude's PermissionRequest), its secrets' shapes masked: it leaves the Mac
     // (Settings' titles only: pushRequest drops it, as any question)

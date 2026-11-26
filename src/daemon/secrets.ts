@@ -63,7 +63,7 @@ const cardOf = (id: string, label: string, ws: string, project?: string) => {
 function resaved() {
   for (const a of asks.values()) {
     const r = rtOf(a.tab)
-    if (r.secret) r.secret = cardOf(r.secret.id, r.secret.label, a.ws, a.project)
+    if (r.secret && !a.fields) r.secret = cardOf(r.secret.id, r.secret.label, a.ws, a.project) // a sign-in card's (#7): none kept, its fields stay
   }
 }
 const forget = (had: { scope: string; label: string }) => {

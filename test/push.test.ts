@@ -437,7 +437,7 @@ test("#1: at the Mac a turn's end isn't pushed and an ask only if it still waits
   await rig.rpc('settingsSet', { webhook: { url, format: 'json', done: true } })
   const turn = async (state: 'waiting' | 'idle') => {
     await rig.rpc('hook', { tab: tab.id, state: 'running' })
-    await sleep(120) // a view between: a new turn, not the last one again (phone.ts pushed)
+    await sleep(300) // a view between: a new turn, not the last one again (phone.ts pushed), under load too
     await rig.rpc('hook', { tab: tab.id, state, payload: state === 'waiting' ? { message: 'needs permission' } : { last_assistant_message: 'done' } })
   }
   assert.deepEqual(await rig.rpc('presence', { idle: 3, locked: false }), { atMac: true })
@@ -454,15 +454,26 @@ test("#1: at the Mac a turn's end isn't pushed and an ask only if it still waits
   await rig.rpc('hook', { tab: tab.id, state: 'running' }) // answered here meanwhile
   await sleep(1500)
   assert.equal(got.length, 1, 'answered on the Mac: dropped, never sent late')
+  await turn('waiting') // answered, then a new ask before the first one's hold ends: pushed once, after its own hold
+  await sleep(200)
+  await rig.rpc('hook', { tab: tab.id, state: 'running' })
+  await sleep(150)
+  await turn('waiting')
+  await sleep(900)
+  assert.equal(got.length, 1, "the first ask's hold doesn't push the second one early")
+  await until(() => got.length === 2, 'the second ask, after its own hold', 5000)
+  await sleep(1500)
+  assert.equal(got.length, 2, 'once')
+  await rig.rpc('hook', { tab: tab.id, state: 'running' })
   await rig.rpc('presence', { idle: 3, locked: true })
   await turn('idle')
-  await until(() => got.length === 2, 'locked: away, pushed at once')
+  await until(() => got.length === 3, 'locked: away, pushed at once')
   await rig.rpc('presence', { idle: 500, locked: false })
   await turn('idle')
-  await until(() => got.length === 3, 'idle past 2 minutes: away')
+  await until(() => got.length === 4, 'idle past 2 minutes: away')
   await rig.rpc('presence', { idle: 1, locked: false })
   await rig.rpc('settingsSet', { pushAtMac: 'push' })
   await turn('idle')
-  await until(() => got.length === 4, 'Push anyway')
+  await until(() => got.length === 5, 'Push anyway')
   await assert.rejects(rig.rpc('settingsSet', { pushAfter: 1 }), /whole seconds, 10 to 3600/)
 })

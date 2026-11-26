@@ -283,15 +283,17 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   // F6: when each message was sent, and each finished turn's end, length and cost
   const times = useMemo(() => (look.times === false ? [] : readerTimes(said ?? [], running)), [said, running, look.times])
   const runCode = useMemo(() => (api.run ? (text: string, same?: boolean) => api.run!(tab, text, same) : undefined), [tab.id])
-  // #8: the workspace's files, for the paths in its answers (MarkdownView FileRefs): read again as it says more, every 15 s at most
+  // #8: the workspace's files, for the paths in its answers (MarkdownView FileRefs): read again as it says more, every 15 s
+  // at most, the last change's read at the end of that wait (its final answer names the files it just made)
   const [known, setKnown] = useState<{ files: Set<string>; root?: string }>()
   const knownAt = useRef(0)
   useEffect(() => {
-    if (!api.files || Date.now() - knownAt.current < 15000) return
-    knownAt.current = Date.now()
+    if (!api.files) return
     let on = true
-    void api.files(tab).then(r => on && setKnown({ files: new Set(r.files), root: r.root }), () => {})
-    return () => void (on = false)
+    const read = () => ((knownAt.current = Date.now()), void api.files!(tab).then(r => on && setKnown({ files: new Set(r.files), root: r.root }), () => {}))
+    const wait = 15000 - (Date.now() - knownAt.current)
+    const t = wait > 0 ? setTimeout(read, wait) : (read(), undefined)
+    return () => ((on = false), clearTimeout(t))
   }, [tab.id, said?.length])
   useEffect(() => void (knownAt.current = 0), [tab.id])
   const fileRefs = useMemo(() => {

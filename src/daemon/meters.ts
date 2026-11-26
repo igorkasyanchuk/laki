@@ -431,7 +431,7 @@ export function todayView(): Today | undefined {
   for (const c of chats) {
     const w = ws.get(c.ws) ?? { ws: c.ws, tokens: 0, cost: 0 }
     ws.set(c.ws, w)
-    w.name = nameOf(c.ws) ?? c.name ?? w.name // its name now, else as it was kept
+    w.name = state.workspaces.some(x => x.id === c.ws) ? nameOf(c.ws) : (c.name ?? w.name) // its name now (none if private), a removed one's as it was kept
     w.tokens += c.tokens
     w.cost += c.cost
   }

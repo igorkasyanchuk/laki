@@ -4,7 +4,7 @@ import type { AppBase, AppCtx } from './appCtx'
 import { type RoleLayout, type SavedLayout, type Role, fillRoles, tabsOf, toRoles, LAYOUT_PRESETS, allAgents } from '../../shared/layout'
 import { type PanelTab, RunButton } from './SidePanel'
 import { askText, type MenuItem, ON, Icon, colorVar, TurnTime, IconButton, act, MidText, titleDbl, Kept } from './ui'
-import { type TabView, GOAL_SAYS, HOME_ACCOUNT, creatorOf } from '../../shared/types'
+import { type Agent, type TabView, GOAL_SAYS, HOME_ACCOUNT, PERMS, creatorOf } from '../../shared/types'
 import { ctxPct, ctxText, usageText, level, levelWord, Ring } from './Usage'
 import { colorOf, tabGlyph, wsName } from './appCtx'
 import { timeLeft } from './Tunnel'
@@ -84,7 +84,7 @@ export function tabTip(ts: TabView[], o: TabTipOf) {
       t.asleep && `Now: ${t.queued ? 'waits its turn after a restart, a look starts it' : 'asleep to free memory, a look resumes it'}`,
       t.kind === 'agent' && t.status === 'exited' && 'Now: ended, ⏎ in it starts it again',
       (t.model || t.effort) && `Model: ${[t.model, t.effort].filter(Boolean).join(', ')}`,
-      t.permFrom && `Mode: ${t.perm}, from ${t.permFrom}, the agent that started it`,
+      t.permFrom && `Mode: ${PERMS[t.preset as Agent]?.find(x => x[0] === t.perm)?.[1] ?? t.perm}, from ${t.permFrom}, the agent that started it`,
       t.account && t.account !== HOME_ACCOUNT && `Account: ${o.account(t) ?? 'another account'}`,
       o.ctxOn && t.context && `Context: ${ctxText(t.context)}`,
       o.costsOn && t.usage && `Used: ${usageText(t.usage)} at API prices`,

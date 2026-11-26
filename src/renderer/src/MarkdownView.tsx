@@ -40,7 +40,7 @@ function FileRef({ text, kids, code }: { text: string; kids?: React.ReactNode; c
   const at = pathAt(text)
   const path = at && refs?.has(at.path)
   const shown = kids ?? (code ? <code>{text}</code> : text)
-  if (!path) return <>{shown}</>
+  if (!path) return kids ? <a data-tip={text} onClick={e => e.preventDefault()}>{kids}</a> : <>{shown}</> // a relative link: shown, not followed
   return (
     <a className="md-file" href="#" data-tip={`${path}${at.line ? `:${at.line}` : ''} · click: open it here · ⌘-click: in your editor`} onClick={e => (e.preventDefault(), refs!.open(path, at.line, e.metaKey))}>
       <Icon name="file" size={11} />
@@ -95,7 +95,7 @@ function Code({ text, lang }: { text: string; lang?: string }) {
             <button type="button" className={shown ? '' : 'on'} onClick={() => setShown(false)}>
               Code
             </button>
-            <button type="button" className={shown ? 'on' : ''} data-tip="The page drawn here: no scripts, nothing loaded from the web" onClick={() => setShown(true)}>
+            <button type="button" className={shown ? 'on' : ''} data-tip="The page drawn here: no scripts, and it loads nothing by itself" onClick={() => setShown(true)}>
               Preview
             </button>
           </span>

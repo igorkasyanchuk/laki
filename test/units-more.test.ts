@@ -1794,6 +1794,7 @@ test("a chat's html block: Preview only for a whole page, sealed by a CSP in its
     assert.match(sealed(p).slice(0, 140), csp, p)
   assert.ok(sealed('<!doctype html><html>').startsWith('<!doctype html><meta'), 'the doctype stays first: no quirks mode')
   assert.equal(sealed('<!doctype html><html><head>').match(/Content-Security-Policy/g)?.length, 1, 'one CSP only')
+  assert.doesNotMatch(sealed('<!doctype html><meta http-equiv="Refresh" content="0;url=https://x.io">'), /http-equiv="Refresh"/i, 'no meta refresh off to a site')
 })
 
 test('#8: a path in an answer: in backticks or bare in prose, its line, never a URL or a sentence', async () => {

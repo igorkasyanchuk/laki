@@ -2096,16 +2096,21 @@ function useArtComment(path: string, page: string | undefined, onComment?: (text
   const frame = useRef<HTMLIFrameElement>(null)
   useEffect(() => {
     if (!commenting) return
-    const f = (e: MessageEvent) => (p => p && e.source === frame.current?.contentWindow && setDraft(d => (d && !d.note.trim() && unmark(d.n), { ...p, note: '' })))(pickOf(e.data))
+    // a new pick: the last one's note, if it has words, kept as a mark (else its number taken off the page)
+    const f = (e: MessageEvent) => (p => p && e.source === frame.current?.contentWindow && (keepDraft(), setDraft({ ...p, note: '' })))(pickOf(e.data))
     window.addEventListener('message', f)
     return () => window.removeEventListener('message', f)
   }, [commenting])
   const unmark = (n: number) => frame.current?.contentWindow?.postMessage({ laki: 'artUnmark', n }, '*')
   const addDraft = () => draft?.note.trim() && (setMarks(m => [...m, draft]), setDraft(null))
+  const draftNow = useRef(draft)
+  draftNow.current = draft
+  const keepDraft = () => (d => d && (d.note.trim() ? setMarks(m => [...m, d]) : unmark(d.n)))(draftNow.current)
   const send = () => {
-    if (!onComment || !marks.length || sending) return
+    const all = draft?.note.trim() ? [...marks, draft] : marks // a note typed and not added yet goes too
+    if (!onComment || !all.length || sending) return
     setSending(true)
-    onComment(artNotes(path, marks)).then(() => (setMarks([]), setCommenting(false)), () => {}).finally(() => setSending(false))
+    onComment(artNotes(path, all)).then(() => (setMarks([]), setDraft(null), setCommenting(false)), () => {}).finally(() => setSending(false))
   }
   const pageNow = page && commenting ? `${page}${page.includes('?') ? '&' : '?'}pick=1` : page
   useEffect(() => (setCommenting(false), setMarks([]), setDraft(null)), [path])
@@ -2134,7 +2139,7 @@ function useArtComment(path: string, page: string | undefined, onComment?: (text
   )
   const buttons = page && onComment && (commenting ? (
       <>
-        <button className="primary" disabled={!marks.length || sending} onClick={send} data-tip="Each note with its part's selector and markup, into the workspace's agent's prompt">
+        <button className="primary" disabled={(!marks.length && !draft?.note.trim()) || sending} onClick={send} data-tip="Each note with its part's selector and markup, into the workspace's agent's prompt">
           {sending ? 'Sending…' : `Send to the agent${marks.length ? ` (${marks.length})` : ''}`}
         </button>
         <button onClick={() => (setCommenting(false), setMarks([]), setDraft(null))}>Stop commenting</button>

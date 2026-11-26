@@ -1087,7 +1087,7 @@ function wsView(w: Workspace) {
 // a project as the view has it: a Terminals or Browsers one as it is; else what it waits on, its setup script, GitHub,
 // and (B6) the memory and notes in its checkout
 // #5: a project's picture for its badge: the repo's own logo or favicon (an SVG or PNG of 12 KB at most, the first of
-// PICTURES there), as a data URL; read once per project and daemon (a new one: restart, or Refresh in its menu ponytail)
+// PICTURES there), as a data URL. ponytail: read once per project and daemon start (a logo added later shows after a restart)
 const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg', 'favicon.png', 'public/favicon.svg', 'public/favicon.png', 'public/logo.svg', 'public/logo.png', 'public/icon.svg', 'app/icon.svg', 'app/icon.png', 'src/app/icon.svg', 'src/app/icon.png', 'static/favicon.svg', 'static/favicon.png', 'assets/logo.svg', 'assets/logo.png', 'docs/logo.svg', 'docs/logo.png', '.github/logo.svg', '.github/logo.png', 'build/icon.png', 'resources/icon.png']
 const pictures = new Map<string, string>()
 export function pictureOf(p: Project) {
@@ -1947,7 +1947,7 @@ export async function projectClone(url: unknown, into?: unknown): Promise<Projec
 // git identity; none set: Laki's, so the first worktree can start at once
 export async function projectNew(name: unknown, into?: unknown): Promise<Project> {
   const n = typeof name === 'string' ? name.trim() : ''
-  if (!/^[\w][\w .-]*$/.test(n) || n.length > 100) throw new Error('a folder name: letters, digits, spaces, . _ or -, not starting with . or -')
+  if (!/^\w(?:[\w .-]*\w)?$/.test(n) || n.length > 100) throw new Error('a folder name: letters, digits, spaces, . _ or -, starting and ending with a letter or digit')
   const last = state.projects.findLast(p => !p.host && !p.kind)
   const parent = typeof into === 'string' && into.trim() ? resolve(tilde(into.trim())) : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
   const dest = join(parent, n)
