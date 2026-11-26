@@ -11,7 +11,7 @@ import type { SpendView } from './Spend'
 import { Glyph } from './Glyph'
 import { ask, closeTo, Icon, type MenuItem, ON, openFrom, ScrollEdge, useMenu } from './ui'
 import { Modal } from './panels'
-import { linkify, Markdown, RunCode, UiBlocks } from './MarkdownView'
+import { FileRefs, linkify, Markdown, RunCode, UiBlocks } from './MarkdownView'
 import { clean } from './Widgets'
 import { api as daemon, bridge, daemonBase, openExternal } from './api'
 import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
@@ -41,7 +41,8 @@ export type ReaderApi = { explain?: (tab: string) => Promise<AskExplained> /* a 
   label: string, say?: string) => void; alwaysAllow?: (tab: TabView) => void; review: (tab: TabView) => void; undo: (tab: TabView) => void;
   mentions?: (tab: TabView) => Mention[]; run?: (tab: TabView, text: string, same?: boolean) => unknown; proof?: (tab: TabView) => Proof | undefined;
   openProof?: (tab: TabView, path: string) => void; proofImage?: (tab: TabView, path: string) => Promise<string | undefined>; spend?: (tab: TabView) => Promise<SpendView>; turnChips?: (tab: TabView,
-  marks: TurnMark[]) => React.ReactNode; drag?: (tab: TabView, path: string) => void } // drag (C10): a turn's file dragged out to Finder or any app // turnChips
+  marks: TurnMark[]) => React.ReactNode; drag?: (tab: TabView, path: string) => void; files?: (tab: TabView) => Promise<{ files: string[]; root?: string }>;
+  openAt?: (tab: TabView, path: string, line?: number, editor?: boolean) => void } // drag (C10): a turn's file dragged out to Finder or any app // turnChips
   // (P5): a turn's chips from turn place extensions; review, undo: its last turn's changes (the card); mentions: @'s workspaces and projects; run: F6, a shell
   // block's command typed into the workspace's terminal
 
@@ -282,6 +283,22 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   // F6: when each message was sent, and each finished turn's end, length and cost
   const times = useMemo(() => (look.times === false ? [] : readerTimes(said ?? [], running)), [said, running, look.times])
   const runCode = useMemo(() => (api.run ? (text: string, same?: boolean) => api.run!(tab, text, same) : undefined), [tab.id])
+  // #8: the workspace's files, for the paths in its answers (MarkdownView FileRefs): read again as it says more, every 15 s at most
+  const [known, setKnown] = useState<{ files: Set<string>; root?: string }>()
+  const knownAt = useRef(0)
+  useEffect(() => {
+    if (!api.files || Date.now() - knownAt.current < 15000) return
+    knownAt.current = Date.now()
+    let on = true
+    void api.files(tab).then(r => on && setKnown({ files: new Set(r.files), root: r.root }), () => {})
+    return () => void (on = false)
+  }, [tab.id, said?.length])
+  useEffect(() => void (knownAt.current = 0), [tab.id])
+  const fileRefs = useMemo(() => {
+    if (!known || !api.openAt) return undefined
+    const has = (p: string) => (q => (known.files.has(q) ? q : undefined))(known.root && p.startsWith(`${known.root}/`) ? p.slice(known.root.length + 1) : p.replace(/^\.\//, ''))
+    return { has, open: (path: string, line?: number, editor?: boolean) => api.openAt!(tab, path, line, editor) }
+  }, [known, tab.id])
   const line = (x: Said, i: number) => [
     x.who === 'you' ? (
       <You key={i} i={i} text={x.text} stopped={x.stopped} onEdit={x.stopped && !running && i === said!.length - 1 ? () => (setText(x.text), box.current?.focus()) : undefined} />
@@ -345,6 +362,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   return (
     <UiBlocks.Provider value={uiDraw}>
     <RunCode.Provider value={runCode}>
+    <FileRefs.Provider value={fileRefs}>
     <div className={fading ? 'reader rd-live' : 'reader'}>
       <div className="reader-scroll" ref={scroll} data-find onScroll={e => (pinned.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
         <ScrollEdge />
@@ -486,6 +504,7 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
         </Modal>
       )}
     </div>
+    </FileRefs.Provider>
     </RunCode.Provider>
     </UiBlocks.Provider>
   )

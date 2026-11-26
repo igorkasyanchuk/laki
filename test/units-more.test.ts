@@ -1782,3 +1782,29 @@ test('Waiting on…: a workspace out of the counts and in its own Board column',
   assert.equal(boardCol({ ...w, waitingOn: { text: 'CI', at: 1 } }, tabs), 'waiting')
   assert.equal(boardCol(w, tabs), 'answer')
 })
+
+test("a chat's html block: Preview only for a whole page, sealed by a CSP in its head", async () => {
+  const { wholePage: isPage, sealed } = await import('../src/renderer/src/text.ts')
+  assert.ok(isPage('<!DOCTYPE html>\n<html><body>x</body></html>'))
+  assert.ok(isPage('  <html lang="en"><body>x</body></html>'))
+  assert.ok(!isPage('<div class="card">x</div>'), 'a snippet keeps the code alone')
+  assert.ok(!isPage('<htmlx>'))
+  const csp = /<meta http-equiv="Content-Security-Policy" content="default-src 'none';/
+  for (const p of ['<!doctype html><html><head><title>t</title></head></html>', '<html><body>x</body></html>', '<!DOCTYPE html><p>x'])
+    assert.match(sealed(p).slice(0, 140), csp, p)
+  assert.ok(sealed('<!doctype html><html>').startsWith('<!doctype html><meta'), 'the doctype stays first: no quirks mode')
+  assert.equal(sealed('<!doctype html><html><head>').match(/Content-Security-Policy/g)?.length, 1, 'one CSP only')
+})
+
+test('#8: a path in an answer: in backticks or bare in prose, its line, never a URL or a sentence', async () => {
+  const { pathAt, BARE_PATH } = await import('../src/renderer/src/text.ts')
+  assert.deepEqual(pathAt('src/app.ts:42'), { path: 'src/app.ts', line: 42 })
+  assert.deepEqual(pathAt('./src/app.ts:42:7'), { path: 'src/app.ts', line: 42 })
+  assert.deepEqual(pathAt('src/app.ts#L9-L12'), { path: 'src/app.ts', line: 9 })
+  assert.deepEqual(pathAt('README.md'), { path: 'README.md' })
+  assert.deepEqual(pathAt('docs/guide'), { path: 'docs/guide' })
+  for (const no of ['npm test', 'useState', '--force', 'https://x.io/a.ts', '..', 'a b/c.ts', '']) assert.equal(pathAt(no), undefined, no)
+  const bare = (s: string) => [...s.matchAll(BARE_PATH)].map(m => m[0])
+  assert.deepEqual(bare('Fixed src/cart.js and test/cart.test.js:12. See https://x.io/a/b too.'), ['src/cart.js', 'test/cart.test.js:12'])
+  assert.deepEqual(bare('read ./docs/a.md, then and/or'), ['./docs/a.md', 'and/or'])
+})

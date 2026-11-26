@@ -1706,6 +1706,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: var(--fs-2); }
 .sp-row.ch-M .sp-name { color: var(--waiting); }
 .sp-row.ch-A .sp-name { color: var(--done); }
 .sp-row.ch-D .sp-name { color: var(--error); text-decoration: line-through; }
+.sp-row.ign .sp-name { color: var(--muted); opacity: 0.75; } /* what git ignores, Show ignored files on */
 .sp-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: color-mix(in srgb, var(--waiting) 75%, transparent); }
 .sp-dot.st-A { background: var(--done); }
 .sp-dot.st-D { background: var(--error); }
@@ -3338,6 +3339,9 @@ button.board-name:hover { background: none; }
 .md-code-head + pre { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .md-code-lang { padding: 0 var(--sp-2); border-radius: var(--r-pill); background: var(--sel); color: var(--fg); font-family: var(--mono); }
 .md-code-head .md-copy { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.md a.md-file { text-decoration: none; cursor: var(--cur-act); } .md a.md-file > svg { vertical-align: -1px; margin-right: var(--sp-1); opacity: 0.8; } .md a.md-file:hover code, .md a.md-file:hover { text-decoration: underline; } /* #8: a file of the workspace named in an answer */
+.md-code-seg button { height: auto; min-height: 0; padding: 0 var(--sp-3); font-size: inherit; line-height: 1.6; } /* a whole page's Code | Preview */
+.md-code-page { display: block; width: 100%; height: 360px; resize: vertical; border: 1px solid var(--line); border-radius: 0 0 var(--r-m) var(--r-m); background: #fff; } /* its own colors, a browser's white under them */
 .rd-failed { align-self: flex-start; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); max-width: 100%; color: var(--error); }
 .rd-failed-why { min-width: 0; overflow-wrap: anywhere; }
 .rd-retry { align-self: flex-start; padding: var(--sp-2) var(--sp-4); border-radius: var(--r-pill); color: var(--waiting); background: color-mix(in srgb, var(--waiting) 12%, transparent); }
@@ -4002,6 +4006,7 @@ html.away .app { --accent: color-mix(in srgb, var(--fg) 24%, var(--panel)); --ac
 .rd-box textarea.rd-ghost::placeholder { font-style: italic; } /* settings.nextPrompt's guess: Tab takes it */
 .secret-strip .secret-row { display: flex; gap: var(--sp-3); margin: 4px 0; } /* laki secret's card (panels.tsx SecretStrip) */
 .secret-strip .secret-row input { flex: 1; min-width: 0; font-family: var(--mono); }
+.secret-strip .secret-field { align-items: center; } .secret-strip .secret-name { flex: none; width: 9em; overflow: hidden; text-overflow: ellipsis; color: var(--muted); } /* #7: a field's name beside its box */
 .secret-strip .secret-given { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); font-size: var(--fs-1); } /* a kept one's last give, and a workspace that never got it */
 .secret-first { color: var(--waiting); }
 .secret-strip .secret-row :is(select, button) { flex: none; width: auto; white-space: nowrap; } /* Keep it's select and the buttons as wide as their words: the field takes the rest */

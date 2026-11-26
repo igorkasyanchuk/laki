@@ -1952,7 +1952,7 @@ export function WhatsNew({ version, lines, onTry, onAll, onClose }: { version: s
   )
 }
 
-export function Welcome({ onOpen, onSsh, onClone, check, onRun, onSample }: { onOpen: () => void; onSsh: () => void; onClone: () => void; check: () => Promise<Doctor>; onRun?: (cmd: string) => void; onSample?: (agent?: Agent) => void }) {
+export function Welcome({ onOpen, onSsh, onClone, onNew, check, onRun, onSample }: { onOpen: () => void; onSsh: () => void; onClone: () => void; onNew?: () => void; check: () => Promise<Doctor>; onRun?: (cmd: string) => void; onSample?: (agent?: Agent) => void }) {
   const [d, setD] = useState<Doctor | null>(null)
   const busy = useRef(false)
   const again = () => void (busy.current || ((busy.current = true), check().then(setD, () => {}).finally(() => (busy.current = false)))) // R12: no restart of Laki to see a new install
@@ -1998,6 +1998,11 @@ export function Welcome({ onOpen, onSsh, onClone, check, onRun, onSample }: { on
       <button className="welcome-ssh" onClick={onClone}>
         <Icon name="github" /> Clone a repository…
       </button>
+      {onNew && (
+        <button className="welcome-ssh" data-tip="An empty folder with git and a first commit, for a new idea" onClick={onNew}>
+          <Icon name="filePlus" /> New project…
+        </button>
+      )}
       <button className="welcome-ssh" onClick={onSsh}>
         <Icon name="server" /> Open a folder over SSH…
       </button>
@@ -2442,17 +2447,50 @@ export function ReplyPop({ from, text, at, to, onAdd, onSend, onClose }: { from:
 // laki secret: what an agent asks you for, typed into a masked field; it gets only a file's path (daemon/secrets.ts)
 // keep: the value kept for next time (Keep: this project, all projects); saved: the one kept for it given (its card said
 // so). kept: the daemon can keep one (an older daemon can't)
-export type SecretGiveO = { value?: string; keep?: 'project' | 'all'; saved?: true }
+export type SecretGiveO = { value?: string; values?: Record<string, string>; keep?: 'project' | 'all'; saved?: true }
 export function SecretStrip({ tab, onGive, kept = true }: { tab: TabView; onGive: (id: string, o?: SecretGiveO) => Promise<unknown>; kept?: boolean }) {
   const [v, setV] = useState('')
   const [busy, setBusy] = useState(false)
   const [keep, setKeep] = useState<'' | 'project' | 'all'>('')
   const [other, setOther] = useState(false) // a saved one: Type another shows the field
+  const [vs, setVs] = useState<Record<string, string>>({}) // #7: several fields' values
+  const [seen, setSeen] = useState<Set<string>>(new Set()) // masked ones shown, to check what was typed
   const s = tab.secret
-  useEffect(() => (setV(''), setKeep(''), setOther(false)), [s?.id])
+  useEffect(() => (setV(''), setKeep(''), setOther(false), setVs({}), setSeen(new Set())), [s?.id])
   if (!s) return null
-  const give = (o?: SecretGiveO) => (setBusy(true), void onGive(s.id, o).then(() => setV(''), () => {}).finally(() => setBusy(false))) // a failure: said by onGive's toast, the field kept
+  // a give's fields emptied as it goes: no browser offers to remember them
+  const give = (o?: SecretGiveO) => (setBusy(true), void onGive(s.id, o).then(() => (setV(''), setVs({})), () => {}).finally(() => setBusy(false))) // a failure: said by onGive's toast, the field kept
   const saved = s.saved && !other
+  if (s.fields) {
+    const all = s.fields.every(f => vs[f.name])
+    return (
+      <form className="queue-strip secret-strip" data-dock="bottom" role="region" aria-label={`${tab.name} asks for ${s.label}`} autoComplete="off" onSubmit={e => (e.preventDefault(), all && give({ values: vs }))}>
+        <div className="queue-head">
+          <Icon name="lock" size={13} />
+          <span className="queue-what">
+            <b>{tab.name}</b> asks for <b>{s.label}</b>
+          </span>
+        </div>
+        {s.fields.map((f, i) => (
+          <label key={f.name} className="secret-row secret-field">
+            <span className="secret-name">{f.name}</span>
+            <input type={f.plain || seen.has(f.name) ? 'text' : 'password'} value={vs[f.name] ?? ''} autoComplete="off" spellCheck={false} autoFocus={i === 0} aria-label={f.name} onChange={e => setVs(x => ({ ...x, [f.name]: e.target.value }))} />
+            {!f.plain && <IconButton icon="eye" on={seen.has(f.name)} title={seen.has(f.name) ? 'Hide it' : 'Show what you typed'} onClick={() => setSeen(x => (n => (n.has(f.name) ? n.delete(f.name) : n.add(f.name), n))(new Set(x)))} />}
+          </label>
+        ))}
+        <div className="secret-row">
+          <span className="grow" />
+          <button type="submit" className="primary" disabled={!all || busy}>
+            Give them
+          </button>
+          <button type="button" disabled={busy} onClick={() => give()}>
+            Refuse
+          </button>
+        </div>
+        <div className="muted small">Each goes to a file of its own only you and the agent's commands can read, deleted after 24 hours; the agent gets the files' paths, never the values.</div>
+      </form>
+    )
+  }
   return (
     <form className="queue-strip secret-strip" data-dock="bottom" role="region" aria-label={`${tab.name} asks for a secret`} onSubmit={e => (e.preventDefault(), saved ? give({ saved: true }) : v && give({ value: v, ...(keep && { keep }) }))}>
       <div className="queue-head">

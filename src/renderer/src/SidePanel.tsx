@@ -10,10 +10,10 @@ import { HideTests, OnlyTests, useHideTests, Near, SplitToggle, useSplit, AnnotR
 import type { Annotations, MergeMethod, TurnKept } from '../../shared/types'
 import { ago, type AutoKey, type Check, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, fileTree, forgeName, prName, findFiles, parseCsv, parseSize, type Picked, pickPrompt, pickWords, previewAddr, previewUrl, type RunAction, SIZES, type Suggestion, toCsv } from './text'
-import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keyTip, type MenuItem, ON, useMenu, act, ScrollEdge } from './ui'
+import { ask, askText, type FileAct, FileCard, Icon, IconButton, type IconName, keep, keyTip, load, type MenuItem, ON, useMenu, act, ScrollEdge } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'commits' | 'review' | 'preview' | 'device' | 'side' | `ext:${string}` // ext: an extension placed in panel
-export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
+export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean; ignored?: string[] } // changed: M, A, D, R; ignored: what git ignores, asked for (a folder: one entry ending in /)
 export type Changes = { base: string; from?: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string } // from: what it was diffed against (a worktree's merge base with its base, else HEAD)
 export type Commit = { sha: string; short: string; author: string; at: number; subject: string; pushed: boolean }
 export type Commits = { base?: string; commits: Commit[]; more?: boolean } // base: a worktree's (none: a folder's own, what no remote has); more: past 200
@@ -26,7 +26,7 @@ export type FileContent = { size: number; text?: string; image?: string; cut?: b
 export type Edit = { text: string; was: string }
 export const edited = (e?: Edit | null) => !!e && e.text !== e.was.replace(/\r\n/g, '\n')
 export type PanelApi = {
-  files: () => Promise<FileList>
+  files: (o?: { ignored?: boolean; under?: string }) => Promise<FileList> // under: an ignored folder's entries, one level
   annots?: () => Promise<Annotations> // P6: its extensions' notes on diff lines (widgetAnnotations), read again as annotAt changes
   annotAt?: number
   newFile: (path: string, dir: boolean) => Promise<string> // the path made
@@ -118,7 +118,22 @@ const ST: Record<string, string> = { M: 'modified', A: 'new', D: 'deleted', R: '
 // root: the worktree's files, or its Artifacts (read-only here: no new files; a double click opens one in its app)
 function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: FilesRoot; onRoot: (r: FilesRoot) => void }) {
   const art = root === 'artifacts' ? api.artifacts : undefined
-  const [d, err, reload] = useLoad(art?.files ?? api.files, `${ws}:${art ? 'art' : 'ws'}`, 8000)
+  // Show ignored files (kept; ⌘K's too, by the laki-ignored event): what git ignores, dimmed
+  const [ign, setIgn] = useState(() => load('laki.filesIgnored', false))
+  useEffect(() => {
+    const f = () => setIgn(load('laki.filesIgnored', false))
+    window.addEventListener('laki-ignored', f)
+    return () => window.removeEventListener('laki-ignored', f)
+  }, [])
+  const showIgn = !art && ign
+  const [d, err, reload] = useLoad(art?.files ?? (() => api.files(showIgn ? { ignored: true } : undefined)), `${ws}:${art ? 'art' : 'ws'}:${showIgn}`, 8000)
+  const [under, setUnder] = useState<Record<string, string[]>>({}) // ignored folders opened: their entries (git lists none)
+  useEffect(() => setUnder({}), [ws, !!art, showIgn])
+  const ignored = useMemo(() => new Set(d?.ignored ?? []), [d])
+  const isIgn = (p: string) => {
+    for (let x = p; x; x = parentOf(x)) if (ignored.has(x) || ignored.has(`${x}/`)) return true
+    return false
+  }
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [sel, setSel] = useState('')
@@ -135,7 +150,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
   const look = (f: string) => api.look && (() => (setSel(f), api.look!(f, !!art)))
   const drag = (f: string) => (api.drag ? { draggable: true, onDragStart: (e: React.DragEvent) => (e.preventDefault(), api.drag!(f, !!art)) } : {}) // C10: to Finder or any app
   const menu = (e: MouseEvent, f: string, dir: boolean) => (art ? art.menu(e, f) : api.menu(e, f, dir))
-  const kids = useMemo(() => tree([...(d?.files ?? []), ...made.map(m => `${m}/`)]), [d, made])
+  const kids = useMemo(() => tree([...(d?.files ?? []), ...(d?.ignored ?? []), ...Object.values(under).flat(), ...made.map(m => `${m}/`)]), [d, made, under])
   const changed = d?.changed ?? {}
   const changedDirs = useMemo(() => {
     const s = new Set<string>()
@@ -143,7 +158,11 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
     return s
   }, [d])
   const folder = kids.has(sel) ? sel : parentOf(sel) // where new files go
-  const toggle = (p: string) => setOpen(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
+  const toggle = (p: string) => {
+    // an ignored folder's entries as it first opens (node_modules: none listed until then)
+    if (!open.has(p) && !kids.get(p)?.length && !(p in under) && isIgn(p)) void api.files({ under: p }).then(r => setUnder(u => ({ ...u, [p]: r.files })), () => setUnder(u => ({ ...u, [p]: [] })))
+    setOpen(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
+  }
   // p's folders open
   const reveal = (p: string) =>
     setOpen(o => {
@@ -197,6 +216,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
         <input value={q} placeholder={art ? 'Search artifacts' : 'Search files'} spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), setQ(''))} />
         {!art && <IconButton icon="filePlus" title={`New file in ${folder || 'the root'}`} onClick={() => startMaking(false)} />}
         {!art && <IconButton icon="folderPlus" title={`New folder in ${folder || 'the root'}`} onClick={() => startMaking(true)} />}
+        {!art && <IconButton icon="eye" on={ign} title={ign ? 'Hide ignored files' : 'Show ignored files: what git ignores (.env, build output, logs), dimmed'} onClick={() => (keep('laki.filesIgnored', !ign), setIgn(!ign))} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
         <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} />
       </div>
@@ -231,7 +251,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
           : rows.map(({ n, depth }) => (
               <div
                 key={n.path}
-                className={`sp-row ${sel === n.path ? 'sel' : ''} ${n.dir ? '' : `ch-${changed[n.path] ?? ''}`}`}
+                className={`sp-row ${sel === n.path ? 'sel' : ''} ${n.dir ? '' : `ch-${changed[n.path] ?? ''}`} ${showIgn && isIgn(n.path) ? 'ign' : ''}`}
                 style={{ paddingLeft: 8 + depth * 14 }}
                 {...act(e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && preview(n.path)), !n.dir && look(n.path))} // a double-click's second opens the editor
                 {...(!n.dir && drag(n.path))}

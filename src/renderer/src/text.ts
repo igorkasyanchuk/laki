@@ -1196,3 +1196,21 @@ export function barFold(s: BarFold, e: { y: number } | 'focus'): BarFold {
 // brighter than white on a display with more range; never on one without it, nor with Reduce motion or Reduce
 // transparency (then they're as they always are)
 export const hdrOn = (setting: unknown, high: boolean, reducedMotion: boolean, reducedTransparency: boolean) => setting === true && high && !reducedMotion && !reducedTransparency
+
+// a whole page (a doctype or an <html> first), not a snippet
+export const wholePage = (s: string) => /^\s*(<!doctype html|<html[\s>])/i.test(s)
+// the page with a CSP first in its head: nothing loaded (no fetch, no picture, no font from the web) but what it holds;
+// the frame's sandbox runs no script, follows no link. The parser puts a <meta> after a doctype or <html> in a head
+export const sealed = (s: string) =>
+  s.replace(/<!doctype html[^>]*>|<html[^>]*>|<head[^>]*>/i, m => `${m}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">`)
+
+// #8: a file's path as an agent writes it: src/app.ts, ./a/b.md, src/app.ts:42 (:42:7), src/app.ts#L42; a bare name
+// only with an extension (app.ts). Not a URL, a flag or a sentence
+export function pathAt(s: string): { path: string; line?: number } | undefined {
+  const m = /^(?:\.\/)?((?:[\w@.+-]+\/)*[\w@+-][\w@.+-]*?)(?::(\d+)(?::\d+)?|#L(\d+)(?:-L?\d+)?)?$/.exec(s.trim())
+  if (!m || /^\.+$/.test(m[1]) || (!m[1].includes('/') && !/\.\w{1,8}$/.test(m[1]))) return undefined
+  const line = Number(m[2] ?? m[3]) || undefined
+  return { path: m[1], ...(line && { line }) }
+}
+// a bare path in prose: a / in it, ending in a letter or digit (a sentence's full stop after it isn't the path's)
+export const BARE_PATH = /(?<![\w/.:@-])(?:\.\/)?[\w@.+-]+(?:\/[\w@.+-]+)+(?::\d+(?::\d+)?)?(?<=[\w])(?![\w/])/g

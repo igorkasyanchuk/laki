@@ -18,7 +18,19 @@ const SECRET_HOURS = 24
 const SECRET_MAX = 64 << 10
 export const SECRETS_DIR = '.laki-secrets'
 const DIR = SECRETS_DIR
-const asks = new Map<string, { tab: string; ws: string; folder: string; label: string; project?: string; done: (r: { path?: string; refused?: string }) => void }>()
+type Field = { name: string; plain?: boolean }
+const asks = new Map<string, { tab: string; ws: string; folder: string; label: string; project?: string; fields?: Field[]; done: (r: { path?: string; paths?: Record<string, string>; refused?: string }) => void }>()
+// #7: one card for a whole sign-in: each field by its name (email, password), a plain one shown as typed, the rest masked;
+// "email:plain" or { name, plain }. 2 to 8, names a slug each, none twice
+export function fieldsOf(raw: unknown): Field[] | undefined {
+  if (raw === undefined || (Array.isArray(raw) && !raw.length)) return undefined
+  if (!Array.isArray(raw)) throw new Error('fields: a list, e.g. --field email:plain --field password')
+  const fs = raw.map(f => (typeof f === 'string' ? (m => ({ name: m[1], plain: m[2] === 'plain' }))(/^(.*?)(?::(plain|masked))?$/.exec(f.trim())!) : { name: String((f as Field)?.name ?? ''), plain: (f as Field)?.plain === true }))
+  for (const f of fs) if (!/^[a-z0-9][a-z0-9_-]{0,39}$/i.test(f.name)) throw new Error(`${JSON.stringify(f.name)}: a field's name is a word (letters, digits, _ or -), e.g. email or password`)
+  if (fs.length < 2 || fs.length > 8) throw new Error('2 to 8 fields (one: laki secret "<what it is>" alone)')
+  if (new Set(fs.map(f => f.name.toLowerCase())).size < fs.length) throw new Error('a field named twice')
+  return fs.map(f => ({ name: f.name, ...(f.plain && { plain: true }) }))
+}
 const GIVEN_MAX = 20 // a kept one's gives remembered (SecretKept's given), the newest
 
 // a secret kept for next time (the card's Keep: this project, all projects): its value by keychain.ts (the Keychain, as
@@ -77,7 +89,7 @@ export function secretsDrop(project: string) {
   for (const k of (state.secretsKept ?? []).filter(x => x.scope === project)) forget(k)
 }
 
-export function secretAsk(o: { label?: unknown; from?: { tab?: string } }) {
+export function secretAsk(o: { label?: unknown; fields?: unknown; from?: { tab?: string } }) {
   const tab = state.tabs.find(t => t.id === o.from?.tab)
   if (!tab) throw new Error('laki secret runs in a Laki tab: the card that asks you shows there')
   const ws = state.workspaces.find(w => w.id === tab.workspace)
@@ -85,36 +97,50 @@ export function secretAsk(o: { label?: unknown; from?: { tab?: string } }) {
   if (!folder) throw new Error(`${ws?.name ?? tab.workspace} has no storage folder (an SSH host's, Terminals' and Browsers' have none): ask the user to put it in a file`)
   const label = String(o.label ?? '').replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80)
   if (!label) throw new Error('what is it? laki secret "Stripe key"')
+  const fields = fieldsOf(o.fields)
   const r = rtOf(tab.id)
   if (r.secret) throw new Error(`${tab.name} asks for ${r.secret.label} already`)
   const id = randomUUID()
   const was = r.status
-  r.secret = cardOf(id, label, tab.workspace, ws?.project)
+  r.secret = fields ? { id, label, fields } : cardOf(id, label, tab.workspace, ws?.project) // several fields: none kept
   if (tracked(tab) && was === 'running') r.status = 'waiting' // Needs you, the Dock's count, a notification
   broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text: `${tab.name} asks for a secret: ${label}` })
   phone(tab, 'waiting', `asks for a secret: ${label}`)
   changed()
-  return new Promise<{ path: string }>((ok, no) => {
+  return new Promise<{ path: string } | { paths: Record<string, string> }>((ok, no) => {
     const timer = setTimeout(() => finish({ refused: `no answer in ${SECRET_WAIT / 60_000} minutes` }), SECRET_WAIT)
-    const finish = (res: { path?: string; refused?: string }) => {
+    const finish = (res: { path?: string; paths?: Record<string, string>; refused?: string }) => {
       clearTimeout(timer)
       asks.delete(id)
       if (r.secret?.id === id) r.secret = undefined
       if (r.status === 'waiting' && was === 'running') r.status = 'running' // its command goes on
       changed()
-      if (res.path) ok({ path: res.path })
+      if (res.paths) ok({ paths: res.paths })
+      else if (res.path) ok({ path: res.path })
       else no(new Error(`the user didn't give ${label}: ${res.refused}`))
     }
-    asks.set(id, { tab: tab.id, ws: tab.workspace, folder, label, project: ws?.project, done: finish })
+    asks.set(id, { tab: tab.id, ws: tab.workspace, folder, label, project: ws?.project, ...(fields && { fields }), done: finish })
   })
 }
 
 // your answer (the card's): the value into its file, or no. saved: the one kept for it (its card said so); keep: this
 // value kept for next time, for the ask's project or for all projects
-export function secretGive(o: { id?: string; value?: unknown; refuse?: boolean; saved?: unknown; keep?: unknown }) {
+export function secretGive(o: { id?: string; value?: unknown; values?: unknown; refuse?: boolean; saved?: unknown; keep?: unknown }) {
   const a = asks.get(String(o.id))
   if (!a) throw new Error('that ask is gone: the agent stopped waiting')
   if (o.refuse) return a.done({ refused: 'refused' }), { ok: true }
+  if (a.fields) {
+    // #7: every field's value, each in its own file
+    const vs = o.values && typeof o.values === 'object' ? (o.values as Record<string, unknown>) : {}
+    const got = a.fields.map(f => ({ f, v: typeof vs[f.name] === 'string' ? (vs[f.name] as string).replace(/\r?\n$/, '') : '' }))
+    const empty = got.find(g => !g.v)
+    if (empty) throw new Error(`${empty.f.name} is empty: type it, or Refuse`)
+    if (got.some(g => g.v.length > SECRET_MAX)) throw new Error(`longer than ${SECRET_MAX >> 10} KB`)
+    const paths = Object.fromEntries(got.map(g => [g.f.name, writeSecret(a.folder, `${a.label} ${g.f.name}`, g.v)]))
+    log(`secret: ${a.label} (${a.fields.map(f => f.name).join(', ')}) for ${a.tab} in ${a.folder}/${DIR}`) // the paths, never the values
+    a.done({ paths })
+    return { ok: true }
+  }
   const k = o.saved === true ? keptFor(a.project, a.label) : undefined
   if (o.saved === true && !k) throw new Error('none is kept for it any more: type it')
   const value = k ? keyRead(keyOf(k).name, keyOf(k).file) : typeof o.value === 'string' ? o.value.replace(/\r?\n$/, '') : ''

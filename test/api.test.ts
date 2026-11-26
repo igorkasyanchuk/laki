@@ -312,6 +312,18 @@ test('files: a plain folder\'s (no dependencies), git\'s renamed, deleted and ad
   git('rm', '-q', 'gone.txt')
   git('add', 'added.txt')
   assert.deepEqual((await rig.rpc('files', { ws: ws.id })).changed, { 'README2.md': 'R', 'gone.txt': 'D', 'added.txt': 'A' })
+
+  // Show ignored files: what git ignores, a wholly ignored folder as one entry, its entries a level at a time
+  writeFileSync(join(ws.path, '.gitignore'), '.env\nbuild/\n')
+  writeFileSync(join(ws.path, '.env'), 'X=1\n')
+  mkdirSync(join(ws.path, 'build/sub'), { recursive: true })
+  writeFileSync(join(ws.path, 'build/out.js'), '')
+  assert.equal((await rig.rpc('files', { ws: ws.id })).ignored, undefined, 'not asked: none')
+  const ig = await rig.rpc('files', { ws: ws.id, ignored: true })
+  assert.deepEqual(ig.ignored.sort(), ['.env', 'build/'])
+  assert.ok(!ig.files.includes('.env'))
+  assert.deepEqual((await rig.rpc('files', { ws: ws.id, under: 'build' })).files.sort(), ['build/out.js', 'build/sub/'])
+  await assert.rejects(rig.rpc('files', { ws: ws.id, under: '../..' }), /not a path inside the workspace/)
 })
 
 test('images: the kind kept, empty ones refused, month-old ones cleaned up', async t => {

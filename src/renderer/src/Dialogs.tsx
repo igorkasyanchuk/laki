@@ -1027,6 +1027,20 @@ export function Dialogs({ app }: { app: AppCtx }) {
           }}
         />
       )}
+      {dialog === 'newProject' && ( // #10: Welcome's and ⌘K's
+        <Prompt
+          title="New project"
+          placeholder="my-app"
+          hint="A folder by that name, git with a first commit, added as a project: its first workspace starts at once."
+          picks={[{ label: 'Into', none: '~/code, else beside your last project', options: [], free: true }]}
+          onClose={() => setDialog(null)}
+          onSubmit={async (name, [into]) => {
+            const p = await call<{ id: string }>('projectNew', { name, into })
+            setDialog(null)
+            newWs(p.id)
+          }}
+        />
+      )}
       {dialog && typeof dialog === 'object' && 'attachPr' in dialog && (w => w && (
         <Prompt
           title="Attach a pull request"

@@ -4,7 +4,7 @@
 import { createContext, Fragment, memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { highlight } from './highlight'
-import { canRun, proposalOf, runText } from './text'
+import { BARE_PATH, canRun, pathAt, proposalOf, runText, sealed, wholePage } from './text'
 import { Icon, type MenuItem, useMenu, useNear } from './ui'
 import { type Block, type Inline, markdown, type Table, tableAs } from '../../shared/markdown'
 
@@ -31,10 +31,41 @@ const UiFence = ({ text }: { text: string }) => {
 // F6: a chat's shell block run in a terminal of the workspace: whoever provides it (the Reader) types it there, no Enter
 // (same: ⌥-click, into a shell tab that's there instead of a new one)
 export const RunCode = createContext<((text: string, same?: boolean) => void) | undefined>(undefined)
+// #8: a path in a chat's answer (in backticks, a relative link, or bare in prose) that is a file of the workspace: a link
+// with the file's icon; a click opens it in the app at its line, ⌘-click in the editor. Whoever provides it (the Reader)
+// knows the files: has gives the path in the workspace, or nothing
+export const FileRefs = createContext<{ has: (p: string) => string | undefined; open: (path: string, line?: number, editor?: boolean) => void } | undefined>(undefined)
+function FileRef({ text, kids, code }: { text: string; kids?: React.ReactNode; code?: boolean }) {
+  const refs = useContext(FileRefs)
+  const at = pathAt(text)
+  const path = at && refs?.has(at.path)
+  const shown = kids ?? (code ? <code>{text}</code> : text)
+  if (!path) return <>{shown}</>
+  return (
+    <a className="md-file" href="#" data-tip={`${path}${at.line ? `:${at.line}` : ''} · click: open it here · ⌘-click: in your editor`} onClick={e => (e.preventDefault(), refs!.open(path, at.line, e.metaKey))}>
+      <Icon name="file" size={11} />
+      {shown}
+    </a>
+  )
+}
+// prose with its bare paths (one with a /) as links
+function Prose({ text }: { text: string }) {
+  const refs = useContext(FileRefs)
+  if (!refs) return <>{text}</>
+  const out: React.ReactNode[] = []
+  let at = 0
+  for (const m of text.matchAll(BARE_PATH)) {
+    out.push(text.slice(at, m.index), <FileRef key={m.index} text={m[0]} />)
+    at = m.index + m[0].length
+  }
+  out.push(text.slice(at))
+  return <>{out}</>
+}
 function Code({ text, lang }: { text: string; lang?: string }) {
   const chat = useContext(InChat)
   const run = useContext(RunCode)
   const [copied, setCopied] = useState(false)
+  const [shown, setShown] = useState(false) // a whole page: its preview instead of the code
   const pre = (
     <pre>
       <code>
@@ -49,7 +80,8 @@ function Code({ text, lang }: { text: string; lang?: string }) {
   )
   if (!chat) return pre
   const n = text.replace(/\n$/, '').split('\n').length
-  // a chat's block: a head with its language and lines, Copy (a check a moment after) and Run
+  const page = (lang === 'html' || lang === 'htm') && wholePage(text)
+  // a chat's block: a head with its language and lines, Copy (a check a moment after) and Run; a whole HTML page, Code | Preview
   return (
     <div className="md-code">
       <div className="md-code-head">
@@ -58,6 +90,16 @@ function Code({ text, lang }: { text: string; lang?: string }) {
           {n} line{n === 1 ? '' : 's'}
         </span>
         <span className="grow" />
+        {page && (
+          <span className="seg md-code-seg">
+            <button type="button" className={shown ? '' : 'on'} onClick={() => setShown(false)}>
+              Code
+            </button>
+            <button type="button" className={shown ? 'on' : ''} data-tip="The page drawn here: no scripts, nothing loaded from the web" onClick={() => setShown(true)}>
+              Preview
+            </button>
+          </span>
+        )}
         {run && canRun(lang, text) && (
           <button type="button" className="link small" data-tip="A new shell tab with it typed: press ⏎ there to run it. ⌥-click: into the last shell tab" onClick={e => run(runText(text), e.altKey)}>
             ▷ Run
@@ -67,7 +109,7 @@ function Code({ text, lang }: { text: string; lang?: string }) {
           <Icon name={copied ? 'check' : 'copy'} size={12} /> {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      {pre}
+      {page && shown ? <iframe className="md-code-page" title="The page's preview" sandbox="" srcDoc={sealed(text)} /> : pre}
     </div>
   )
 }
@@ -372,10 +414,10 @@ function MdTable({ b }: { b: Table }) {
   )
 }
 function mdInline(x: Inline, k: number): React.ReactNode {
-  if (typeof x === 'string') return x
+  if (typeof x === 'string') return x.includes('/') ? <Prose key={k} text={x} /> : x
   switch (x.t) {
-    case 'code': // a web address in backticks: a link still
-      return /^https?:\/\/\S+$/.test(x.text) ? webLink(x.text, k, <code>{x.text}</code>) : <code key={k}>{x.text}</code>
+    case 'code': // a web address in backticks: a link still; a file's path: its link where the chat knows the files
+      return /^https?:\/\/\S+$/.test(x.text) ? webLink(x.text, k, <code>{x.text}</code>) : pathAt(x.text) ? <FileRef key={k} text={x.text} code /> : <code key={k}>{x.text}</code>
     case 'b':
       return <strong key={k}>{x.kids.map(mdInline)}</strong>
     case 'i':
@@ -387,8 +429,9 @@ function mdInline(x: Inline, k: number): React.ReactNode {
     case 'a':
     case 'img': {
       const href = x.t === 'a' ? x.href : x.src
-      const web = /^(https?:|mailto:|laki:)/i.test(href) // a relative one is a file of the repo: shown, not followed; laki://: in the app
+      const web = /^(https?:|mailto:|laki:)/i.test(href) // a relative one is a file of the repo: opened where the chat knows the files, else shown, not followed; laki://: in the app
       const kids = x.t === 'a' ? x.kids.map(mdInline) : `🖼 ${x.alt || 'image'}`
+      if (!web && x.t === 'a' && pathAt(href)) return <FileRef key={k} text={href} kids={kids} />
       return (
         <a key={k} href={web ? href : undefined} data-tip={href} onClick={e => (e.preventDefault(), web && openExternal(href))}>
           {kids}

@@ -1,6 +1,6 @@
 // ⌘K: the palette (Palette) and what App puts in it (paletteItems: built as it shows, from what appCtx.ts says it reads)
 import type { AppCtx } from './appCtx'
-import { type IconName, type MenuItem, Icon, ON, ProjectMark, act, ScrollEdge } from './ui'
+import { type IconName, type MenuItem, Icon, keep, load, ON, ProjectMark, act, ScrollEdge } from './ui'
 import { type ReactNode, useState, useMemo, useRef, useEffect, useId, useSyncExternalStore } from 'react'
 import { type Preview, type PreviewAct, previewOf } from './palettePreview'
 import { type PalKind, paletteGroups, fuzzy, PAL_RECENT, needsSorted, prNo, rowFact } from './text'
@@ -250,6 +250,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   if (app.view?.dnd) a({ label: 'Quiet: end now', icon: 'moon', run: () => void call('dndSet', { off: true }).catch(() => {}) })
   else for (const c of quietChoices()) a({ label: `Quiet ${c.label}`, icon: 'moon', hint: 'no notifications', run: () => void call('dndSet', c.o).then(() => app.toast(`Quiet ${c.label}: a summary follows`)).catch(() => {}) })
   a({ id: 'clone', label: 'Clone a repository… (a URL, or owner/repo)', icon: 'github', run: () => setDialog('clone') })
+  if (hasCap(view!, 'projectNew')) a({ id: 'newProject', label: 'New project… (an empty folder with git)', icon: 'filePlus', run: () => setDialog('newProject') })
   a({ label: 'Settings', icon: 'gear', hint: kh('settings'), run: () => setDialog('settings') })
   a({ id: 'themes', label: 'Themes: change how Laki looks', icon: 'palette', run: () => setDialog({ section: 'appearance', spot: 'Theme' }) }) // Settings › Appearance, at its Theme card, lit
   a({ id: 'schedules', label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
@@ -312,6 +313,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
     for (const x of targets) aw({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
     aw({ id: 'openPort', label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
     aw({ label: 'Files', icon: 'file', hint: kh('panel'), run: () => showPanel('files') })
+    if (git) (on => aw({ label: on ? 'Hide ignored files' : 'Show ignored files', icon: 'eye', tip: 'In Files: what git ignores (.env, build output, logs), dimmed', run: () => (keep('laki.filesIgnored', !on), window.dispatchEvent(new Event('laki-ignored')), showPanel('files')) }))(load('laki.filesIgnored', false))
     if (bridge?.floatPanel) aw(panelHost.out ? { label: 'Bring the side panel back', icon: 'popIn', tip: 'From its own window into this one', run: () => panelHost.float(false) } : { label: 'Move the side panel to its own window', icon: 'popOut', tip: 'Changes, Files, Review and Preview in a window of their own, say on another screen; it follows this window\'s workspace', run: () => panelHost.float() })
     if (git) aw({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
     if (git) aw({ id: 'review', label: 'PR comments: checks and threads', icon: 'review', run: () => showPanel('review') })

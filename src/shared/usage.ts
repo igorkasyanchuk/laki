@@ -14,7 +14,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki new <project|.> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] (gemini: Antigravity CLI, agy) [--cmd c] [--prompt text] [--name n] [--local]
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
                                     opencode's: provider/model as \`opencode models\` lists it (an unknown one is refused)
-            [--perm <mode>] [--fast]  its permission mode (auto, acceptEdits, plan, bypassPermissions: claude, codex) and fast mode
+            [--perm <mode>] [--fast]  its permission mode (auto, acceptEdits, plan, bypassPermissions: claude, codex) and fast mode;
+                                    from an agent's tab, no --perm: the agent's own mode now (never one that never asks)
             [--sandbox|--no-sandbox]  the agent's own sandbox on or off over its profile's (claude, codex)
             [--cap 5|"2M tokens"]  its spend cap: past it Laki stops its agents and asks (80%: a notice); only you raise it
             [--template <name>]     the prompt through one of your prompt templates
@@ -67,8 +68,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               user's Needs you till you ask or start again; --done: not any more
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
   laki update --when-idle [--off]             update Laki once no agent works or asks: the app, then its daemon
-  laki secret <what it is>                    in an agent's tab: the user types a token on a masked card; prints only
-                                              the path of a 0600 file that holds it (gone after 24 hours)
+  laki secret <what it is> [--field name[:plain]]…   in an agent's tab: the user types a token on a masked card;
+                                              prints only the path of a 0600 file that holds it (gone after 24 hours);
+                                              --field: several on one card (a sign-in), a file each, as JSON
   laki show <text> [--open <folder|file|url>…] [--title t]   in a tab: a card under it in Laki, a button per --open
                                               (a folder in Finder, a file in its app, a page in the browser)
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
@@ -374,9 +376,11 @@ it starts says Created by <name>.
   secret: `In an agent's tab: ask the user for a secret (an API key, a token, a password) without it going into the chat.
 They type it on a masked card under your tab; you get only the path of a 0600 file in $LAKI_STORAGE_FOLDER that holds
 it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat "$path"). Waits up to 15 minutes;
-exits 1 if they refuse.
+exits 1 if they refuse. A whole sign-in on one card: a --field each (:plain shows it as typed, an email; the rest are
+masked), and you get {"email": path, "password": path}.
 
-  path=$(laki secret "Stripe test key") && STRIPE_KEY=$(cat "$path") npm test`,
+  path=$(laki secret "Stripe test key") && STRIPE_KEY=$(cat "$path") npm test
+  laki secret "Staging QA sign-in" --field email:plain --field password`,
   show: `In a Laki tab: a card under it in the app with your words and a button per --open the user clicks: a folder
 opens in Finder, a file in its app, an http(s) link in the browser (4 at most; a path: absolute, or from where you
 are). Use it instead of asking the user to run open: for evidence, a report, a page to check. A newer card replaces it.

@@ -501,6 +501,7 @@ const api = {
   state: (p, c) => (v => (c && own.get(c)?.() ? v : masked(v)))((v => (p?.byClient && clientsMod.clientWho(p.byClient)?.projects ? onlyProjects(v, clientsMod.clientWho(p.byClient)!.projects!) : v))(core.agentCaller(p?.from) || p?.byClient ? recorded(core.view()) : core.view())), // T1: a trusted client's too, kept to its projects // S7: an agent's, in Recording mode: no private workspace (whoCalls asks who only then); S3: its secrets only to your own window (own)
   projectAdd: p => core.projectAdd(p.path, !core.agentCaller(p.from)), // an agent's: never out of the archive
   projectClone: p => core.projectClone(p.url, p.into), // U7: yours only (FROM, AGENT_NO)
+  projectNew: p => core.projectNew(p.name, p.into), // #10: yours only, as projectClone
   sampleNew: () => core.sampleNew(), // U4: Welcome's sample repo, made once
   sampleRm: () => core.sampleRm(),
   projectRm: async p => (await rmAsk(p, `remove the project ${core.findProject(String(p.id ?? '')).name}`, 'Its workspaces list, notes and settings in Laki go; the folder stays.'), core.projectRm(p.id)),
@@ -700,7 +701,7 @@ const api = {
   reviewMark: p => reviewMark(p), // R11: Since I reviewed's mark, the user's
   baseBranches: p => filesMod.baseBranches(p.ws), // Changes' base menu
   wsBase: p => filesMod.wsBase(p),
-  files: p => filesMod.files(p.ws, p.project),
+  files: p => filesMod.files(p.ws, p.project, { ignored: p.ignored === true, ...(typeof p.under === 'string' && { under: p.under }) }),
   fileNew: p => filesMod.fileNew(p),
   fileRead: p => filesMod.fileRead(p),
   dbRead: p => filesMod.dbRead(p), // #1: a SQLite database's tables, a table's rows, a read-only query (db.ts)
@@ -1010,7 +1011,7 @@ const FROM = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggest
   'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
   'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics',
   'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm',
-  'voiceText', 'projectClone', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen',
+  'voiceText', 'projectClone', 'projectNew', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen',
   'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList',
   'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct',
   'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun',
@@ -1561,7 +1562,7 @@ const ANSWER_NO = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'su
   'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
   'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy',
   'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext',
-  'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet',
+  'agentContextOpen', 'remoteDeviceSet', 'projectAdd', 'projectClone', 'projectNew', 'sampleNew', 'sampleRm', 'projectRm', 'projectArchive', 'updateIdle', 'projectSet',
   'memoryAdd', 'memoryRm', 'projectTrust', 'quickNew', 'wsRm', 'wsArchive', 'hookTick', 'wsFan', 'show', 'browse', 'browseDone', 'wsRestore', 'wsFork',
   'layoutSet', 'layoutMove', 'todoAdd', 'todoRm', 'memoryCompact', 'memoryTick', 'cliInstall', 'cliRemove', 'reminderTick', 'tabClose', 'tabReopen',
   'gateRestart', 'tabMode', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'tabSet', 'settingsSet', 'storageTidy', 'presetSave', 'openIn', 'reorder', 'bgSet',

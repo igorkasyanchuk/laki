@@ -380,6 +380,20 @@ test('laki secret: a masked card on the tab; the value only in a 0600 file in it
   assert.equal(after.secret, undefined)
   assert.equal(after.status, 'running') // its command goes on
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).artifacts ?? 0, 0) // hidden: no artifact
+  // #7: a whole sign-in on one card, a file each
+  for (const [fields, why] of [[['email'], /2 to 8 fields/], [['a b', 'c'], /a field's name is a word/], [['pw', 'PW:plain'], /named twice/]] as const)
+    await assert.rejects(rig.rpc('secretAsk', { label: 'QA sign-in', fields, from: { tab: tab.id } }), why)
+  const both = rig.rpc('secretAsk', { label: 'QA sign-in', fields: ['email:plain', 'password'], from: { tab: tab.id } })
+  const card = await until(async () => (await rig.tab(ws.id)).secret, 'the fields card')
+  assert.deepEqual(card.fields, [{ name: 'email', plain: true }, { name: 'password' }])
+  await assert.rejects(rig.rpc('secretGive', { id: card.id, values: { email: 'qa@shop.test' } }), /password is empty/)
+  await rig.rpc('secretGive', { id: card.id, values: { email: 'qa@shop.test', password: 'fake-secret' } })
+  const { paths } = await both
+  assert.deepEqual(Object.keys(paths), ['email', 'password'])
+  assert.equal(readFileSync(paths.password, 'utf8'), 'fake-secret')
+  assert.equal(statSync(paths.email).mode & 0o777, 0o600)
+  assert.match(paths.email, /\/\.laki-secrets\/qa-sign-in-email-[0-9a-f]{6}$/)
+  assert.ok(!JSON.stringify(await rig.rpc('state')).includes('fake-secret'), 'never in the view')
   // refused: the agent hears no
   const again = rig.rpc('secretAsk', { label: 'GitHub token', from: { tab: tab.id } })
   again.catch(() => {}) // asserted below
@@ -388,7 +402,7 @@ test('laki secret: a masked card on the tab; the value only in a 0600 file in it
   await assert.rejects(again, /didn't give GitHub token: refused/)
   await assert.rejects(rig.rpc('secretGive', { id: s2.id, value: 'late' }), /that ask is gone/)
   assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 3600e3 }), 0)
-  assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 25 * 3600e3 }), 1) // a day on: gone
+  assert.equal(await rig.rpc('secretsTidy', { now: Date.now() + 25 * 3600e3 }), 3) // a day on: gone (the key, the sign-in's two)
   assert.ok(!existsSync(path))
   // S10: a .laki-secrets the agent made a link (to a folder of yours): not written, never tidied through
   const box = dirname(dirname(path))

@@ -173,7 +173,7 @@ export function bodyOf(app: AppCtx) {
                       <StarLaki />
                     </>
                   ) : (
-                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} onClone={() => setDialog('clone')} check={() => api.call<Doctor>('doctor')} onRun={welcomeRun} onSample={hasCap(view, 'sample') ? welcomeSample : undefined} />
+                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} onClone={() => setDialog('clone')} onNew={hasCap(view, 'projectNew') ? () => setDialog('newProject') : undefined} check={() => api.call<Doctor>('doctor')} onRun={welcomeRun} onSample={hasCap(view, 'sample') ? welcomeSample : undefined} />
                   )
                 )}
               </div>

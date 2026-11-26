@@ -409,7 +409,7 @@ export function PanelWindow() {
       { label: 'Copy path', icon: 'copy', run: () => void navigator.clipboard.writeText(path).then(() => done('Copied')) },
     ])
   const papi: PanelApi = {
-    files: () => api.call<FileList>('files', { ws }),
+    files: o => api.call<FileList>('files', { ws, ...o }),
     ...(w.annotAt && { annots: () => api.call<Annotations>('widgetAnnotations', { ws }), annotAt: w.annotAt }),
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws, path, dir }).then(r => r.path),
     openFile: file => void api.call('openIn', { ws, app: 'editor', file }).catch(fail),

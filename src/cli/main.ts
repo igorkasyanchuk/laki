@@ -31,6 +31,7 @@ const envs: string[] = [] // laki preset's --env KEY=value, again and again
 const tabs: string[] = [] // laki new's --tab, again and again: more tabs in the new workspace (an agent, agent:model, or a command)
 const opens: string[] = [] // laki show's --open <folder|file|url>, again and again
 const choices: string[] = [] // laki alert's --choice, again and again
+const fieldArgs: string[] = [] // laki secret's --field name[:plain], again and again (#7)
 const shipFiles: string[] = [] // laki ship's --files a,b (again and again): only those committed
 const wsRefs: string[] = [] // laki events' --ws, again and again
 const VALUED = new Set(['why', 'withdraw', 'hook', 'hook-event', 'login', 'word', 'cap', 'after', 'project', 'scopes', 'projects', 'expires', 'limits', 'for', 'write', 'net', 'out', 'wait', 'base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'perm', 'template', 'action', 'group', 'issue', 'pr', 'link', 'fan', 'race', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level', 'budget', 'at', 'expect-url', 'timeout', 'only-if', 'notify', 'missed', 'catch-until', 'on', 'branch', 'label', 'by', 'keep-runs'])
@@ -83,6 +84,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'wait-on' && a === '--done') flags.done = true // laki wait-on's only
   else if (!textOnly && ['alert', 'notice'].includes(args[0]) && (a === '--choice' || a === '--title')) a === '--choice' ? choices.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki alert's and notice's only
   else if (!textOnly && args[0] === 'notice' && a === '--to') flags.to = argv[++i] ?? '' // laki notice's only
+  else if (!textOnly && args[0] === 'secret' && a === '--field') fieldArgs.push(argv[++i] ?? '') // laki secret's only
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
   else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
@@ -877,10 +879,11 @@ async function main() {
       throw new Error(r.closed ? 'the user closed it without a choice' : `no answer in ${ALERT_WAIT / 60_000} minutes`)
     }
     case 'secret': {
-      // laki secret <what it is>: the user types it on a masked card in the app; only its file's path comes back (secrets.ts)
-      if (!rest.length) throw new Error('usage: laki secret <what it is>, e.g. laki secret "Stripe test key"')
-      const r = await rpc('secretAsk', { label: rest.join(' '), from: caller() }, SECRET_WAIT + 30_000)
-      return out(r, r.path)
+      // laki secret <what it is> [--field name[:plain]]…: the user types it on a masked card in the app; only its file's
+      // path comes back (secrets.ts); with fields, one card for all of them and a file each: {"email": path, …}
+      if (!rest.length) throw new Error('usage: laki secret <what it is> [--field name[:plain]]…, e.g. laki secret "Stripe test key", or laki secret "Staging sign-in" --field email:plain --field password')
+      const r = await rpc('secretAsk', { label: rest.join(' '), ...(fieldArgs.length && { fields: fieldArgs }), from: caller() }, SECRET_WAIT + 30_000)
+      return out(r, r.paths ? JSON.stringify(r.paths) : r.path)
     }
     case 'screen': {
       // laki screen shot [app] | windows | tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe: the iOS

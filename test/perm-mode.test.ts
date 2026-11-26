@@ -138,3 +138,25 @@ test('tabMode: a build whose footer never changes is told, nothing is assumed', 
   await assert.rejects(rig.rpc('tabMode', { tab, mode: 'plan' }), /didn't change mode/)
   assert.equal((await rig.tab(ws.id)).mode, 'default')
 })
+
+test("#6: a worker its agent starts with no --perm starts in the agent's mode now, a codex one too; its own --perm wins", async t => {
+  const rig = await fresh(t)
+  const { ws, tab } = await started(rig)
+  await rig.rpc('tabMode', { tab, mode: 'plan' })
+  const lead = await rig.tab(ws.id)
+  const worker = async (o: object) => {
+    const w = await rig.rpc('wsNew', { project: ws.project, prompt: 'x', caller: { ws: ws.id, tab }, ...o })
+    return (await rig.rpc('state')).tabs.find((x: any) => x.workspace === w.id && x.kind === 'agent')
+  }
+  const one = await worker({ preset: 'claude', name: 'one' })
+  assert.equal(one.perm, 'plan')
+  assert.equal(one.permFrom, lead.name)
+  assert.equal((await worker({ preset: 'codex', name: 'two' })).perm, 'plan') // codex's Read only: the same id
+  const own = await worker({ preset: 'claude', name: 'three', perm: 'acceptEdits' })
+  assert.equal(own.perm, 'acceptEdits')
+  assert.equal(own.permFrom, undefined)
+  await rig.rpc('tabMode', { tab, mode: 'default' }) // Ask: not a mode it passes on (PERMS has none): its profile's
+  assert.equal((await worker({ preset: 'claude', name: 'four' })).perm, undefined)
+  const yours = await rig.rpc('wsNew', { project: ws.project, preset: 'claude', name: 'yours' }) // yours: no lead
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.workspace === yours.id).perm, undefined)
+})

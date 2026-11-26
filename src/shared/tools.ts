@@ -313,8 +313,8 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   {
     name: 'laki_secret',
     description: "Ask the user for a secret (an API key, a token, a password) without it going into this chat: they type it on a masked card under your tab in Laki, and you get only the path of a 0600 file that holds it (deleted after 24 hours). Read it where it's used, never print it: KEY=$(cat \"$path\"). Waits up to 15 minutes; an error if they refuse.",
-    inputSchema: obj({ label: str('what it is, a few words: Stripe test key') }, ['label']),
-    run: a => rpc('secretAsk', { label: a.label, from: { ws: from, tab: process.env.LAKI_TAB } }, SECRET_WAIT + 30_000),
+    inputSchema: obj({ label: str('what it is, a few words: Stripe test key'), fields: { type: 'array', items: { type: 'string' }, description: 'several values on one card (a sign-in): each a name, :plain to show it as typed, e.g. ["email:plain", "password"]; you get {"email": path, "password": path}' } }, ['label']),
+    run: a => rpc('secretAsk', { label: a.label, ...(Array.isArray(a.fields) && a.fields.length && { fields: a.fields }), from: { ws: from, tab: process.env.LAKI_TAB } }, SECRET_WAIT + 30_000),
   },
   {
     name: 'laki_alert',

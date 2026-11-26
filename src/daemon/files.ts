@@ -676,8 +676,11 @@ const MAX_FILES = 50000
 // files lists the workspace's files (git's: tracked and untracked, not ignored; a plain folder's: all
 // but dependencies), and how the changed ones changed: M, A (new), D, R
 // project: its own folder's instead (the new-workspace page's @ completion, before there's a workspace)
-export async function files(ref: string, project?: string) {
+// ignored: what git ignores too (Files' Show ignored files), a wholly ignored folder as one entry ending in /;
+// under: such a folder's own entries, one level (opened in Files: node_modules lists nothing until then)
+export async function files(ref: string, project?: string, more: { ignored?: boolean; under?: string } = {}) {
   const ws = project ? (p => ({ path: p.path, host: p.host, project: p.id }))(findProject(project)) : findWs(ref)
+  if (more.under !== undefined) return { files: await oneLevel(ws as Workspace, more.under), changed: {}, cut: false }
   // Terminals and Browsers: your home folder, whose walk would be junk and macOS's prompts (Desktop, Documents…)
   if (state.projects.find(p => p.id === ws.project)?.kind) return { files: [], changed: {}, cut: false }
   if (ws.host && state.projects.find(p => p.id === ws.project)?.git === false) {
@@ -706,7 +709,7 @@ export async function files(ref: string, project?: string) {
     return { files: out, changed: {}, cut: out.length >= MAX_FILES }
   }
   const z = (args: string[]) => exec(ws, 'git', args).then(r => r.stdout.split('\0'))
-  const [list, st] = await Promise.all([z(['ls-files', '-z', '--cached', '--others', '--exclude-standard']), z(['status', '--porcelain', '-z', '--untracked-files=all'])])
+  const [list, st, ign] = await Promise.all([z(['ls-files', '-z', '--cached', '--others', '--exclude-standard']), z(['status', '--porcelain', '-z', '--untracked-files=all']), more.ignored ? z(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory']) : []])
   const changed: Record<string, string> = {}
   for (let i = 0; i < st.length; i++) {
     const [xy, path] = [st[i].slice(0, 2), st[i].slice(3)]
@@ -715,8 +718,16 @@ export async function files(ref: string, project?: string) {
     if (xy.includes('R') || xy.includes('C')) i++ // the old name follows
   }
   const all = [...new Set(list.filter(Boolean))]
-  return { files: all.slice(0, MAX_FILES), changed, cut: all.length > MAX_FILES }
+  return { files: all.slice(0, MAX_FILES), changed, cut: all.length > MAX_FILES, ...(more.ignored && { ignored: ign.filter(Boolean).slice(0, MAX_FILES) }) }
 }
+// a folder's entries, its folders ending in / (an ignored one opened in Files: git lists nothing in it)
+async function oneLevel(ws: Workspace, rel: string) {
+  const at = rel.replace(/\/+$/, '')
+  const abs = inside(ws, at)
+  const names = ws.host ? (await exec(ws, 'ls', ['-Ap', abs])).stdout.split('\n').filter(Boolean) : readdirSync(abs, { withFileTypes: true }).map(e => (e.isDirectory() ? `${e.name}/` : e.name))
+  return names.slice(0, MAX_LEVEL).map(n => `${at}/${n}`)
+}
+const MAX_LEVEL = 5000 // ponytail: one folder's first 5,000 entries
 const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'target', 'dist', 'build', '.venv', '__pycache__'])
 
 export async function fileNew(o: { ws: string; path: string; dir?: boolean }) {

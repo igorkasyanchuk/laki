@@ -3,7 +3,7 @@
 // and Recording mode's private workspaces. test/caller.test.ts proves the from is its process's, whatever it says
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, readFileSync, symlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -188,7 +188,7 @@ test("S7: Recording mode: a private workspace's events (its turns, its output) r
   assert.doesNotMatch(JSON.stringify(phone.events.filter(e => e.ev === 'state')), /secret-client|the private task/, 'nor in its states')
 })
 
-test('U7: Clone a repository: a local repo or a URL into a folder, added as a project; no program-running transport; not an agent', async t => {
+test('U7: Clone a repository: a local repo or a URL into a folder, added as a project; no program-running transport; not an agent. New project too', async t => {
   const rig = await fresh(t)
   const bare = join(rig.home, 'shop.git')
   execFileSync('git', ['clone', '-q', '--bare', rig.repo, bare])
@@ -207,6 +207,17 @@ test('U7: Clone a repository: a local repo or a URL into a folder, added as a pr
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'one' })
   const tab = await rig.tab(ws.id)
   await assert.rejects(rig.rpc('projectClone', { url: bare, into: join(rig.home, 'two'), from: { ws: ws.id, tab: tab.id } }), /clone a repository/)
+
+  // #10: New project: a folder with git and a first commit, added; an empty one of yours taken, one with files refused
+  const np = await rig.rpc('projectNew', { name: 'idea', into: join(rig.home, 'code') })
+  assert.ok(np.path.endsWith('/code/idea') && np.git)
+  assert.equal(execFileSync('git', ['log', '--format=%s'], { cwd: np.path, encoding: 'utf8' }).trim(), 'First commit')
+  assert.equal(readFileSync(join(np.path, 'README.md'), 'utf8'), '# idea\n')
+  mkdirSync(join(rig.home, 'code/empty'))
+  assert.ok((await rig.rpc('projectNew', { name: 'empty', into: join(rig.home, 'code') })).git)
+  await assert.rejects(rig.rpc('projectNew', { name: 'shop', into: join(rig.home, 'code') }), /already there with files in it/)
+  for (const name of ['', '.x', '-x', 'a/b', '../up']) await assert.rejects(rig.rpc('projectNew', { name, into: join(rig.home, 'code') }), /a folder name/, name)
+  await assert.rejects(rig.rpc('projectNew', { name: 'two', into: join(rig.home, 'code'), from: { ws: ws.id, tab: tab.id } }), /make a new project/)
 })
 
 test("S3: the view's secrets are your window's alone: the CLI's and an agent's state, and remote access's link, are masked; masks sent back change nothing", async t => {

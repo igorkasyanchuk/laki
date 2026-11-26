@@ -171,7 +171,7 @@ export type Runtime = { inTool?: number /* claude's PreToolUse to its PostToolUs
   project rule answered */; failed?: string; autoContinued?: boolean; contSent?: boolean; mode?: string; modeUnknown?: boolean; hookAt?: number; perm?: Perm;
   permCmd?: string; permCut?: boolean; progress?: { pct: number; note?: string }; plan?: TabPlan; planAsk?: string; status: Status; done: boolean; limit?: number;
   last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; noteDue?: string /* agy's: Laki's note, in front of the first message typed into a new chat (memoryFirst) */; runAt?: number; idleAt?: number; waitAt?: number; askKey?: string;
-  published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string; saved?: 'project' | 'all' };
+  published?: Published[]; later?: NodeJS.Timeout; bg?: number; compacting?: number; asked?: string; suggest?: string; secret?: { id: string; label: string; fields?: { name: string; plain?: boolean }[]; saved?: 'project' | 'all' };
   changes?: TurnChanges } // perm: the permission it asks for (claude's PermissionRequest: the ask's tool, what, rule), until its next hook that isn't a wait;
   // permCmd: a Bash ask's whole command (2,000 characters at most; perm's what is a line of 300), with it, for askExplain; permCut: it was longer than that;
   // changes: what its last turn changed (turns.ts); secret: what it asks you for (secrets.ts, laki secret); asked: its last prompt (claude's UserPromptSubmit,
@@ -1911,6 +1911,32 @@ export async function projectClone(url: unknown, into?: unknown): Promise<Projec
   } catch (e) {
     rmSync(dest, { recursive: true, force: true }) // half a clone: none
     throw new Error(`clone failed: ${String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n').at(-1)}`)
+  }
+  return projectAdd(dest)
+}
+
+// #10: a brand-new project (Welcome's and ⌘K's New project): a folder made under into (as Clone's), git init with a
+// first commit (a README), added; an empty folder already there is taken, one with anything in it refused. The user's
+// git identity; none set: Laki's, so the first worktree can start at once
+export async function projectNew(name: unknown, into?: unknown): Promise<Project> {
+  const n = typeof name === 'string' ? name.trim() : ''
+  if (!/^[\w][\w .-]*$/.test(n) || n.length > 100) throw new Error('a folder name: letters, digits, spaces, . _ or -, not starting with . or -')
+  const last = state.projects.findLast(p => !p.host && !p.kind)
+  const parent = typeof into === 'string' && into.trim() ? resolve(tilde(into.trim())) : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
+  const dest = join(parent, n)
+  if (existsSync(dest) && (!statSync(dest).isDirectory() || readdirSync(dest).length)) throw new Error(`${dest} is already there with files in it: open it as a project, or pick another name`)
+  const made = !existsSync(dest)
+  mkdirSync(dest, { recursive: true })
+  const at = { path: dest }
+  try {
+    writeFileSync(join(dest, 'README.md'), `# ${n}\n`)
+    await git(at, 'init', '-q', '-b', 'main')
+    await git(at, 'add', '-A')
+    const commit = (...who: string[]) => git(at, ...who, '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'First commit')
+    await commit().catch(() => commit('-c', 'user.name=Laki', '-c', 'user.email=new@laki.invalid')) // no identity set
+  } catch (e) {
+    for (const x of made ? [dest] : [join(dest, '.git'), join(dest, 'README.md')]) rmSync(x, { recursive: true, force: true }) // half made: none, an empty folder of yours as it was
+    throw new Error(`new project failed: ${firstLine(e)}`)
   }
   return projectAdd(dest)
 }
@@ -3682,6 +3708,17 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     throw e
   }
 }
+// #6: a worker an agent starts with no mode of its own starts in its lead's mode now (a claude's as its footer shows it,
+// else the one it started in), where the worker's agent has that mode (PERMS share their ids: Claude's auto is Codex's
+// auto); never one that never asks (agentNoCmd's rule) or that leaves a sandbox its profile keeps. Else its profile's
+function leadMode(fromTab: string | undefined, agent: Agent, preset: string, sandbox?: boolean) {
+  const t = state.tabs.find(x => x.id === fromTab && x.kind === 'agent')
+  const perm = t && (rt.get(t.id)?.mode ?? t.perm)
+  if (!t || !perm || !PERMS[agent]?.some(x => x[0] === perm)) return undefined
+  const prof = presetNamed(preset)
+  if (neverAsks(agent, perm, prof?.args) || ((sandbox ?? prof?.sandbox) && sandboxOff(agent, perm, prof?.args))) return undefined
+  return { perm, from: t.alias ? `@${t.alias}` : t.name }
+}
 async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
   const proj = findProject(o.project)
   if (proj.archived) throw new Error(`${proj.name} is archived: bring it back first (Settings › Projects › Archived projects)`)
@@ -3695,6 +3732,8 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
+  const lead = o.from && o.perm === undefined && isAgent(agent) ? leadMode(o.fromTab, agent, preset, o.sandbox) : undefined
+  if (lead) o = { ...o, perm: lead.perm } // #6: its lead's mode
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast, o.sandbox) // before the worktree: a wrong one makes nothing
   const prof = presetNamed(preset)
   if (isAgent(agent) && (o.sandbox ?? prof?.sandbox) && sandboxOff(agent, o.perm === undefined ? prof?.perm : o.perm || undefined, prof?.args)) throw new Error(SANDBOX_NO) // tabSpec's, before the worktree too
@@ -3819,7 +3858,11 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
       save()
       step(`agent: ${preset} later, ${o.startAt === 'limit' ? 'as its plan limit resets' : new Date(o.startAt).toISOString()}`)
       if (o.startAt === 'limit') void pendingTick() // its reset read now, for the view
-    } else if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, sandbox: o.sandbox, vars: o.vars, agent: by, ...cause }).name} (its command: the workspace's Logs)`)
+    } else if (preset !== 'none') {
+      const t = addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, sandbox: o.sandbox, vars: o.vars, agent: by, ...cause })
+      if (lead) t.permFrom = lead.from
+      step(`agent: ${t.name}${lead ? ` in ${lead.perm} mode, its lead's (${lead.from})` : ''} (its command: the workspace's Logs)`)
+    }
     else step('no agent (none)')
   } finally {
     changed() // the workspace is made, even when its agent didn't start

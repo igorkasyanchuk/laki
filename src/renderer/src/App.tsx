@@ -1558,7 +1558,7 @@ export function App() {
   }
   const redo = (w: WorkspaceView, id: string, then?: () => void) => call('hunkRedo', { ws: w.id, id }).then(() => (then?.(), done('Back as it was')), () => {})
   const panelApi = (w: WorkspaceView): PanelApi => ({
-    files: () => api.call<FileList>('files', { ws: w.id }),
+    files: o => api.call<FileList>('files', { ws: w.id, ...o }),
     ...(w.annotAt && { annots: () => api.call<Annotations>('widgetAnnotations', { ws: w.id }), annotAt: w.annotAt }),
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
     openFile: file => void call('openIn', { ws: w.id, app: 'editor', file }).catch(() => {}),
@@ -2118,6 +2118,8 @@ export function App() {
     proof: t => (p => (p?.tab === t.id ? p : undefined))(view?.workspaces.find(w => w.id === t.workspace)?.proof), // the Proof card: its last checked turn's
     openProof: (t, path) => openFile({ ws: t.workspace, path, storage: true }),
     proofImage: (t, path) => call<{ image?: string }>('fileRead', { ws: t.workspace, path, storage: true }).then(r => r.image),
+    files: t => (w => (w ? api.call<FileList>('files', { ws: w.id }).then(r => ({ files: r.files, root: w.path })) : Promise.resolve({ files: [] })))(view?.workspaces.find(x => x.id === t.workspace)), // #8: its answers' paths
+    openAt: (t, path, line, editor) => (w => w && (editor ? panelApi(w).openFile(path) : panelApi(w).preview(path, line)))(view?.workspaces.find(x => x.id === t.workspace)),
     drag: bridge?.dragOut && ((t, path) => (w => w?.path && !w.host && bridge!.dragOut!(`${w.path}/${path}`, w.path))(view?.workspaces.find(x => x.id === t.workspace))),
     spend: hasCap(view, 'ws.spend') ? t => call<SpendView>('wsSpend', { ws: t.workspace }) : undefined,
     turnChips: (t, marks) => <TurnChips marks={marks} widgets={view?.widgets ?? []} open={m => setDialog({ widget: m.widget, turn: { tab: t.id, at: m.at }, back: dialog })} />,

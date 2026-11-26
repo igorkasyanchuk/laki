@@ -84,6 +84,7 @@ export function tabTip(ts: TabView[], o: TabTipOf) {
       t.asleep && `Now: ${t.queued ? 'waits its turn after a restart, a look starts it' : 'asleep to free memory, a look resumes it'}`,
       t.kind === 'agent' && t.status === 'exited' && 'Now: ended, ⏎ in it starts it again',
       (t.model || t.effort) && `Model: ${[t.model, t.effort].filter(Boolean).join(', ')}`,
+      t.permFrom && `Mode: ${t.perm}, from ${t.permFrom}, the agent that started it`,
       t.account && t.account !== HOME_ACCOUNT && `Account: ${o.account(t) ?? 'another account'}`,
       o.ctxOn && t.context && `Context: ${ctxText(t.context)}`,
       o.costsOn && t.usage && `Used: ${usageText(t.usage)} at API prices`,

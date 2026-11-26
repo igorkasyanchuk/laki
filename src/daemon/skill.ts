@@ -94,7 +94,8 @@ prompts are the user's prompt templates (read-only), each variable an argument.
 2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode|<profile>] [--name short-name] [--base <branch>]\`:
    a new worktree on a new branch, set up by the project's setup script, with the agent started on the
    prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent; \`--model\` and
-   \`--effort\` pick the agent's (blank: its own), \`--perm\` its permission mode; \`--no-setup\` skips the setup script;
+   \`--effort\` pick the agent's (blank: its own), \`--perm\` its permission mode (none: yours now, where its agent has it and it
+   isn't one that never asks); \`--no-setup\` skips the setup script;
    \`--template\`, \`--action\` and \`--group\` use the user's prompt templates, agent actions and sidebar groups.
    ${groupRule("each project's \`groups\` in \`laki ls --json\`; \`--group <name>\`")}
    Another agent in a workspace that exists: \`laki tab <ws> --preset codex --prompt "<task>"\`.

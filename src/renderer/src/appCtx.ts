@@ -37,7 +37,7 @@ import type { SelectionUse } from './Term'
 import type { Drag } from './Panes'
 
 // the page or dialog over the workspace, App's `dialog`
-export type Dialog = null | 'toolbar' | 'chats' | 'scriptLogs' | 'new' | 'project' | 'clone' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' |
+export type Dialog = null | 'toolbar' | 'chats' | 'scriptLogs' | 'new' | 'project' | 'clone' | 'newProject' | 'palette' | 'starters' | 'onboard' | 'files' | 'ship' |
   'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'usage' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' |
   'timer' | 'importantTimer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string;
   back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog; turn?: { tab: string; at: number } /* P5:
