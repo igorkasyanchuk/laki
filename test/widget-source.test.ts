@@ -359,7 +359,7 @@ test("a URL source reaches this Mac only as written, never by a redirect; elsewh
   await rig.rpc('widgetReload')
   await rig.rpc('widgetSet', { id: 'u', on: true })
   const srv = createServer((q, r) => (q.url === '/ok' ? r.end('{"n": 42}') : r.writeHead(302, { location: '/ok' }).end()))
-  await new Promise<void>(ok => srv.listen(0, 'localhost', ok))
+  await new Promise<void>(ok => srv.listen(0, '127.0.0.1', ok)) // not 'localhost': a container with no IPv6 network binds ::1 there, and its clients' localhost is 127.0.0.1 only (ADDRCONFIG)
   t.after(() => srv.close())
   const port = (srv.address() as any).port
   const idle = () => until(async () => !(await find(rig, 'u')).running, 'u done fetching')

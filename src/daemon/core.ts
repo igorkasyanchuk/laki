@@ -5714,6 +5714,7 @@ export async function peerWho(port: number, proc = process.platform === 'linux' 
 // binary, and no ELECTRON_RUN_AS_NODE in the environment it started with. ponytail: a native addon loaded into Electron
 // run as node could signal it too; the app's binary without the runAsNode fuse (SECURITY.md) is the real fix
 export async function appPeer(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<boolean> {
+  if (!process.versions.electron) return false // a daemon on plain node: the app (Electron) is never on its binary, any node script is (Linux)
   const p = await peerInfo(port, proc).catch(() => undefined)
   if (!p || p.tab || p.own) return false
   const bin = realpathSync(process.execPath)

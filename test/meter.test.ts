@@ -425,9 +425,12 @@ test("cost warning: a workspace past yellow, then red: colored, told once each; 
   const answer = (id: string, output: number) => line({ type: 'assistant', timestamp: new Date().toISOString(), message: { id, model: 'claude-opus-4-6', usage: { input_tokens: 0, output_tokens: output } } })
   const cost = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).cost
   const notices = () => app.events.filter(e => e.ev === 'notice')
-  await until(async () => (await rig.rpc('state')).workspaces.length, 'its view') // the meters' first read: before any chat is priced
-  writeFileSync(file, answer('a', 34000)) // $0.85
+  // priced at $0 first, seen by a tick: a cost the meters' first read finds is from before (marked, not told), and that
+  // read can come late (no window connected: a slow tick)
+  writeFileSync(file, answer('z', 1)) // $0.000025: priced, $0 to the cent
   await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-2' } })
+  await until(async () => (await cost())?.usd === 0, 'its chat priced at $0')
+  appendFileSync(file, answer('a', 34000)) // $0.85
   await until(() => notices().length === 1, 'yellow told')
   assert.match(notices()[0].text, /has cost \$0\.85 so far, past your yellow amount of \$0\.5/)
   assert.deepEqual(await cost(), { usd: 0.85, level: 'yellow', warn: { yellow: 0.5, red: 1 } })
