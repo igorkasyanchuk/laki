@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Safe mode: after the daemon stops three times in a row in its first minute, Laki starts no extensions, scheduled tasks, workflows or scans on its own; a banner turns them on, with or without what ran before the crash.
 - Settings › Agents & profiles › What agents call: what agents asked of Laki this week through the laki command and its MCP server, with what was refused or failed and the last error.
 - Two fingers across a workspace's row or a Needs you card: left snoozes it (further left archives), right marks it seen (Settings › Layout › Swipe on rows).
 - Schedule, Board and Settings show their title large at the top, and small in the glass head as you scroll (a Design other than Classic).

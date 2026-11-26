@@ -18,6 +18,7 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/daemon/dbWorker.ts` | `dbRead` off the daemon's main thread (`out/main/dbWorker.js`) |
 | `src/daemon/sheet.ts` | an Excel workbook's sheets as tables (fileRead's `sheets`): the zip through node's zlib, values, dates by their style, each part once and 96 MB in all; pure; run in a worker (`sheetWorker.ts`, files.ts' `sheetsOf`: 3 s, 256 MB) |
 | `src/daemon/remote.ts` | tunnels (cloudflared, tailscale), shared tabs, remote access |
+| `src/daemon/safe.ts` | safe mode: `starts.json`'s last 5 starts (alive after a minute, clean at shutdown, suspects at an uncaught error); three young deaths in a row turn it on until `safeOff`; `safeOn` gates extensions, scheduled tasks, workflows, the PR and port scans and git tidy (docs/dev/api.md) |
 | `src/daemon/toolDays.ts` | what agents call: each day's calls, refusals and errors per API method (main.ts call's `toolTally`), the last error redacted; `tool-days.json`, `agentCalls` |
 | `src/daemon/agentLog.ts` | what agents did through Laki's API, per workspace (main.ts call's `agentLine`): kept and capped, `agentLog` reads it |
 | `src/daemon/e2e.ts` | S14, remote access end to end: HKDF-SHA-256 keys, AES-256-GCM frames with per-direction counters (`channel`, `first`), a device key wrapped by its cookie (`wrap`, `unwrap`); the page's half is `src/renderer/src/e2e.ts` (WebCrypto, IndexedDB) |

@@ -18,6 +18,7 @@ import { wsStat } from './files.ts'
 import { flowPhone } from './phone.ts'
 import { isLive } from './resources.ts'
 import { widgetEvent, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
+import { safeOn, safeSeen } from './safe.ts'
 
 // ---------- the board's to-dos (Board.tsx): prompts waiting for a workspace; starting one is wsNew, then todoRm
 
@@ -660,6 +661,7 @@ export function scheduleHook(name: string, event: string, body: unknown, project
 }
 const HOOK_BODY = 8000 // a webhook's body in the prompt, at most
 export async function eventTick(now = Date.now()) {
+  if (safeOn()) return
   const on = (state.schedules ?? []).filter(s => s.trigger && s.trigger.event !== 'webhook' && s.on && !s.archived && !projectArchived(s.project)) // a webhook's: heard, not read
   if (!on.length || eventBusy || (await quotaLow(now))) return
   eventBusy = true
@@ -819,6 +821,7 @@ async function emptyGone(r: ScheduleRun, d: { files: number; dirty?: number } | 
 // condition isn't checked: you asked); late: a catch-up's words (T2), before what it did
 export async function runSchedule(s: Schedule, now = Date.now(), o: { asked?: boolean; late?: string; event?: TaskEventIn; again?: boolean } = {}): Promise<ScheduleRun> {
   s = state.schedules?.find(x => x.id === s.id) ?? s // scheduleSet replaces a task: the current one
+  safeSeen({ kind: 'task', id: s.id, name: s.name || s.id })
   const r: ScheduleRun = { id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, now), at: now, ok: true, what: '', ...(o.event && { event: o.event.words }), ...(o.asked && { asked: true }), ...(s.after && s.afterRun && !o.asked && { after: s.afterRun }) }
   let check = ''
   let head: string | undefined
@@ -950,6 +953,7 @@ export const pendingView = (p: Pending): PendingView => ({ at: p.at, limit: p.li
 // (then it starts: a reset moves on as it's reached). Usage not known: the next tick
 let pendingBusy = false
 export async function pendingTick(now = Date.now()) {
+  if (safeOn()) return
   if (pendingBusy) return
   pendingBusy = true
   try {
@@ -994,6 +998,7 @@ export function startPending(w: Workspace, now = Date.now(), asked = false) {
 // every 30 s (tests pass `now`): what's due runs, what's long overdue is missed (logged, or a catch-up waits: T2); then
 // the next time; then one catch-up waiting, if any (several that woke together go a tick, 30 s, apart)
 export async function scheduleTick(now = Date.now()) {
+  if (safeOn()) return // safe mode: due ones wait until you turn everything on (safe.ts)
   // every due one moves on first: a tick while a run is still starting (a worktree takes a while) doesn't start it again
   const due = (state.schedules ?? []).filter(s => s.on && !s.archived && s.next !== undefined && s.next <= now).map(s => ({ s, at: s.next! }))
   for (const { s } of due) {

@@ -28,6 +28,7 @@ import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets
 import { abortAfter, copyTree, move, readCapped, readJson, writeAtomic } from '../shared/conn.ts'
 import { chatCost, chatCostBefore } from './meters.ts'
 import { isolationEnv } from '../shared/isolation.ts'
+import { safeOn, safeSeen } from './safe.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -2136,11 +2137,12 @@ export function flowForget(o: { id: string }) {
 
 // every 5 s: waits, agents that went away, workspaces that did
 export function flowTick(now = Date.now()) {
-  if (!flowsOn(state.settings)) return
+  if (!flowsOn(state.settings) || safeOn()) return // safe mode: runs wait at their blocks until you leave it (safe.ts)
   if (resumeLater) flowResume() // turned on since the start
   timers(now)
   for (const r of runs()) {
     if (!live(r)) continue
+    if (r.status === 'running') safeSeen({ kind: 'workflow', id: r.workflow, name: r.flow.name || r.workflow, source: r.source, project: r.project })
     const b = blockOf(r, r.cur)
     const ws = wsOf(r)
     // past its budget: it asks now when what it does can stop and run again (a command, a wait on checks, a retry's
@@ -2192,8 +2194,8 @@ let resumeLater = false
 const boot = Date.now() // runs started since were never cut short
 export function flowResume() {
   for (const r of runs()) if (live(r) && r.clock) r.clock = Date.now() // its working time goes on from now
-  resumeLater = !flowsOn(state.settings)
-  if (resumeLater) return // off: they wait until it's on again
+  resumeLater = !flowsOn(state.settings) || safeOn()
+  if (resumeLater) return // off (or safe mode): they wait until it's on again
   const asks = (r: FlowRun) => r.status === 'waiting' && r.wait?.kind !== 'agent-ask' // yours wait on; an agent's ask was cut short with its turn
   // queued ones wait on (flowTick's next); one cut short before it had a workspace goes back in the queue
   const requeue = runs().filter(r => going(r) && !r.ws && !r.cur && r.started < boot)

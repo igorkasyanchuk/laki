@@ -37,6 +37,7 @@ import * as askStreak from './askStreak.ts'
 import { signIn } from './signin.ts'
 import { mcpAuthTick, mcpSignIn } from './mcpAuth.ts'
 import { dir, inRig } from './dir.ts'
+import { safeCrash, safeLeave, safeOn, safeStart, safeStop } from './safe.ts'
 import * as scheduleMod from './schedule.ts'
 import * as hostsMod from './hosts.ts'
 import * as prMod from './pr.ts'
@@ -132,6 +133,7 @@ if (!takeLock()) {
   console.log('laki daemon already running')
   process.exit(0)
 }
+safeStart() // safe mode after three young deaths in a row (safe.ts)
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
@@ -143,7 +145,7 @@ ptyEarly(earlyHost)
 await core.ptyAdopt() // R6: terminals that outlived the last daemon (settings.ptyHost), before the rest start again
 await core.netProxyUp().catch((e: Error) => log(`wrapper sandbox's network proxy: ${e.message}`)) // its port and passwords: a kept terminal's go on
 core.restoreAll()
-flowResume() // workflow runs back at their blocks
+flowResume() // workflow runs back at their blocks (safe mode: once you leave it, flowTick's)
 scanWidgets()
 try {
   refreshSkills()
@@ -824,6 +826,22 @@ const api = {
   screenLock: p => remoteMod.screenLock(p), // D9: the app's powerMonitor: the Mac locked (true) or unlocked; remote access follows it (settings.remoteWhen)
   remoteLog: p => activityList(Math.min(1000, Math.max(1, Number(p?.n) || 200))), // D9: what was done remotely, newest first
   agentLog: p => agentLogOf(core.findWs(String(p?.ws ?? '')).id), // what its agents did through Laki, newest first (agentLog.ts)
+  // safe mode's banner (safe.ts): without, a suspect turned off first (an extension, a workflow, a task); then all of
+  // it starts again now: due tasks, later starts, extensions' fetches (workflows: flowTick's next)
+  safeOff: (p: { without?: { kind?: unknown; id?: unknown; source?: unknown; project?: unknown }; now?: number }) => {
+    const w = p?.without
+    if (w && typeof w.id === 'string') {
+      if (w.kind === 'extension') widgetSet({ id: w.id, on: false })
+      else if (w.kind === 'task') scheduleMod.scheduleSet({ id: w.id, on: false })
+      else if (w.kind === 'workflow') flowPause({ id: w.id, source: w.source as never, project: typeof w.project === 'string' ? w.project : undefined, on: false }, 'turned off in safe mode')
+      else throw new Error(`no suspect ${String(w.kind)}`)
+    }
+    if (!safeLeave()) return { on: false }
+    core.changed()
+    void scheduleMod.scheduleTick(p.now).then(() => scheduleMod.pendingTick(p.now)).catch(e => log('safeOff', e))
+    widgetTick()
+    return { on: false }
+  },
   agentCalls: () => agentCalls(), // what agents call: the last 7 days per method (calls, refused, errors, the last error), the tools none of whose methods they called (toolDays.ts); the user's
   wsSpend: p => metersMod.wsSpend(p), // where a workspace's tokens went (shared/spend.ts): the user's; an agent's for its own workspace (agentNo)
   diskUsage: p => resourcesMod.diskUsage({ again: p?.again === true }), // Settings › Resources › Disk, laki doctor --disk (kept 10 minutes)
@@ -1014,7 +1032,7 @@ const FROM = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggest
   'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
   'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'events', 'agentLog', 'agentCalls', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
-  'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'presence', 'remoteLog', 'diagnostics',
+  'safeOff', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'presence', 'remoteLog', 'diagnostics',
   'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm',
   'voiceText', 'projectClone', 'projectNew', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen',
   'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList',
@@ -1564,7 +1582,7 @@ chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookL
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
   alertAnswer: p => (alertMacOnly(p) ? 'raise or remove a spend cap' : ''), // cap.ts' choices that raise it: the Mac's
 }
-const ANSWER_NO = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
+const ANSWER_NO = new Set(['safeOff', 'kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
   'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
   'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy',
   'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext',
@@ -2552,7 +2570,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   setTimeout(() => void agentCliMod.agentVersionsTick(), 60e3).unref()
   inboundStart() // issue.labeled's poll, the webhook server (inbound.ts)
   ticks.register('tidy', 3600000, () => (core.imagesTidy(), core.storageTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), noteTrashTidy(), checkTidy(), secretsTidy(), turnsTidy(), metersMod.statusTidy())) // pasted images past settings.imageDays, storage folders' files past storageDays, archived workspaces past archivedDays, deleted extensions past 30 days
-  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), noteTrashTidy(), checkTidy(), void scheduleMod.pendingTick(), core.state.settings?.bgRefresh !== false && prMod.scanPRs().catch(() => {})), 2000)
+  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), noteTrashTidy(), checkTidy(), void scheduleMod.pendingTick(), core.state.settings?.bgRefresh !== false && !safeOn() && prMod.scanPRs().catch(() => {})), 2000)
   // a test's daemon (the rig's LAKI_TEST_PARENT: its test process, which the CLI's autostart passes on too) goes with
   // it, so a test run killed midway leaves none behind
   const parent = Number(process.env.LAKI_TEST_PARENT)
@@ -2586,6 +2604,7 @@ function shutdown(keep: unknown = false) {
     log('keeping shells', e) // the stop goes on
   }
   toolDaysSave() // what agents called, kept as it stops (toolDays.ts)
+  safeStop() // a clean stop: no crash (safe.ts)
   try {
     screensMod.screensSave(true) // #S1: each shell tab's screen, for the next start
   } catch (e) {
@@ -2608,5 +2627,5 @@ if (inRig()) process.on('SIGUSR2', () => ptyClose(true)) // a test's daemon only
 // a stdout or stderr whose reader is gone (a test's rig ended, laki serve | head): its lines dropped. Unheard, the EPIPE is an
 // uncaught error whose log line fails again: a loop at 100% CPU that never lets the daemon end
 for (const s of [process.stdout, process.stderr]) s.on('error', () => {})
-process.on('uncaughtException', e => (log('uncaught', e), core.troubled(e))) // R6: counted, in the view's trouble: the app's bar
-process.on('unhandledRejection', e => (log('unhandled', e), core.troubled(e)))
+process.on('uncaughtException', e => (log('uncaught', e), core.troubled(e), safeCrash())) // R6: counted, in the view's trouble: the app's bar
+process.on('unhandledRejection', e => (log('unhandled', e), core.troubled(e), safeCrash()))

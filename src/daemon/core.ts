@@ -85,6 +85,7 @@ import { claudeMcpConfig, codexMcpArgs, type McpServer, mcpAll, mcpFor, mcpOk, o
 import { SHELL_DIRS, SHELL_KINDS, shellKind, shellWord } from '../shared/shells.ts'
 import { proxyDrop, proxyFor, proxyUp } from './netProxy.ts'
 import { BLOCK, isolationEnv, PORT_BASE } from '../shared/isolation.ts'
+import { safeOn, safeView } from './safe.ts'
 
 export const run = promisify(execFile)
 
@@ -1179,6 +1180,7 @@ export function view(): View {
     ...(state.settings?.ptyHost && ptyWhy() && { ptyHostOff: ptyWhy() }), // R9: why new terminals run in the daemon
     ...(updateIdle && { updateIdle }),
     ...(trouble && { trouble }),
+    ...(safeOn() && { safe: safeView() }), // safe mode after crashes (safe.ts): MainArea's banner
     ...(state.mergeQueues?.length && { mergeQueues: state.mergeQueues }),
     ...(newerData && { newerData }),
     ...(t => t && { telegram: t })(tgView()), // Settings › Telegram: no token, no code

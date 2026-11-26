@@ -37,6 +37,7 @@ import { fixtureNames, fixturesOf } from './widgetDev.ts'
 import { aiKey, allowedOf, allowOf, approve, cmdsOf, grantsOf, steering, TOOL_NAME, toolsOf, ungrant, widgetToolCall } from './widgetTools.ts'
 import { dirHash, eachHash, filesHash, notOpened, repoBad, repoFiles } from './widgetTrust.ts'
 import { historyOf, snapshot, statOf } from './widgetFiles.ts'
+import { safeOn, safeSeen } from './safe.ts'
 export * from './widgetLogs.ts'
 export * from './widgetEvents.ts'
 export * from './widgetTools.ts'
@@ -308,7 +309,7 @@ const capped = (w: Entry, x: Workspace) => Promise.race([readFacts(w, x).catch((
 export const factsFor = async (w: Entry, x?: Workspace) => void (x && factNames(w).length && Date.now() - (facts.get(keyOf(w.id, x.id))?.at ?? 0) > 9000 && (await capped(w, x)))
 let factsGoing = false
 export async function factsTick() {
-  if (!shown() || factsGoing) return
+  if (!shown() || factsGoing || safeOn()) return
   factsGoing = true
   for (const k of facts.keys()) if (!widgets.has(k.slice(0, k.lastIndexOf('@')))) facts.delete(k) // a removed extension's
   try {
@@ -1375,6 +1376,8 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   const meta = metaOf(w, x?.id)
   const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^(action|event):[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
   const once = o.once === true && !onOf(w)
+  if (safeOn()) return { ok: false, error: "safe mode: extensions don't fetch until you turn everything on" }
+  safeSeen({ kind: 'extension', id: w.id, name: w.m.name || w.id })
   if (!onOf(w) && (guarded(w) || (!once && !(force && w.s.by !== 'ai')))) return { ok: false, error: guarded(w) ? `${OFF(w)}: it ${whence(w)}, look at what it runs (laki widget what ${w.id})` : OFF(w) } // a repo's: never once, unlooked
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script: give it a source (static, file or url)` }
   const src = sourceOf(w)
@@ -1665,6 +1668,7 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
 // workspace is selected if it's older than that; one placed in row (a mark on each row) every live workspace's, AT_ONCE
 // at a time (the rest at the next ticks)
 export function widgetTick(now = Date.now(), reason: 'schedule' | 'open' | 'select' = 'schedule') {
+  if (safeOn()) return // safe mode (safe.ts)
   streamSync(now)
   termTick(now)
   if (!shown()) return

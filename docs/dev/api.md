@@ -52,6 +52,21 @@ tools of `shared/tools.ts` none of whose methods were called (`toolMethods`: eac
 the names and never answers; ponytail: what it calls before its first await). Settings › Agents & profiles › *What
 agents call* (SettingsAgents.tsx `AgentCalls`). Tested in `test/tool-days.test.ts`.
 
+- safe mode (`safe.ts`): `<data>/starts.json` (writeAtomic) keeps the last 5 starts, each `{ at, alive?, clean?,
+  suspects? }`: `safeStart` (right after the lock) adds this one, `alive` after a minute (`LAKI_SAFE_ALIVE_MS`: tests'),
+  `clean` at `shutdown` (`safeStop`: a quit, Settings' restart, an update's, a restore's; the hung bar's SIGKILL is a
+  death), `suspects` at an uncaught error (`safeCrash`: what `safeSeen` saw in the 10 s before: an extension's fetch
+  (widgetRun) or handler (widgetEvents' handle), a running workflow run (flowTick), a task's run (runSchedule)). The
+  last 3 all neither alive nor clean: `safe { since, suspects }`, kept in the file until the user leaves it (a restart
+  doesn't end it), in the view as `safe`. While safe, these return at once: `widgetRun`, `widgetTick`, `factsTick`,
+  `widgetEvent`'s handlers and workflow starts (the event is still logged), `scheduleTick`, `eventTick`, `pendingTick`,
+  `flowTick` and `flowResume` (`resumeLater`: flowTick resumes once it's off), `scanPorts` (after `syncBranches` and
+  the artifacts), `prTick`, `scanPRs`, `gitTidyTick`. Extensions' gates still run (they hold Ship and Merge). A test's
+  daemon (`inRig`) is exempt unless `LAKI_SAFE_TEST=1`. `safeOff { without?, now? }` (AGENT_NO, REMOTE_NO, ANSWER_NO):
+  `without` turned off first (`widgetSet` on false, `scheduleSet` on false, or `flowPause`), then safe cleared and
+  `scheduleTick`, `pendingTick`, `widgetTick` run now. MainArea.tsx's banner: *Turn on without* and the name, per
+  suspect, *Turn everything on*. Tested in `test/safe.test.ts`.
+
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
   worktrees' *When everything is done*): core.ts `whenDone` at each view, beside `keepAwake`: armed by something going
   (an agent running or waiting, a live workflow run, a scheduled task or a workspace's late start due within the hour),

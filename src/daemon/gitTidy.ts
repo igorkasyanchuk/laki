@@ -14,6 +14,7 @@ import type { GitFacts, Project } from '../shared/types.ts'
 import { changed, exec, git, log, projectArchived, save, settingUp, state, tabStatus, worktreeDo } from './core.ts'
 import { making } from './hosts.ts'
 import { du } from './resources.ts'
+import { safeOn } from './safe.ts'
 
 export const TIDY_DAYS = 7
 export const LOOSE_MANY = 20000 // laki doctor says so past this many loose objects
@@ -76,7 +77,7 @@ export async function gitTidy(o: { project: string; asked?: boolean }) {
 
 // hourly: the first project due (a week since its last run, or never), not busy; one a tick
 export async function gitTidyTick(now = Date.now()) {
-  if (state.settings?.gitTidy === false) return
+  if (state.settings?.gitTidy === false || safeOn()) return // safe mode (safe.ts)
   const due = state.projects.find(p => tidyable(p) && now - (p.tidied?.at ?? 0) >= TIDY_DAYS * 86400e3 && !busy(p))
   if (due) await gitTidy({ project: due.id })
 }

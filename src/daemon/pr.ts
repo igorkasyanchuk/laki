@@ -15,6 +15,7 @@ import { isLive } from './resources.ts'
 import { forgeOf, glabAct, glabDraft, glabIssues, glabPR, glabSays, githubOnly, isLab, noMR, glabRevert } from './gitlab.ts'
 import { gatesKey, widgetEvent } from './widgets.ts'
 import { alertShow } from './alerts.ts'
+import { safeOn } from './safe.ts'
 
 // ---------- branches: each workspace's follows its folder, the PRs it names, a scan soon after a turn
 
@@ -128,7 +129,7 @@ const checksOf = (list: Check[]): PR['checks'] =>
 // the timer's scan (every minute): once settings.prScan minutes have gone by (a little early: the timer drifts)
 let prLast = 0
 export function prTick(now = Date.now()) {
-  if (state.settings?.bgRefresh === false || now - prLast < (state.settings?.prScan || PR_SCAN) * 60000 - 5000 || prScan) return // one going (a turn's end's): the next minute's
+  if (safeOn() || state.settings?.bgRefresh === false || now - prLast < (state.settings?.prScan || PR_SCAN) * 60000 - 5000 || prScan) return // one going (a turn's end's): the next minute's
   prLast = now
   return scanPRs(true)
 }
@@ -227,6 +228,7 @@ export async function quotaLow(now: number) {
   return true
 }
 export function scanPRs(bg = false, only?: Set<string>): Promise<void> {
+  if (safeOn()) return Promise.resolve() // safe mode: no PR scan (safe.ts)
   if (prScan) {
     if (!bg) prAgain = !only || prAgain === true ? true : new Set([...(prAgain ?? []), ...only]) // e.g. a ship just opened a PR
     return prScan

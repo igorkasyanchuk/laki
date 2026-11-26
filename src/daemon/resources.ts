@@ -16,6 +16,7 @@ import { gitFacts } from './gitTidy.ts'
 import { Session } from './session.ts'
 import { widgetEvent } from './widgets.ts'
 import type { turnsDrop, turnsKept } from './turns.ts'
+import { safeOn } from './safe.ts'
 
 const KILL_AFTER = Number(process.env.LAKI_KILL_AFTER_MS) || 3000 // SIGKILL this long after a SIGTERM that's shrugged off (tests' shorter)
 // what an agent runs without a shell between (its browser bridge, an MCP server, the browser that one drives), any
@@ -31,6 +32,7 @@ const RESTORED_QUIET = 60_000
 export async function scanPorts() {
   syncBranches()
   void scanArtifacts()
+  if (safeOn()) return // safe mode: no port scan (safe.ts)
   const root = new Map<number, string>()
   const rootTab = new Map<number, string>() // each pid's tab (the tree it's under)
   const agents: number[] = [] // agent tabs' pids

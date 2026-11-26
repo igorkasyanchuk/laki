@@ -3633,6 +3633,10 @@ Laki starts agents and what Laki does itself, not what you type in a shell tab: 
 - **The window froze or went blank**: after 10 seconds Laki asks *Wait* or *Reload* (your agents keep running either
   way); `~/.laki/app.log` says what happened.
 - **The app shows "connecting to the daemon…"**: check `~/.laki/daemon.log`. To restart the daemon, run `laki stop`, then reopen the app.
+- **A *Safe mode* banner**: the daemon stopped three times in a row in its first minute, so Laki starts nothing on its
+  own: no extensions' fetches, scheduled tasks, workflows, PR or port scans. Terminals and agents work. *Turn on without*
+  and a name turns off what ran before a crash and the rest on; *Turn everything on* turns it all on. It stays until you
+  pick one, across restarts.
 - **Laki uses a lot of memory**: Settings › Resources says what: it's nearly always the agents (each Claude is
   200 MB to a few GB after a long day) and what they started. *Sleep* the idle ones, or set *Sleep idle agents
   after*.

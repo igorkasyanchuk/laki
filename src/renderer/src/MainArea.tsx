@@ -44,6 +44,22 @@ export function mainOf(app: AppCtx) {
             <IconButton icon="x" title="Dismiss" onClick={() => setTroubleSeen(view.trouble!.at)} />
           </div>
         )}
+        {connected && view.safe && ( // safe mode (daemon/safe.ts): only you leave it, with or without what ran before a crash
+          <div className="stale-bar" role="alert">
+            <Icon name="alertCircle" size={16} />
+            <span>
+              <b>Safe mode.</b> Laki's daemon stopped three times in a row in its first minute, so extensions, scheduled tasks, workflows and the PR and port scans are off. Terminals and agents work.
+            </span>
+            {view.safe.suspects.map(s => (
+              <button key={`${s.kind}:${s.id}`} title={`Turns the ${s.kind === 'task' ? 'scheduled task' : s.kind} ${s.name} off, then the rest on`} onClick={() => void api.call('safeOff', { without: { kind: s.kind, id: s.id, source: s.source, project: s.project } }).then(() => toast(`Everything is on but ${s.name}`), fail)}>
+                Turn on without {s.name}
+              </button>
+            ))}
+            <button className={view.safe.suspects.length ? 'ghost' : undefined} onClick={() => void api.call('safeOff', {}).then(() => toast('Everything is on'), fail)}>
+              Turn everything on
+            </button>
+          </div>
+        )}
         {connected && ws?.broken && ( // T13: its worktree broke: what Laki found, and the repairs for that kind
           <div className="stale-bar" role="alert">
             <Icon name="alertCircle" size={16} />

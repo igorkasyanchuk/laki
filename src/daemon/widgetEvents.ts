@@ -17,6 +17,7 @@ import { filesHash } from './widgetTrust.ts'
 import { dir } from './dir.ts'
 import { approve, grant, grantKey } from './widgetTools.ts'
 import { LOG_RUN, xlog } from './widgetLogs.ts'
+import { safeOn, safeSeen } from './safe.ts'
 
 // ---------- events (widget.json's on: { "<event>": "<action>" | "refresh" }): core calls widgetEvent as each happens.
 // Every extension that's on and answers it runs that action, or fetches again, with LAKI_EVENT, the event's JSON on
@@ -84,6 +85,7 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   if (name === 'tool.call' && ![...widgets.values()].some(w => handlerOf(w, name))) return rec // every tool call: kept only when an extension answers it, or it'd be the whole log
   sent.push(rec)
   if (sent.length > SENT_MAX) sent.shift()
+  if (safeOn()) return rec // safe mode: no workflow starts, no handler runs (safe.ts)
   const flows = name === 'tool.call' ? undefined : eventHooks.flows?.(name, { ...head, ...extra }, x?.id, o.from?.agent, hops) // every tool call: never a workflow's start
   if (flows) Object.assign(rec, { flows: flows.flows }, flows.refused.length && { refused: flows.refused })
   if (![...widgets.values()].some(w => handlerOf(w, name))) return rec // none answers it: nothing built
@@ -320,6 +322,7 @@ async function drain(id: string) {
 // an extension handling an agent's event: that agent's, until its handler ends (an event it emits meanwhile is the agent's)
 const handling = new Map<string, string>()
 async function handle(id: string, j: Job) {
+  safeSeen({ kind: 'extension', id, name: widgets.get(id)?.m.name || id })
   const w = widgets.get(id)
   if (!w || !onOf(w)) return
   // an agent's event and an action: a command the user never asked for, asked first as an agent's tool is (Always: for
