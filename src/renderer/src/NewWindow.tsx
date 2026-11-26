@@ -23,7 +23,7 @@ import { FONT_SIZE, termLook } from './settingsBase'
 import { Term } from './Term'
 import { setSendKey } from '../../shared/keys'
 import { applyTheme, LESS_CLEAR, macApp, type Paint, paintKey, paintOf, transparent, userCss } from './themes'
-import { ask, AskHost, askText, Icon, IconButton, keep, load, Tips, Toasts, useMenu } from './ui'
+import { ask, AskHost, askText, Icon, IconButton, keep, load, Tips, Toasts, useMenu , setBadges } from './ui'
 import { handOff } from './tell'
 import { cloudVoice, voiceStart } from './voice'
 import { Glyph as ExtGlyph, imagesVia, insertMenus, inWs, WidgetPanel } from './Widgets'
@@ -63,6 +63,7 @@ function useView() {
   userCss(view?.settings.customCss) // Appearance › Custom CSS, as the app's window
   setSendKey(view?.settings.sendKey) // Settings › Keys › Send with
   setSecretHint(view?.settings.secretHint) // a pasted secret's line (secretHint.tsx)
+  if (view) setBadges(view.projects.filter(p => !p.kind), view.settings.projectBadges !== false) // #5: badges as the app window's (Settings › Layout › Project badges)
   return view
 }
 
