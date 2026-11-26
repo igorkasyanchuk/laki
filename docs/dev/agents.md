@@ -729,6 +729,9 @@ node-pty's children belong to the daemon (session.ts), so a crash or a restart e
   `<data>/ptyhost.log`. It ends with `quit` (a stop), with no live terminal and no daemon for 10 minutes
   (`LAKI_PTY_IDLE_MS`), with no daemon at all for 3 days whatever still runs (`LAKI_PTY_ORPHAN_MS`), or in tests once
   `LAKI_TEST_PARENT` is gone.
+  A daemon that stops reading (a hung one) is dropped once 16 MB wait to go out to it (`send`'s `SEND_MAX`, at least
+  3 rings: an attach's reply; `LAKI_PTY_SEND_MAX`: tests'): its terminals go on, the next connection attaches from the
+  ring (`test/ptyhost.test.ts`).
 - **Protocol** (`src/ptyhost/proto.ts`): a unix socket `<data>/pty.sock` (0600; in the temp folder by the data folder's
   hash when that path is too long for a socket), frames of a 4-byte length and JSON. Ops: `hello`, `list`, `spawn`,
   `attach { id, from }`, `write`, `resize`, `kill { id, signal }`, `forget`, `quit`; events: `spawned`, `data` (`at`: its

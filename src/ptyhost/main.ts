@@ -30,9 +30,14 @@ const secret = Buffer.from(randomBytes(32).toString('hex'))
 let wrote = false // the secret's file is this host's: removed as it quits (one that lost the race to listen never wrote it)
 const known = (t: unknown) => typeof t === 'string' && t.length === secret.length && timingSafeEqual(Buffer.from(t), secret)
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), 'ptyhost', ...a)
-// ponytail: no bound on what waits for a daemon that stopped reading (a hung one): dropping it would end its terminals
-// once it's back (ptyHost.ts' lost); a cap with a re-attach from the ring if a hung daemon is ever seen to cost memory
-const send = (s: Socket, m: unknown) => void (s.destroyed || s.write(frame(m)))
+// a daemon that stopped reading (a hung one): past SEND_MAX waiting to go out, its connection is dropped, the terminals
+// kept; one that dials again attaches from where its output got to (ptyHost.ts' regain), the ring's 2 MB at most
+const SEND_MAX = Math.max(Number(process.env.LAKI_PTY_SEND_MAX) || 16 << 20, 3 * RING) // over an attach's reply (the ring); tests' smaller
+const send = (s: Socket, m: unknown) => {
+  if (s.destroyed) return
+  if (s.writableLength > SEND_MAX) return void (log(`a connection not reading: ${s.writableLength} bytes waited, dropped`), s.destroy())
+  s.write(frame(m))
+}
 const live = () => [...ptys.values()].filter(p => p.exit === undefined)
 const size = (v: unknown, max: number, d: number) => Math.max(1, Math.min(max, Number(v) | 0 || d))
 

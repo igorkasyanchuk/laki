@@ -216,21 +216,42 @@ export function apply() {
   const { stage, aside } = pending
   pending = undefined
   try {
-    mkdirSync(aside, { recursive: true, mode: 0o700 })
-    for (const n of KEEP) {
-      if (existsSync(join(dir, n))) renameSync(join(dir, n), join(aside, n))
-      if (existsSync(join(stage, n))) renameSync(join(stage, n), join(dir, n))
-    }
-    const was = json(join(aside, 'state.json'))
-    const now = json(join(dir, 'state.json'))
-    if (was && now) {
-      for (const k of MACHINE) if (was[k] !== undefined) now[k] = was[k]
-      writeFileSync(join(dir, 'state.json'), JSON.stringify(now, null, 2), { mode: 0o600 })
-    }
-    log(`restore: done; what was here is in ${aside}`)
-  } catch (e) {
-    log(`restore failed: ${(e as Error).message} (what was here is in ${aside})`)
+    moveIn(stage, aside)
   } finally {
     rmSync(stage, { recursive: true, force: true })
+  }
+}
+// each of names: what's here moved aside, the backup's moved in; a step that fails puts back each one moved, last
+// first (the backup's to the stage, what was here from aside), so the data is as it was, not half a restore
+export function moveIn(stage: string, aside: string, into = dir, names: readonly string[] = KEEP) {
+  const moved: { name: string; hadOld: boolean; hadNew: boolean }[] = []
+  try {
+    mkdirSync(aside, { recursive: true, mode: 0o700 })
+    for (const name of names) {
+      const m = { name, hadOld: false, hadNew: false }
+      moved.push(m)
+      if (existsSync(join(into, name))) renameSync(join(into, name), join(aside, name)), (m.hadOld = true)
+      if (existsSync(join(stage, name))) renameSync(join(stage, name), join(into, name)), (m.hadNew = true)
+    }
+    const was = json(join(aside, 'state.json'))
+    const now = json(join(into, 'state.json'))
+    if (was && now) {
+      for (const k of MACHINE) if (was[k] !== undefined) now[k] = was[k]
+      writeFileSync(join(into, 'state.json'), JSON.stringify(now, null, 2), { mode: 0o600 })
+    }
+    log(`restore: done; what was here is in ${aside}`)
+    return true
+  } catch (e) {
+    const stuck: string[] = []
+    for (const m of moved.reverse())
+      try {
+        if (m.hadNew) renameSync(join(into, m.name), join(stage, m.name))
+        if (m.hadOld) renameSync(join(aside, m.name), join(into, m.name))
+      } catch (e2) {
+        stuck.push(`${m.name} (${(e2 as Error).message})`)
+      }
+    if (!stuck.length) rmSync(aside, { recursive: true, force: true }) // empty: all of it back
+    log(`restore failed: ${(e as Error).message}; ${stuck.length ? `put back all but ${stuck.join(', ')}: those are in ${aside}` : 'rolled back, the data is as it was'}`)
+    return false
   }
 }

@@ -2,7 +2,8 @@
 // week old (LAKI_BACKUP_MS: the tick and the week, a test's), the newest four of its own kept, nothing else in the
 // folder touched; a folder that isn't there: one notice, not one a tick; offered once after your first backup
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readdirSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, seen, until } from './helpers.ts'
@@ -64,4 +65,24 @@ test('#B2: the default folder (~/Documents/Laki backups) is made the first time,
   await rig.rpc('settingsSet', { backupEvery: 'weekly', backupDir: '' }) // the field emptied: its placeholder's folder, not none
   const folder = join(rig.home, 'Documents', 'Laki backups')
   await until(() => existsSync(folder) && readdirSync(folder).some(n => /^laki-weekly-.*\.tgz$/.test(n)), 'a backup in the folder it made', 20000)
+})
+
+test("a restore's move that fails midway is rolled back: what was here is back, nothing half restored", async () => {
+  const home = mkdtempSync(join(tmpdir(), 'laki-restore-'))
+  process.env.LAKI_HOME = join(home, 'data') // dataBackup.ts' import: never yours
+  const { moveIn } = await import('../src/daemon/dataBackup.ts')
+  const [into, stage] = [join(home, 'into'), join(home, 'stage')]
+  for (const d of [into, stage]) mkdirSync(d)
+  for (const n of ['a', 'b']) writeFileSync(join(into, n), `old ${n}`), writeFileSync(join(stage, n), `new ${n}`)
+  mkdirSync(join(stage, 'x'))
+  writeFileSync(join(stage, 'x', 'y'), 'new y') // into has no x/: its move fails, after a and b moved
+  assert.equal(moveIn(stage, join(home, 'aside'), into, ['a', 'b', 'x/y']), false)
+  assert.deepEqual(['a', 'b'].map(n => readFileSync(join(into, n), 'utf8')), ['old a', 'old b'], 'what was here, back')
+  assert.deepEqual(['a', 'b'].map(n => readFileSync(join(stage, n), 'utf8')), ['new a', 'new b'], "the backup's, back in the stage")
+  assert.ok(!existsSync(join(home, 'aside')), 'nothing left aside')
+  // all of it: moved in, what was here aside
+  assert.equal(moveIn(stage, join(home, 'aside'), into, ['a', 'b']), true)
+  assert.deepEqual(['a', 'b'].map(n => readFileSync(join(into, n), 'utf8')), ['new a', 'new b'])
+  assert.deepEqual(['a', 'b'].map(n => readFileSync(join(home, 'aside', n), 'utf8')), ['old a', 'old b'])
+  rmSync(home, { recursive: true, force: true })
 })

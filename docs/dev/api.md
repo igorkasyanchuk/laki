@@ -203,7 +203,9 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   while `agentsBusy` unless `force`; `{ dryRun?, manifest, rows: { what, now, backup }[], dropped, aside }`. Not a dry
   run: the daemon stops 200 ms after its answer and `shutdown` calls `apply` last (the daemon.lock kept till then): each
   `BACKUP_KEEP` name moved into `aside` (`<data>/backup-before-restore-<time>`), the backup's moved in, this Mac's
-  remote access and tunnels written back into its state.json. The user's only (AGENT_NO, REMOTE_NO, ANSWER_NO;
+  remote access and tunnels written back into its state.json (`moveIn`); a step that fails puts back each one moved,
+  last first (`{ name, hadOld, hadNew }`: the backup's to the stage, what was here from aside), logged, so the data is
+  as it was (`test/backup-auto.test.ts`). The user's only (AGENT_NO, REMOTE_NO, ANSWER_NO;
   `backup` cap); `test/cli-more.test.ts`; `usage-days.json` (the Usage page's days) in `BACKUP_KEEP` too.
   **Weekly** (#B2): `settings.backupEvery` (`weekly`; unset or `off`: none) and `backupDir` (~ is home), the user's alone
   (AGENT_SETTINGS_NO, REMOTE_KEYS' `backup.*`; a client has no settingsSet). `backupTick` (main.ts' ticks, hourly;

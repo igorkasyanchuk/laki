@@ -107,6 +107,22 @@ test('the pty host: a socket of the user alone; spawn, write, resize, attach fro
   await until(() => !running(h.pid!) && !running(two) && !existsSync(join(home, 'pty.sock')) && !existsSync(join(home, 'pty.secret')), 'the host, its terminal and its secret gone')
 })
 
+test("the pty host: a daemon that stops reading is dropped past LAKI_PTY_SEND_MAX, its terminal kept for the next", async t => {
+  const home = mkdtempSync(join(tmpdir(), 'laki-pty-'))
+  const h = host(home, { LAKI_PTY_SEND_MAX: String(6 << 20) })
+  t.after(() => (h.kill('SIGKILL'), rmSync(home, { recursive: true, force: true })))
+  const a = await own(home)
+  a.post({ op: 'spawn', id: 'loud', file: '/bin/sh', args: ['-c', 'while :; do printf "%01000d\\n" 0; done'], cwd: home, env: { PATH: process.env.PATH ?? '' }, cols: 80, rows: 24 })
+  const pid = (await until(() => a.got.find(x => x.ev === 'spawned' && x.id === 'loud'), 'spawned')).pid
+  a.s.pause() // a hung daemon: nothing read
+  const b = await own(home) // one daemon at a time: taken only once the host dropped the one not reading
+  a.s.destroy()
+  assert.ok(running(pid), 'its terminal still runs')
+  assert.deepEqual((await b.ask({ op: 'list' })).ptys.map((p: any) => [p.id, p.exit]), [['loud', undefined]])
+  assert.ok((await b.ask({ op: 'attach', id: 'loud', from: 0 })).d.length > 0, 'attached again from the ring')
+  b.post({ op: 'kill', id: 'loud', signal: 'SIGKILL' })
+})
+
 test('the pty host: with no terminal and no daemon it ends by itself; one of another version is started again only when it holds no live terminal', async t => {
   const home = mkdtempSync(join(tmpdir(), 'laki-pty-'))
   process.env.LAKI_HOME = home // ptyHost.ts' data folder, read as it loads
