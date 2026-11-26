@@ -4845,10 +4845,12 @@ function loopCount(tab: Tab, r: Runtime, pl: { hook_event_name?: unknown; tool_i
   if (r.loop) return void ((r.loop = { ...r.loop, cmd: hit.cmd.slice(0, 500), n: hit.n }), changed())
   r.loop = { cmd: hit.cmd.slice(0, 500), n: hit.n, since: Date.now() }
   const ws = state.workspaces.find(w => w.id === tab.workspace)
-  const text = `${ws?.name || tab.workspace} · ${tab.name} ran ${hit.cmd.slice(0, 120)} ${hit.n} times with the same error`
+  const who = `${ws?.name || tab.workspace} · ${tab.name}`
+  const said = `Ran ${hit.cmd.slice(0, 120)} ${hit.n} times with the same error`
   wsLog({ id: tab.workspace }, `${tab.name} loops: ${hit.cmd.slice(0, 200)} failed ${hit.n} times with the same error`)
-  broadcast({ ev: 'loop', tab: tab.id, ws: tab.workspace, text })
-  if (state.settings?.notifyOn?.loop !== false) phoneLong(tab, redact(text), 'loop') // it leaves the Mac: secrets' shapes masked
+  broadcast({ ev: 'loop', tab: tab.id, ws: tab.workspace, text: `${who} ${said.replace(/^R/, 'r')}` })
+  // the phone's: the command is off the screen, so it's the push's question (titles only drops it), secrets' shapes masked
+  if (state.settings?.notifyOn?.loop !== false) phoneLong(tab, `${who} loops`, 'loop', redact(said))
   changed()
 }
 // a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the

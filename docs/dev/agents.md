@@ -422,8 +422,9 @@ Bash calls) or 5 times in a turn sets `Runtime.loop` `{ cmd, n, since }` once pe
 `tab.loop` while it runs (`needAt` its `since`). A success of that command clears it, `failDismiss` (Needs you's *Let it
 work*) clears it and sets `loopLet` (none again this turn), a turn's start or end (`loopEnd`) forgets everything. As it's
 set: a line in the workspace's log, the `loop` event (useDaemon: a notification unless `settings.notifyOn.loop` is
-false, the tab is on screen and focused, or muted; Quiet: `notify`'s) and `phoneLong(…, 'loop')` (the same switch; held
-at the Mac, `holding`). Needs you's card (`failedNeed`, `needsTab`): *Nudge* (askText with the message, then `send`
+false, the tab is on screen and focused, or muted; Quiet: `notify`'s) and `phoneLong(…, 'loop')` (the same switch, drawn
+without macOS's disabled state; held at the Mac, `holding`; its title the workspace and tab, the command, redacted,
+the push's question: *titles only* drops it). Needs you's card (`failedNeed`, `needsTab`): *Nudge* (askText with the message, then `send`
 steer), *Stop* (`stopAll` with its tab), *Let it work*; no ✕ or Snooze (any hook of a running turn ends a snooze). The
 sidebar row's `ws-loop` mark says *looping ×n*. Only claude's hooks say a call failed: codex's notify, OpenCode's plugin
 (busy, idle, asks, errors), Antigravity and Grok (no hooks) and ACP (its `tool_call_update` failed is the Reader's, not
