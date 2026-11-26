@@ -2534,7 +2534,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('mcpAuthTick', Number(process.env.LAKI_MCP_AUTH_MS) || 20_000, () => mcpAuthTick(), { idle: 'slow' }) // an MCP server that needs a sign-in, read off a claude or codex tab's screen (mcpAuth.ts)
   ticks.register('diskLowTick', Number(process.env.LAKI_DISK_LOW_MS) || 5 * 60_000, () => resourcesMod.diskLowTick(), { idle: 'slow' }) // before it's full: a notice once a low spell (tests' shorter)
   ticks.register('dndTick', 20_000, () => core.dndTick(), { idle: 'keep' }) // U8: Do not disturb ends on time, its digest shown
-  ticks.register('logTick', 3_600_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep' }) // R3: past 10 MB while it runs too, not only at its start
+  ticks.register('logTick', 1_800_000, () => void rotateLog(join(dir, 'daemon.log'), true), { idle: 'keep', unref: true }) // R3: past 10 MB while it runs too (copied to .1, then cut: stdout stays open on it), not only at its start
   ticks.register('ghHour', 3_600_000, core.ghHour) // Laki's own gh calls, an hour's, in its log
   ticks.register('screensSave', screensMod.SCREEN_EVERY(), () => screensMod.screensSave(), { idle: 'slow' }) // #S1: shell tabs' screens whose output changed, kept for a restart
   ticks.register('backupTick', Number(process.env.LAKI_BACKUP_MS) || 3_600_000, () => void backupMod.backupTick(), { idle: 'keep' }) // #B2: the weekly backup, when it's due (tests: LAKI_BACKUP_MS, both the tick and the week)

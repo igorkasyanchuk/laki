@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- The daemon's log is cut back past 10 MB every half hour while it runs, not every hour.
 - A restore that fails midway puts your data back as it was, and a hung daemon no longer makes the terminals' host hold their output in memory without end.
 - A closed agent tab's cost stays in its workspace's spend cap and cost warning.
 - Settings say a little more on security: remote access's page comes through its tunnel too, an extension's gate holds Laki's Ship and Merge (not an agent's own git or gh), and the terminal that started Laki stays allowed.

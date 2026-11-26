@@ -38,10 +38,10 @@
 //   policyTick     5 min  keep   the managed policy read again
 //   aiTick         10 min keep   Laki AI's unused spec chats ended
 //   memoryTick     30 min keep   memory's compaction, when due
+//   logTick        30 min keep   daemon.log past 10 MB copied to daemon.log.1, then cut (conn.ts rotateLog)
 //   archiveIdleTick 30 min keep  worktrees nobody touched archived (pr.ts, settings.archiveIdle)
 //   spareTick      10 min keep   each project's spare worktree made or brought to the checkout's commit (settings.spareWorktree), removed without it
 //   ghHour         1 h    keep   Laki's own gh calls in its log
-//   logTick        1 h    keep   daemon.log past 10 MB moved to daemon.log.1 (conn.ts rotateLog)
 //   tidy           1 h    keep   old pasted images, storage files, archived workspaces, trash
 //   agentVersionsTick 6 h slow   the agent CLIs' newest versions, npm's registry (agentCli.ts: a dot on Settings)
 // Not here: one-shot waits (core.ts whenPrompt, workflow.ts esc), each a few seconds.
