@@ -168,7 +168,10 @@ export function bgOutput(p: { tab: string; id: string }) {
 type MeterRun = Tail & { m: Meter; big?: boolean; bg: BgRead } // big: claude's own settings run it on a 1M window
 const meters = new Map<string, MeterRun>()
 const todayPath = join(dir, 'usage-today.json')
-let spent: { day: string; chats: Record<string, { ws: string; tokens: number; cost: number }> } | undefined
+// name: its workspace's as it was, so one removed since is still named in Today
+let spent: { day: string; chats: Record<string, { ws: string; name?: string; tokens: number; cost: number }> } | undefined
+// (none for a private one, or one of a private project: Recording mode hides them, never named here)
+const nameOf = (ws: string) => (w => (w && !w.private && !state.projects.find(p => p.id === w.project)?.private ? w.name || w.id : undefined))(state.workspaces.find(x => x.id === ws))
 function spentNow() {
   const day = dayOf(Date.now())
   if (!spent) spent = readJson(todayPath)
@@ -190,7 +193,7 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
   if (tab.preset === 'claude') bgOf(text, r.bg)
   const s = spentNow()
   if (r.m.today.tokens > (s.chats[tab.resumeId!]?.tokens ?? 0)) {
-    s.chats[tab.resumeId!] = { ws: tab.workspace, tokens: r.m.today.tokens, cost: r.m.today.cost }
+    s.chats[tab.resumeId!] = { ws: tab.workspace, name: nameOf(tab.workspace), tokens: r.m.today.tokens, cost: r.m.today.cost }
     writeAtomic(todayPath, JSON.stringify(s))
   }
   keepDays(tab, r.m)
@@ -305,7 +308,7 @@ function otherRead(t: Tab) {
   keepDays({ ...t, resumeId: id }, { days })
   const today = Object.values(days[dayOf(Date.now())] ?? {}).reduce((a, v) => ({ tokens: a.tokens + v.tokens, cost: a.cost + v.cost }), { tokens: 0, cost: 0 })
   const s = spentNow()
-  if (today.tokens > (s.chats[id]?.tokens ?? 0)) (s.chats[id] = { ws: t.workspace, ...today }), writeAtomic(todayPath, JSON.stringify(s))
+  if (today.tokens > (s.chats[id]?.tokens ?? 0)) (s.chats[id] = { ws: t.workspace, name: nameOf(t.workspace), ...today }), writeAtomic(todayPath, JSON.stringify(s))
 }
 const WINDOW = 200e3 // claude's context unless its model says [1m] (its transcript doesn't say)
 // claude's own settings, as it reads them (the workspace's local, then its project's, then yours: its account's folder):
@@ -424,10 +427,11 @@ export function statusTidy() {
 export function todayView(): Today | undefined {
   const chats = Object.values(spentNow().chats)
   if (!chats.length) return
-  const ws = new Map<string, { ws: string; tokens: number; cost: number }>()
+  const ws = new Map<string, { ws: string; name?: string; tokens: number; cost: number }>()
   for (const c of chats) {
     const w = ws.get(c.ws) ?? { ws: c.ws, tokens: 0, cost: 0 }
     ws.set(c.ws, w)
+    w.name = nameOf(c.ws) ?? c.name ?? w.name // its name now, else as it was kept
     w.tokens += c.tokens
     w.cost += c.cost
   }

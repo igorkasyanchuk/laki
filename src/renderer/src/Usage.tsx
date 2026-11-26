@@ -3,7 +3,7 @@
 // sign-in, at most every 5 minutes (usage.ts); Settings › Appearance picks the agents. Under them, today's tokens and
 // their ≈ cost at API prices (the daemon's meters, View.today); and the words a tab's context and usage are said in.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Backdrop, IconButton, Page, act } from './ui'
+import { Backdrop, Icon, IconButton, Page, act } from './ui'
 import { ago as agoOf } from './Info'
 
 import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow, usageOld } from '../../shared/types'
@@ -111,7 +111,7 @@ export function UsageButton({ load, credits, onUse, onDays, today, asks, onAsk }
 const nameOf = (r: AgentUsage, rows: AgentUsage[]) => [NAMES[r.agent] ?? r.agent, rows.filter(x => x.agent === r.agent).length > 1 && (r.account === HOME_ACCOUNT ? 'Default' : r.name)].filter(Boolean).join(' · ')
 
 // today's, its workspaces by name
-export type Spent = Omit<Today, 'ws'> & { ws: { name: string; tokens: number; cost: number }[] }
+export type Spent = Omit<Today, 'ws'> & { ws: { name: string; gone?: boolean; tokens: number; cost: number }[] } // gone: removed since
 
 function windowRow(w: UsageWindow, now: number) {
   const p = live(w, now)
@@ -251,7 +251,9 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
             </div>
             {today.ws.map((w, i) => (
               <div key={i} className="usage-row usage-spent">
-                <span className="usage-label">{w.name}</span>
+                <span className="usage-label" data-tip={w.gone ? 'Removed since: its name as it was' : undefined}>
+                  {w.gone && <Icon name="trash" size={11} />} {w.name}
+                </span>
                 <span className="usage-pct">{w.cost ? `$${w.cost.toFixed(2)}` : ''}</span>
                 <span className="muted small usage-when">{tokensText(w.tokens)} tokens</span>
               </div>

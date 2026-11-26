@@ -122,6 +122,7 @@ test("meter: a tab's view has its context and usage, read on as the transcript g
   const today = (await rig.rpc('state')).today
   assert.deepEqual([today.tokens, today.ws.map((x: any) => x.ws)], [447000, [ws.id]])
   assert.deepEqual(JSON.parse(readFileSync(join(rig.data, 'usage-today.json'), 'utf8')).chats['chat-1'].tokens, 447000)
+  assert.equal(today.ws[0].name, ws.id, 'its name kept with it: Today names a workspace removed since')
 
   // codex: its rollout under $HOME/.codex/sessions, the window its own
   const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
@@ -154,6 +155,9 @@ test("meter: a tab's view has its context and usage, read on as the transcript g
   assert.ok(d.rows.every((r: any) => r.ws === ws.id), JSON.stringify(d.rows)) // Where it went: each row's workspace
   assert.deepEqual(d.ai, []) // no Laki AI calls
   assert.ok(JSON.parse(readFileSync(join(rig.data, 'usage-days.json'), 'utf8')).chats['chat-1'].days)
+  // removed: Today still names it, as it was
+  await rig.rpc('wsRm', { id: ws.id, force: true })
+  assert.deepEqual((await rig.rpc('state')).today.ws.map((x: any) => [x.ws, x.name]), [[ws.id, ws.id]])
 })
 
 // a protobuf message: [field, varint or bytes]…

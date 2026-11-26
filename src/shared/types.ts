@@ -1583,7 +1583,7 @@ export function unmasked<T extends Record<string, any>>(p: T, now: Settings): T 
   return Object.fromEntries(Object.entries(p ?? {}).filter(([k, v]) => !(k in m && m[k] !== real[k] && JSON.stringify(v) === JSON.stringify(m[k])))) as T
 }
 // today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
-export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
+export type Today = { tokens: number; cost: number; ws: { ws: string; name?: string /* its name as kept: a removed one's too */; tokens: number; cost: number }[] }
 
 // specs and brainstorms (settings.specs, specsOn; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
