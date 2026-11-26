@@ -6,14 +6,14 @@ import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { aiOn, capSpent, capText, costWords, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
-import { Num, ask, cardMorph, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
+import { Num, ask, cardMorph, choose, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { bulkAnswer, type NeedsApi, NeedsList } from './Needs'
 import { api, openExternal } from './api'
 import { rollup, Glyph } from './Glyph'
 import { type Collision, spanText } from '../../shared/overlap'
-import { type CSSProperties, type DragEvent, type KeyboardEvent as ReactKey, useLayoutEffect, useRef } from 'react'
+import { type CSSProperties, type DragEvent, type KeyboardEvent as ReactKey, useEffect, useLayoutEffect, useRef } from 'react'
 import { short, prState, Avatar, PrCard } from './Info'
 import { RowMarks, rowMarks, TurnChips, WidgetGrid, type WidgetApi } from './Widgets'
 import { planCount } from '../../shared/todos'
@@ -74,12 +74,20 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     if (gone.length) done(`Archived ${gone.length === 1 ? wsName(gone[0]) : `${gone.length} workspaces`}${held.length ? `; ${held.map(wsName).join(', ')} held by an extension (archive it alone to see why)` : ''}`, () => gone.forEach(w => restore(w.id)))
     else if (held.length) toast(`${held.map(wsName).join(', ')} held by an extension: archive it alone to see why`)
   }
+  // several deleted at once (the bar's trash, or Delete with them picked): their artifacts kept (C5, as one's own
+  // delete), unless the box is ticked
   const pickedRm = async () => {
     const ws_ = pickedWs()
-    if (!(await ask(`Delete ${ws_.length} workspaces?`, { text: `${ws_.map(wsName).join(', ')}: their tabs stop, worktrees are removed (the branches stay). Uncommitted changes go with them.`, ok: 'Delete', danger: true }))) return
+    if (!ws_.length) return
+    const arts = ws_.reduce((n, w) => n + (w.artifacts ?? 0), 0)
+    const one = ws_.length === 1
+    const drop = arts && settings?.keepStorage !== false ? { label: `Also delete ${one ? 'its' : 'their'} ${arts === 1 ? 'artifact' : `${arts} artifacts`}`, on: false } : undefined
+    const text = one ? `Its tabs stop${ws_[0].kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}. Uncommitted changes go with it.` : `${ws_.map(wsName).join(', ')}: their tabs stop, worktrees are removed (the branches stay). Uncommitted changes go with them.`
+    if ((await choose(`Delete ${one ? wsName(ws_[0]) : `${ws_.length} workspaces`}?`, `${text}${drop ? ` ${one ? 'Its' : 'Their'} artifacts are kept unless you tick below.` : ''}`, [{ label: 'Cancel' }, { label: 'Delete', primary: true, danger: true }], drop)) !== 1) return
     setPicked([])
-    const ok = await busyWith(ws_.map(w => w.id), 'deleting', () => Promise.all(ws_.map(w => call('wsRm', { id: w.id }).then(() => true, () => false))))
-    done(`Deleted ${ok.filter(Boolean).length} workspaces: their branches stay`)
+    const ok = await busyWith(ws_.map(w => w.id), 'deleting', () => Promise.all(ws_.map(w => call('wsRm', { id: w.id, ...(drop?.on && { dropArtifacts: true }) }).then(() => true, () => false))))
+    const n = ok.filter(Boolean).length
+    done(`Deleted ${one ? wsName(ws_[0]) : `${n} workspaces`}${drop?.on ? ` and ${one ? 'its' : 'their'} artifacts` : ''}: ${one ? 'its branch stays' : 'their branches stay'}`)
   }
   const pickedMute = () => {
     const ws_ = pickedWs()
@@ -664,6 +672,21 @@ export function Sidebar({ app }: { app: AppCtx }) {
     if (stop) rove(t, stop)
   })
   const { addMenu, busiest, dialog, find, lastAt, view, narrow, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
+  // Delete (⌫ or ⌦) with workspaces picked: Delete them… (a field's or a terminal's keys stay theirs)
+  const rmNow = useRef(pickedRm)
+  rmNow.current = pickedRm
+  useEffect(() => {
+    if (!picked.length) return
+    const f = (e: KeyboardEvent) => {
+      if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('.menu, .overlay')) return
+      if ((e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable], .xterm')) return
+      e.preventDefault()
+      e.stopPropagation()
+      void rmNow.current()
+    }
+    window.addEventListener('keydown', f, true)
+    return () => window.removeEventListener('keydown', f, true)
+  }, [picked.length > 0])
   // behind a rail page or a strip: hidden but laid out where it was (styles.css [data-away]), its width given back by a
   // margin so the main area lies over it; it comes back as it was, its scroll too
   const away = listOff || !!strip
@@ -731,7 +754,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
           <IconButton icon="archive" title="Archive them" onClick={pickedArchive} />
           <IconButton icon="bellOff" title="Mute or unmute them" onClick={pickedMute} />
           <IconButton icon="sep" title="Move to group" onClick={e => (items => (items.length ? openMenu(e, items) : toast('Pick workspaces of one project to move them')))(groupMoves(pickedWs()))} />
-          <IconButton icon="trash" title="Delete them…" onClick={pickedRm} />
+          <IconButton icon="trash" title="Delete them… (Delete)" onClick={pickedRm} />
           <IconButton icon="x" title="Clear (Esc)" onClick={() => setPicked([])} />
         </div>
       )}
