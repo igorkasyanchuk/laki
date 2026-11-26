@@ -24,6 +24,7 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |
 | `src/shared/browserBudget.ts` | the memory budget's step: which hidden Browsers page goes (`unloadStep`, main measures and guards) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc`; the daemon's `readJson` (R7: a broken store of its own set aside as `.broken-<ms>`), `writeAtomic` (a temp file of its own, fsynced, then a rename and the folder fsynced), `move` (across volumes too) and `priorOf` (a Write ask's file as it is, for its diff) |
+| `src/shared/artPick.ts` | #3, Comment on an HTML artifact: `ART_PICK`, the picker main.ts' `artifactPage` adds on `?pick=1` (a hover outline; a click numbers a part and posts its selector, markup and words to the viewer), `pickOf` (the viewer's check of that message), `artNotes` (the message for the agent) |
 | `src/shared/caps.ts` | namespaced method names (`RPC_NAMES`: `note.list` → `noteList`, resolved first in main.ts' `call()`; `oldName`), the daemon's `CAPS` (the view's `caps`, `ping { caps: true }`) and `hasCap` (an older daemon by `CAP_SINCE`'s API numbers): `docs/rpc-namespaces.md` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/tray.ts` | Q8: the menu bar icon's state (`stateOf`: idle, working, waiting, blocked), its tooltip and title, its four template pictures (`trayBitmap`) |
