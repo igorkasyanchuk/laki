@@ -3,6 +3,20 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Phone pushes wait while you're at the Mac: a finished turn shows here only, and an ask reaches the phone only if nobody answers it here in 90 s (Settings › Phone pushes).
+- An HTML report from an agent has Comment: click parts of the page, write a note on each, and send them all to the agent with where each one is.
+- Projects get a badge: their repo's logo, or two letters of their own on their color; a click changes it.
+- New project… on Welcome and ⌘K: a folder with git and a first commit, its first workspace a click away.
+- File paths in an agent's answers in the Reader open the file at that line; a whole HTML page in a code block has Preview.
+- Files can show what git ignores (.env, build output), dimmed.
+- An agent can ask for a whole sign-in on one card (email and password), each in a file of its own.
+- Workers an agent starts begin in its permission mode, unless it picks another.
+- Delete (⌫) with several workspaces picked deletes them, their artifacts too if you tick it.
+- Today's spend names a workspace removed since, instead of "a removed workspace".
+- The Laki AI window scrolls again, its box back at the bottom; a long branch name in the status bar has no gap before it.
+
 ## 0.65.0 · Nov 26, 2026
 
 - Remote access at a stable address pins the page's code on your phone: a file the tunnel changed is refused, the page warns and your Mac offers to stop remote access.

@@ -414,7 +414,8 @@ selected workspace's PR is in the status bar.
   first. Terminals', Browsers' and archived rows take none.
 - ⌘-click picks a workspace, ⇧-click every one between it and the last picked: a bar over the list then archives them
   (the ones with uncommitted changes asked once; Undo brings them all back), mutes them, moves them to a group or
-  deletes them (asked first), and dragging one of them moves them all. Esc or a plain click lets them go.
+  deletes them (asked first; Delete or ⌫ does it too, and their artifacts are kept unless you tick *Also delete their
+  artifacts*), and dragging one of them moves them all. Esc or a plain click lets them go.
 - A line divides the projects; each one's workspaces hang under it, indented (Settings › Layout › *The sidebar* adds
   a guide line beside them; none by default).
 - *Diff size* (Settings › Layout › *Sidebar rows*, or a right click › *Show ›*; off by default) puts each workspace's diff size on its row
@@ -2180,7 +2181,9 @@ buttons that open a file, folder or page: `laki show`.
 **Secrets**: an agent that needs a token runs `laki secret "Stripe test key"` (or MCP's `laki_secret`). Its tab then
 needs you: a card under it asks for that, with a masked field. What you type goes to a 0600 file in the workspace's
 storage folder (hidden, deleted after 24 hours) and the agent gets only the file's path, so the value never enters
-its chat or the model's context. *Refuse* says no; after 15 minutes it's a no.
+its chat or the model's context. *Refuse* says no; after 15 minutes it's a no. A whole sign-in on one card:
+`laki secret "Staging QA sign-in" --field email:plain --field password` asks for each (a plain one shown as typed, the
+rest masked with an eye to check them) and the agent gets `{"email": path, "password": path}`, a file each.
 
 *Keep* beside the field (*Only this time*, *Keep for this project*, *Keep for all projects*) keeps the value for next
 time, in the Keychain (else a 0600 file in Laki's data). When an agent asks for the same name again there, the card
@@ -3241,6 +3244,7 @@ laki doctor --disk                                      # what each workspace ta
 laki skills audit [--project shop]                      # every agent's skills: size, ~tokens, the large ones and ones only one agent has
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 path=$(laki secret "Stripe test key")                   # in an agent's tab: you type it on a masked card; it gets a 0600 file's path
+laki secret "QA sign-in" --field email:plain --field password   # several on one card: {"email": path, …}
 laki alert "Ship it?" --choice Ship --choice Wait       # an important card on your screen; prints your pick
 laki notice "fix-login is ready" --to fix-login         # a card in Laki's window, on any page; Open goes to fix-login
 laki screen fix-the-login/claude

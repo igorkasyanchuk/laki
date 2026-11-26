@@ -64,6 +64,12 @@ reads it: the Info tab's *What its agents did*, `laki agent log`.
   `.git/worktrees/<x>/gitdir` may name any folder); refused from an agent, `AGENT_NO`): a project's ⋯ › *Import
   worktrees…* (panels.tsx `ImportWorktrees`);
 - `projectClone { url, into? }` (U7): its progress to the windows as `cloneProgress { line }` (git's own last line, four a second at most), `git clone` of an `https://`, `ssh://` or `git@host:path` URL, `owner/repo` (GitHub's: `gh repo clone`, else https) or a repo's folder here, into `<into>/<name>` (unset: `~/code` when it's there, else beside the last project, else home), then `projectAdd`. Argv only, `--` before the URL, `protocol.ext.allow=never`; anything else (`ext::`, `file://`, `http://`, a leading `-`) is refused. A failed clone leaves no folder. Yours only (`FROM`, `AGENT_NO`).
+- `projectNew { name, into? }` (#10): a folder under into (as projectClone's), `git init -b main`, a README and a first
+  commit (the user's git identity, else Laki's), added; an empty folder already there is taken, one with files refused;
+  yours only (FROM, `AGENT_NO`, `REMOTE_NO`). `files`' `ignored` (what git ignores too: `ls-files --others --ignored
+  --directory`, a wholly ignored folder one entry ending in /) and `under` (such a folder's entries, one level: Files'
+  Show ignored files). `secretAsk`'s `fields` (#7: 2 to 8, `name[:plain]`, one card, `{ paths }`; `secretGive`'s
+  `values`). `presence { idle, locked }` (#1: the app's powerMonitor every 15 s; phone.ts `atMac` holds pushes).
 - `uiDo` (Q13, Laki AI's `laki_ui`; OPEN, as `tabFocus`): `do` show (`tab`, or `ws`: its agent tab, else its first;
   archived refused), link (a `laki://` link, 500 characters at most: links.ts `parseLink` routes it, select and fill in
   only), full_screen (`on`, unless false), panel (`UI_PANELS`, `none` shuts it), close; broadcast as `ui`, App's

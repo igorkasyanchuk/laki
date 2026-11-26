@@ -16,7 +16,7 @@ short version.
   Yesterday, Last 7 days, Last 30 days, Older. *Show › Workers* off keeps an orchestrator's workers out of the sidebar,
   counted on their lead's row.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
-  settings.
+  settings. Each has a badge in the sidebar, ⌘K, the rail and pickers: its repo's logo or favicon, else two letters of its own on its color (a click changes the letters, icon, picture or color). *New project…* (Welcome, ⌘K) makes a folder with git and a first commit and adds it.
 - **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from
   your own templates, then start a workspace from it; or brainstorm an idea with Laki AI in a chat beside it, which writes
   options, a mind map, diagrams and clickable prototypes. Both in one list, filtered by kind, and *New* ▾ for either.
@@ -47,13 +47,13 @@ time and AI money per run (`budget: 60 min, $5`).
   *New session* line; a prompt stopped before an answer: *Edit and resend*; Claude Code waiting out a rate limit says so;
   ←/→ between the questions of one ask; ⏎ or ⌘⏎ sends (Settings › Keys). Any ⌘K command can get its own key there.
   *Continue in Codex* (or Claude Code) hands the chat and its changes to the other agent; *Compacting…* shows while
-  Claude Code compacts. An agent asks for a token with `laki secret`: you type it on a masked card (kept for the project or all projects if you
+  Claude Code compacts. An agent asks for a token with `laki secret` (a whole sign-in, email and password, on one card with `--field`): you type it on a masked card (kept for the project or all projects if you
   like, one click next time), it gets a file's path; a token or key you paste into a prompt box is flagged, masked, and *Pass as a secret* puts it in such a file instead. Asked to, it puts an important question on your screen with `laki alert … --choice …`: a card over every app, your pick goes back to it. `laki notice … --to <session>` is the same card inside Laki's window, on any page, its *Open* going to that session.
   *Side chat*: a quick question about what it's doing, answered beside it (a copy of its chat) while it works.
   *Subagents · n* and *Background · n* over its box list what a Claude Code chat still runs (*Show output*, *Stop*),
   and the status bar's *n running* lists the workspace's, finished ones too;
   an MCP tool's app (MCP Apps) shows under its call, and a `laki-ui` block in an answer is drawn with Laki's own
-  controls (a table, stats, choices you click to answer).
+  controls (a table, stats, choices you click to answer). A file path in an answer (in backticks, a link, or bare: `src/app.ts:42`) that is in the workspace opens there at its line (⌘-click: your editor); a whole HTML page in a code block has *Preview*, drawn right there with no scripts and nothing loaded.
 - **Claude's own numbers**: Claude Code tabs pass Laki their status line, so the context meter knows the chat's real
   window and the plan limits come from Claude itself; your own status line still shows. Numbers older than 20 minutes
   are dimmed and say how old, with *Ask api.anthropic.com* beside them for the current ones.
@@ -68,7 +68,7 @@ time and AI money per run (`budget: 60 min, $5`).
   lines*) the agent gets as a file; a click reads or edits it, ⇧⌘V pastes it as text.
 - **Notifications** (Settings › Notifications, after General): Quiet, macOS notifications and their sound, then a table
   of what tells you where: a row per event (an agent waits, a turn finished, CI failing, a plan limit, a long turn, a
-  workspace's cost past your amounts, a timer), a column per place (macOS, a card on screen, the phone, the sound), the edge glow and the Dock's bounce.
+  workspace's cost past your amounts, a timer), a column per place (macOS, a card on screen, the phone, the sound), the edge glow and the Dock's bounce. Phone pushes wait while you're at the Mac (unlocked, used in the last 2 minutes): a finished turn shows here only, an ask reaches the phone if nobody answers it here in 90 s (Settings › Phone pushes).
 - **Quiet**: no notifications, sounds, cards or phone pushes for 30 minutes, an hour or until 9:00 (the menu bar's
   menu, ⌘K, `laki quiet 1h`, Settings › Notifications); asks still show in Needs you and `laki alert` still comes. As it
   ends, one notification and card sum up what waits, finished and failed.
@@ -93,7 +93,7 @@ time and AI money per run (`budget: 60 min, $5`).
   *Dismiss*, and a bulb on its row. Nothing starts without you.
 - **Orchestrate**: a workspace an agent started says *Created by @lead* (a click goes to that tab), and the tab that started it has a workers dock: each worker's state, progress and question (answered there), failed ones until cleared, what they spent, and Allow N safe, Archive N done and Stop all, each asking first. The orchestrator skill (`/laki:orchestrate` in Claude Code, `/laki-orchestrate` in OpenCode) has one agent split work across several,
   a workspace each, follow them up and bring their reports together. Agents also talk by name: `laki name backend`
-  makes one `@backend` for the rest, `laki ask @backend "…"` asks it and prints its reply.
+  makes one `@backend` for the rest, `laki ask @backend "…"` asks it and prints its reply. A worker started without `--perm` starts in its lead's mode (never one that never asks).
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; ⇧⌘T reopens a tab you closed, its chat resumed (the + menu lists the last 10); their dev servers' ports in the status bar (not
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
@@ -129,13 +129,13 @@ time and AI money per run (`budget: 60 min, $5`).
   a drag to swipe, your keyboard to type, a screenshot into the agent's prompt; a device per workspace, or floated over
   every app; an emulator it starts has no window but Laki's. A *Review* tab puts every changed file's diff in one page, with comments gathered and
   posted as one PR review; its *Walk through* (Laki AI) puts the changes in 3 to 7 steps to read in order, marking
-  what to read with care. Diffs come *Filled* or *Quiet* (the code's own colors on a light tint; Settings › Appearance). One-click layouts put the agent beside the preview, the diff or a shell.
+  what to read with care. Diffs come *Filled* or *Quiet* (the code's own colors on a light tint; Settings › Appearance). One-click layouts put the agent beside the preview, the diff or a shell. Files' *Show ignored files* (the eye, ⌘K) lists what git ignores, dimmed; a folder like `node_modules` lists its files as you open it.
 - **Expose to the world**: a dev server's port as a public link (Cloudflare), for anyone or only some emails; it
   comes back if cloudflared drops, and with your own Cloudflare domain keeps an address like `shop.example.com`.
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
-  opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the side panel's Info. Deleting a workspace keeps them (Settings › Resources › *Artifacts of deleted workspaces*: open, start a workspace with one, delete) unless you tick *Also delete its artifacts*.
+  opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the side panel's Info. Deleting a workspace keeps them (Settings › Resources › *Artifacts of deleted workspaces*: open, start a workspace with one, delete) unless you tick *Also delete its artifacts*. An HTML one has *Comment*: click parts of the page, write a note on each, and *Send to the agent* puts them all in its prompt with where each one is.
 - **Board, schedules, calendar**: every workspace by where it is, to-dos, prompts that run at times written in English (a new workspace each run, the same one each run, or one you pick; *Continue* or *Start fresh*; in groups, like workflows: drag, fold, turn several on or off at once; *Archive* and restore, *Duplicate*; or on a GitHub event: CI failing, a PR, an issue, a push; old run workspaces tidied, a failing task retried, then turned off with *Fix*),
   and reminders, once or again and again (*every weekday at 9:30*), on a calendar of all of it.
 - **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
