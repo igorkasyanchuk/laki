@@ -817,6 +817,7 @@ const api = {
   stateOwn: () => core.view(), // S3: the whole view, its secrets too (laki remote's link, a profile's env): yours only; state's is masked
   remoteStop: () => remoteMod.remoteStop(),
   remoteCheck: () => remoteMod.remoteCheck(), // D8: Settings' Check: its address reached from outside now (Tailscale: tailscale status)
+  presence: p => phoneMod.presenceSet(p), // #1: the app's powerMonitor: idle seconds and the lock, for holding phone pushes at the Mac (phone.ts)
   screenLock: p => remoteMod.screenLock(p), // D9: the app's powerMonitor: the Mac locked (true) or unlocked; remote access follows it (settings.remoteWhen)
   remoteLog: p => activityList(Math.min(1000, Math.max(1, Number(p?.n) || 200))), // D9: what was done remotely, newest first
   agentLog: p => agentLogOf(core.findWs(String(p?.ws ?? '')).id), // what its agents did through Laki, newest first (agentLog.ts)
@@ -1009,7 +1010,7 @@ const FROM = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggest
   'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
   'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
-  'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'remoteLog', 'diagnostics',
+  'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'presence', 'remoteLog', 'diagnostics',
   'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm',
   'voiceText', 'projectClone', 'projectNew', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen',
   'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList',
@@ -1573,7 +1574,7 @@ const ANSWER_NO = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'su
   'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount',
   'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart',
   'tunnelStop', 'tunnelCheck', 'ship', 'shipDraft', 'input', 'watchLimits', 'scheduleSet', 'scheduleRm', 'scheduleRun', 'scheduleTick', 'eventTick',
-  'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock',
+  'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock', 'presence',
   'remoteLog', 'archivedTidy', 'shareTick', 'tunnelTick', 'widgetSet', 'widgetLog', 'widgetLogClear', 'widgetRun', 'widgetRm', 'widgetRestore', 'widgetTrash',
   'widgetUndo', 'widgetRemix', 'widgetSlug', 'studioChatRm', 'widgetAction', 'widgetStore', 'widgetReload', 'widgetFileSave', 'widgetWrite', 'widgetTick',
   'factsTick', 'widgetTrashTidy', 'widgetPush', 'widgetEmit', 'widgetToolCall', 'widgetGrantRm', 'widgetMock', 'widgetDev', 'widgetNew', 'widgetFromTerm',

@@ -103,9 +103,14 @@ app.on('browser-window-focus', () => handoffNow())
 app.on('browser-window-blur', () => setImmediate(handoffNow)) // another of Laki's windows may take the focus
 // D9: remote access that follows the Mac's lock (Settings › Remote access › Start it): the lock and the unlock to the
 // daemon, as the app (its token); laki serve has no app, so none
+// #1: where you are, for holding phone pushes while you're at the Mac (phone.ts atMac): seconds since your last input and
+// the lock, every 15 s and as it locks or unlocks
+const presence = () => void rpc('presence', { idle: powerMonitor.getSystemIdleTime(), locked: powerMonitor.getSystemIdleState(1) === 'locked' }).catch(() => {})
 app.whenReady().then(() => {
-  powerMonitor.on('lock-screen', () => void rpc('screenLock', { locked: true }).catch(() => {}))
-  powerMonitor.on('unlock-screen', () => void rpc('screenLock', { locked: false }).catch(() => {}))
+  powerMonitor.on('lock-screen', () => (void rpc('screenLock', { locked: true }).catch(() => {}), presence()))
+  powerMonitor.on('unlock-screen', () => (void rpc('screenLock', { locked: false }).catch(() => {}), presence()))
+  setInterval(presence, 15_000)
+  presence()
 })
 app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
 // st (Q8, Settings › General › Menu bar's Show state): the state its picture shows (stateOf's), its title's ! and its

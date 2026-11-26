@@ -16,7 +16,8 @@ const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
 ]
 
 const DETAILS: [Webhook['detail'], string][] = [[undefined, 'The question and its choices'], ['titles', 'Only who needs you']]
-export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChange: (w: Webhook) => void; test?: (w: Webhook) => Promise<unknown> }) {
+type AtMac = { pushAtMac?: 'hold' | 'push'; pushAfter?: number; pushIdle?: number }
+export function WebhookSection({ w, onChange: put, test, mac, onMac }: { w: Webhook; onChange: (w: Webhook) => void; test?: (w: Webhook) => Promise<unknown>; mac?: AtMac; onMac?: (o: AtMac) => void }) {
   // a URL or format answers can't use (a public ntfy.sh topic) turns them off: the daemon refuses them on
   const onChange = (n: Webhook) => put(n.answer && !answerOk(n) ? { ...n, answer: false } : n)
   const tapOk = answerOk(w)
@@ -73,6 +74,38 @@ export function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChang
         </Switch>
       </div>
       </Group>
+      {mac && onMac && (
+        <Group title="When I'm at the Mac" hint="At the Mac: unlocked, and you typed or moved the mouse lately. Telegram's pushes follow it too; Send test always goes">
+          <div className="seg" role="radiogroup" aria-label="When I'm at the Mac">
+            {(['hold', 'push'] as const).map(v => (
+              <button key={v} type="button" role="radio" aria-checked={(mac.pushAtMac ?? 'hold') === v} className={(mac.pushAtMac ?? 'hold') === v ? 'on' : ''} onClick={() => onMac({ pushAtMac: v })}>
+                {v === 'hold' ? 'Hold pushes' : 'Push anyway'}
+              </button>
+            ))}
+          </div>
+          {(mac.pushAtMac ?? 'hold') === 'hold' && (
+            <div className="grid2">
+              <label>
+                Still push an ask after
+                <select value={mac.pushAfter ?? 90} onChange={e => onMac({ pushAfter: Number(e.target.value) })}>
+                  {[30, 60, 90, 180, 300].map(n => <option key={n} value={n}>{n < 120 ? `${n} s` : `${n / 60} min`}, if nobody answered it here</option>)}
+                </select>
+              </label>
+              <label>
+                At the Mac: input in the last
+                <select value={mac.pushIdle ?? 120} onChange={e => onMac({ pushIdle: Number(e.target.value) })}>
+                  {[60, 120, 300, 600].map(n => <option key={n} value={n}>{n / 60} min</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+          <p className="muted small">
+            {(mac.pushAtMac ?? 'hold') === 'hold'
+              ? "While you're here a finished turn shows on the Mac only, and an ask goes to the phone only if it still waits after that long. Lock the Mac or walk away and pushes come to the phone again."
+              : 'Every push goes to the phone, wherever you are.'}
+          </p>
+        </Group>
+      )}
       <Group title="What it sends" hint="It goes through the service you picked (ntfy, Slack) and stays there">
       <div className="seg" role="radiogroup" aria-label="What it sends">
         {DETAILS.map(([v, label]) => (

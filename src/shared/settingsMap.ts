@@ -80,6 +80,7 @@ export const FIND: [string, string, string?][] = [
   ['ai', 'Keep pasted images (days)', 'images screenshots files attached storage retention delete older clean thumbnails 30'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap ntfy choices menu permission allow'],
+  ['webhook', "When I'm at the Mac", 'hold pushes desk away idle locked present quiet phone silent at the mac push anyway'],
   ['appearance', 'Follow the system', 'theme auto light dark mode macos system appearance match switch sunset'],
   ['layout', 'Design', 'layout frame window cards sections tiles inset soft frosted glass macos mac floating translucent rounded corners padding gaps style variation'],
   ['layout', 'Menus', 'menus context right click native macos system menu look voiceover workspace tab'],

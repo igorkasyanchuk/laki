@@ -193,6 +193,7 @@ export type AppSettings = Paint & {
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   limitFallback?: Partial<Record<AccountAgent, string[]>> // Auto fallback: accounts in order, the next taking over a tab at its plan limit
   remoteAwake?: 'ac' | 'always' | 'off' // D8: the Mac awake while remote access runs
+  pushAtMac?: 'hold' | 'push'; pushAfter?: number; pushIdle?: number // #1: phone pushes while you're at the Mac (phone.ts)
   remoteWhen?: 'manual' | 'locked' // D9: on its own while the Mac is locked
   remoteMail?: string // the one address remote access lets in
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
@@ -3182,7 +3183,7 @@ export function SettingsPage(p: {
               <OutputLine only={s.voice?.speakOn === 'headphones'} />
             </Group>
           )}
-          {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
+          {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} mac={{ pushAtMac: s.pushAtMac, pushAfter: s.pushAfter, pushIdle: s.pushIdle }} onMac={set} />}
           {sec === 'telegram' && p.call && p.telegram && <TelegramSection tg={p.telegram} call={p.call} />}
           {on('pr') && (
             <>

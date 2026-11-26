@@ -3193,6 +3193,8 @@ export function settingsSet(o: Settings, own = false) {
   if ('termShell' in o && o.termShell !== state.settings?.termShell) o = { ...o, termShell: termShellOk(o.termShell) } // checked only as it changes: Settings sends every setting back, a shell gone since too
   if ('artifactHosts' in o) o = { ...o, artifactHosts: Array.isArray(o.artifactHosts) ? [...new Set(o.artifactHosts.filter(artHostOk).map(h => h.toLowerCase()))].slice(0, 200) : undefined } // S18: names on the internet only
   if ('costWarn' in o) o = { ...o, costWarn: costWarnParse(o.costWarn) } // #3: dollars, or refused
+  if (o.pushAtMac !== undefined && o.pushAtMac !== 'hold' && o.pushAtMac !== 'push') throw new Error(`When I'm at the Mac: hold or push, not ${JSON.stringify(o.pushAtMac)}`)
+  for (const [k, lo, hi] of [['pushAfter', 10, 3600], ['pushIdle', 30, 3600]] as const) if (o[k] !== undefined && !(Number.isInteger(o[k]) && o[k]! >= lo && o[k]! <= hi)) throw new Error(`${k}: whole seconds, ${lo} to ${hi}`)
   if ('backupEvery' in o && o.backupEvery !== undefined && o.backupEvery !== 'off' && o.backupEvery !== 'weekly') throw new Error(`Back up: weekly or off, not ${JSON.stringify(o.backupEvery)}`)
   if ('backupDir' in o && o.backupDir !== undefined) o = { ...o, backupDir: (d => { if (d && !(d.startsWith('/') || d === '~' || d.startsWith('~/'))) throw new Error("Back up into: a folder's full path (~ is home)"); return d || undefined })(String(o.backupDir).trim()) }
   if ('mcp' in o) o = { ...o, mcp: mcpOk(o.mcp, state.settings?.mcp, MASK, ENV_KEY) } // #6: every project's MCP servers (a value sent back masked: the one kept)

@@ -22,6 +22,16 @@ import { register } from './ticks.ts'
 // within the 30 ms before a view is built looks like the same one, and its end isn't pushed
 export const pushed = new Map<string, string>()
 export const hidden = (ws?: Workspace) => !!ws && !!state.settings?.recording && (!!ws.private || !!state.projects.find(p => p.id === ws.project)?.private)
+// #1: where you are, by the app's powerMonitor (main's presence, every 15 s and as the Mac locks): at the Mac is unlocked
+// with input in the last settings.pushIdle seconds (120). Nothing heard for a minute (the app quit, laki serve): away
+let presence: { idle: number; locked: boolean; at: number } | undefined
+export function presenceSet(p: { idle?: unknown; locked?: unknown }) {
+  presence = { idle: Math.max(0, Number(p.idle) || 0), locked: p.locked === true, at: Date.now() }
+  return { atMac: atMac() }
+}
+export const atMac = (now = Date.now()) => !!presence && now - presence.at < 60_000 && !presence.locked && presence.idle + (now - presence.at) / 1000 < (state.settings?.pushIdle ?? 120)
+// Settings › Phone pushes › When I'm at the Mac: Hold pushes (unset) or Push anyway
+const holding = () => state.settings?.pushAtMac !== 'push' && atMac()
 // U8: Do not disturb holds every push but an important workspace's ask (ask: a wait for you)
 const quiet = (ws?: Workspace, ask = false) => (state.dnd?.until ?? 0) > Date.now() && !(ask && ws?.important)
 // where a push goes: the webhook (Settings › Phone pushes) and Telegram (Settings › Telegram), each by its own When
@@ -58,6 +68,10 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
   const t = to(kind, bell, tab.workspace)
   if ((!t.hook && !t.tg) || pushed.get(tab.id) === kind || (!bell && (tab.muted || mutedWs(ws))) || hidden(ws)) return
   pushed.set(tab.id, kind)
+  // #1: at the Mac a turn's end shows there only; an ask goes to the phone only if it still waits after pushAfter (you
+  // answered it on the Mac meanwhile: dropped, never sent late). A bell (T16) is pushed anyway
+  const hold = !bell && holding()
+  if (hold && kind === 'done') return void log(`push held: ${tab.name} is done, you're at the Mac`)
   // a wait's message; a done turn's last line that asks something
   const question = (kind === 'waiting' ? text : text.split('\n').reverse().find(l => l.trim().endsWith('?')) ?? '').trim().slice(0, 500)
   // a wait goes a moment later, with its menu (drawn after the hook, often), unless it's over by then
@@ -75,7 +89,8 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
     const tg = kind === 'done' ? { question: [last, st && st.files ? `+${st.add} −${st.del} · ${st.files} file${st.files === 1 ? '' : 's'}` : ''].filter(Boolean).join('\n') || undefined } : undefined
     send(t, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: said || undefined, options: ask?.options }, ask && { tab: tab.id, key: JSON.stringify(ask.options) }, { tg })
   }
-  if (kind === 'waiting') setTimeout(go, Number(process.env.LAKI_PUSH_WAIT_MS) || 800) // tests' shorter
+  if (hold) log(`push held: ${tab.name} asks, you're at the Mac: to the phone in ${state.settings?.pushAfter ?? 90} s if it still waits`)
+  if (kind === 'waiting') setTimeout(go, hold ? Number(process.env.LAKI_PUSH_HOLD_MS) || (state.settings?.pushAfter ?? 90) * 1000 : Number(process.env.LAKI_PUSH_WAIT_MS) || 800) // tests' shorter
   else go()
 }
 

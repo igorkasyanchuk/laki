@@ -765,6 +765,9 @@ export type Settings = {
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
   remoteIdleOff?: number | 'never' // T10: hours without a device's call before remote access turns itself off (unset: 12; open to anyone: 2 at most; never: one email or Tailscale only; laki serve's never); the user's alone (REMOTE_KEYS' remote.*)
+  pushAtMac?: 'hold' | 'push' // #1: while you're at the Mac (phone.ts atMac): turns' pushes held (unset), or pushed anyway
+  pushAfter?: number // #1: a held ask still pushed after these seconds if nobody answered it on the Mac (90)
+  pushIdle?: number // #1: at the Mac: unlocked and input in the last these seconds (120)
   remoteWhen?: 'manual' | 'locked' // D9: remote access as you start it (unset), or on its own while the Mac is locked (remote.ts screenLock)
   remoteAwake?: 'ac' | 'always' | 'off' // D8: the Mac awake while remote access runs (core's caffeinate, reason remote): on AC power (unset), also on battery, or never
   remoteAuth?: 'email' | 'pin' | 'tailscale' | 'domain' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); both at a quick tunnel's address; tailscale, your tailnet (tailscale serve); domain, My domain (D1: settings.tunnel's named tunnel, a PIN always)
