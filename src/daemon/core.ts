@@ -1959,7 +1959,7 @@ export async function projectNew(name: unknown, into?: unknown): Promise<Project
     writeFileSync(join(dest, 'README.md'), `# ${n}\n`)
     await git(at, 'init', '-q', '-b', 'main')
     await git(at, 'add', 'README.md') // a Finder's .DS_Store left out
-    const commit = (...who: string[]) => git(at, ...who, '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'First commit')
+    const commit = (...who: string[]) => git(at, ...who, '-c', 'commit.gpgsign=false', 'commit', '-q', '--no-verify', '-m', 'First commit') // Laki's README: your hooks are for your code
     await commit().catch(() => commit('-c', 'user.name=Laki', '-c', 'user.email=new@laki.invalid')) // no identity set
   } catch (e) {
     for (const x of made ? [dest] : [join(dest, '.git'), join(dest, 'README.md')]) rmSync(x, { recursive: true, force: true }) // half made: none, an empty folder of yours as it was
