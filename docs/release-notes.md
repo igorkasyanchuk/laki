@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.67.0 · Nov 27, 2026
 
 - Frosted's menus, dialogs and toasts let the window's glass through more, by Glass › Strength (solid under Reduce transparency).
 - On Linux, Settings › Updates says when a newer Laki is out and that you replace the AppImage with it.
