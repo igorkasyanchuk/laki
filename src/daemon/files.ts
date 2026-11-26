@@ -725,8 +725,16 @@ export async function files(ref: string, project?: string, more: { ignored?: boo
 async function oneLevel(ws: Workspace, rel: string) {
   const at = rel.replace(/\/+$/, '')
   const abs = inside(ws, at)
-  const names = ws.host ? (await exec(ws, 'ls', ['-Ap', abs])).stdout.split('\n').filter(Boolean) : readdirSync(abs, { withFileTypes: true }).map(e => (e.isDirectory() || (e.isSymbolicLink() && statSync(join(abs, e.name), { throwIfNoEntry: false })?.isDirectory()) ? `${e.name}/` : e.name))
+  const names = ws.host ? (await exec(ws, 'ls', ['-Ap', abs])).stdout.split('\n').filter(Boolean) : readdirSync(abs, { withFileTypes: true }).map(e => (e.isDirectory() || (e.isSymbolicLink() && dirLink(join(abs, e.name))) ? `${e.name}/` : e.name))
   return names.slice(0, MAX_LEVEL).map(n => `${at}/${n}`)
+}
+// a link to a folder; a dangling, looping or unreadable one: a file
+const dirLink = (p: string) => {
+  try {
+    return statSync(p).isDirectory()
+  } catch {
+    return false
+  }
 }
 const MAX_LEVEL = 5000 // ponytail: one folder's first 5,000 entries
 const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'target', 'dist', 'build', '.venv', '__pycache__'])

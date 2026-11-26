@@ -467,7 +467,11 @@ while the app is open with the ring on screen (not a Browsers page); the daemon 
 Phone pushes are the daemon's (`push.ts`, `phone.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
 `format` ntfy/slack/json/webpush, `waiting` unset on, `done` unset off) and Telegram (below), each by its own When
 (`phone.ts` `to`; `send` makes one nonce for both, buttons only where taps come back) on a `turn` that waits or is done, and on
-`overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. A wait goes 800 ms
+`overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. At the Mac
+(#1: `presenceSet`, main's `presence` every 15 s and on lock/unlock: the system's idle seconds and the lock; `atMac`:
+unlocked, input in the last `settings.pushIdle` s (120), heard from in the last minute) and `pushAtMac` not `push`, a done
+turn isn't pushed and a wait goes only after `pushAfter` s (90) if it still waits and is still the tab's latest (`waits`,
+numbered from one count; the latest's timer takes its entry out); a bell goes anyway. A wait goes 800 ms
 later with `askOf`'s choices as lines (JSON: `options`; `webhook.detail` `titles`: `pushRequest` drops the question,
 choices and nonce, Settings' *What it sends*, L8); with `webhook.answer` (Settings' *Answer from the phone*,
 off by default) a `nonce` per push: Telegram's `inline_keyboard` (`callback_data` `nonce:n`) and ntfy's JSON publish
@@ -734,7 +738,8 @@ that), a Read of a SKILL.md; codex's shell calls that read one; the main chat's,
 most). The status bar's `.sb-ctx` is a button: its menu lists them, a pick calls `skillOpen` (`tab`, `name`: the
 folder said, else the workspace's `.claude/skills/<name>` or `.codex/skills/<name>`, else the agent's own; its SKILL.md
 in the editor; the user's only). share.ts `toolLine` names a Skill call's skill (the Reader's `.rd-skill` chip). Today's (`dayOf`, by each line's `timestamp`, this Mac's day; `m.today` starts over at midnight)
-per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace; a chat's the more of
+per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace and its name then,
+`nameOf`: none for a private one, so a removed one is still named, `gone` in StatusBar's Today; a chat's the more of
 what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
 (`todayView`: tokens, cost, the 5 workspaces that used most).
 A workspace's spend cap (`daemon/cap.ts`; `Workspace.cap` as `Cap` `{ usd?, tokens? }`, `{}` none; unset: its first agent

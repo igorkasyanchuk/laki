@@ -3,7 +3,10 @@
 ### Profiles and accounts
 
 Settings › *Agents & profiles* (the code's word stays *preset*): each preset can carry `model` and `effort` (`agentCmd`:
-the tab's own, from the new-workspace page, wins), for claude and codex `perm` and `fast` (likewise; below), and
+the tab's own, from the new-workspace page, wins), for claude and codex `perm` and `fast` (likewise; below; a worker an
+agent starts with no `perm` takes its lead's mode now, core.ts `leadMode` (#6): the footer's, else its own, where the
+worker's agent has it, never one that never asks or that leaves a sandbox its profile keeps; `permFrom` names the lead,
+kept in `pending` for a later start; TabBar's tip says it), and
 `account`. `daemon/accounts.ts`: an
 `Account` (`settings.accounts`, only through `accountAdd`/`accountSet`/`accountRm`: `settingsSet` drops `accounts`, so an
 import never brings folders) is a folder `<data>/accounts/<agent>-<id>` given as `CLAUDE_CONFIG_DIR` / `CODEX_HOME`
@@ -189,7 +192,8 @@ what the view shows on the tab's runtime:
   workspace (no storage folder) carries none. Tested in `test/worktrees.test.ts`, `test/ai.test.ts`, `test/reader.test.ts`.
 
 `daemon/secrets.ts`: `laki secret <what>` (MCP's `laki_secret`; `SECRET_WAIT`, the CLI's rpc waits as long):
-`secretAsk` (`from`'s tab; its storage folder, none on a host) puts `secret` (`{ id, label }`) on the tab (waiting while
+`secretAsk` (`from`'s tab; its storage folder, none on a host) puts `secret` (`{ id, label }`; with `fields`, #7: 2 to 8 `name[:plain]`, `fieldsOf`, one card for a sign-in, none
+kept offered, `secretGive`'s `values` a file each, `{ paths }` back) on the tab (waiting while
 its command runs: Needs you, a notification, a phone push), panels.tsx `SecretStrip` at the pane's foot, a password
 field; `secretGive` (`id`, `value` or `refuse`; refused from an agent) writes `<storage>/.laki-secrets/<slug>-<hex>`, 0600
 (hidden: no artifact) and the agent gets its path (S10: only into a real folder of the storage folder, `ownDir`: a

@@ -1033,7 +1033,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
         <Prompt
           title="New project"
           placeholder="my-app"
-          hint="A folder by that name, git with a first commit, added as a project: its first workspace starts at once."
+          hint="A folder by that name, git with a first commit, added as a project; then its new-workspace page opens."
           picks={[{ label: 'Into', none: '~/code, else beside your last project', options: [], free: true }]}
           onClose={() => setDialog(null)}
           onSubmit={async (name, [into]) => {

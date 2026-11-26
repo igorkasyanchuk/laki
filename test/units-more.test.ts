@@ -1794,6 +1794,7 @@ test("a chat's html block: Preview only for a whole page, sealed by a CSP in its
     assert.match(sealed(p).slice(0, 140), csp, p)
   assert.ok(sealed('<!doctype html><html>').startsWith('<!doctype html><meta'), 'the doctype stays first: no quirks mode')
   assert.equal(sealed('<!doctype html><html><head>').match(/Content-Security-Policy/g)?.length, 1, 'one CSP only')
+  assert.match(sealed('<html><a href="https://x.io">x</a>'), /^<html><meta [^>]+><base target="_blank">/, 'a link opens a popup the sandbox blocks: none followed')
   assert.doesNotMatch(sealed('<!doctype html><meta http-equiv="Refresh" content="0;url=https://x.io">'), /http-equiv="Refresh"/i, 'no meta refresh off to a site')
 })
 

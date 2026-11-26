@@ -311,7 +311,9 @@ are tested in `test/units-more.test.ts`.
   - A workspace with a PR gets GitHub's mark in the sidebar (`.ws-pr`, its `prState` as colors; an open one's failing
     checks a red mark of their own before it, `.ws-pr.ci`, as conflicts get theirs: a red GitHub mark is a closed PR),
     unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`), or their own `icon` in
-    their `color` (ui.tsx `ProjectMark`, `.p-mark`: an emoji with a line in it; also the new-workspace page's project
+    their `color` (ui.tsx `ProjectMark`, `.p-mark`: an emoji with a line in it; none (#5): the view's `picture`, the
+    daemon's `pictureOf`, else `.p-letters`, `setBadges`' `badgeLetters` on `autoColor`; a click on the sidebar's badge:
+    `projectActions(p, true)`, `badgeItems`; also the new-workspace page's project
     menu (a menu item's `mark`), the palette's workspaces and tabs (`PaletteItem` `mark`), Settings' nav, a rail pin's
     corner); App's `tint`: a workspace's color, else its project's (the peek card, rail pins, the bubbles).
   - A project's workspaces are in `.project-ws` (indented on a guide line; a line between projects). Rows are inset and
@@ -357,7 +359,8 @@ are tested in `test/units-more.test.ts`.
   - Picked rows (`picked`, ⌘-click and ⇧-click, `pickRow`, `anchor`; `pickable`: a project's live workspaces, not
     terminals' or browsers'; not on a phone): `.ws.ws-picked`, `.pick-bar` over the list (Archive: `wsArchive` `ifClean`
     each, the dirty ones asked once, Undo restores all; Mute; Move to group, `pickedGroups`, when they share a project
-    with groups; Delete, asked once), a drag of a picked row moves them all (`moveIds`); Esc or a plain click clears.
+    with groups; Delete, asked once, ⌫ or ⌦ too while any is picked outside a field, a terminal, a menu or a dialog, with
+    *Also delete their artifacts* when they have some), a drag of a picked row moves them all (`moveIds`); Esc or a plain click clears.
   - Back and forward (`settings.history`, on unless false; Settings › Appearance › Rail): `hist` (a ref: `Place`s, `{ d: dialog, ws }`, `HISTORY_MAX`
     back) gets each new place (`isPlace`: a page, `PAGES`/`PAGE_KEYS`, or none; a dialog over them isn't one), what was
     ahead dropped (Workflows' index, a workflow and a run are places too: its dialog's `nav`, `WorkflowsPage` `onNav`); `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
@@ -915,7 +918,10 @@ are tested in `test/units-more.test.ts`.
   `openLabel` Open: App's `openArt`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's
   *Artifacts: n* toggles `ArtifactsBar`; its ⋯ (`ArtifactsApi` `reveal('')`, `files`: `artifactsInFiles`) and the big
   view's buttons go to Finder or there (one shown big: the list again every 2 s, a file written anew read again by its
-  time; `ArtifactView` looks at `fileRead`'s `stat` every 1.5 s, a change reads it or loads the page again). *View as page* is the same viewer on a worktree's HTML file (`artView.wt`; `PanelApi.page`, Diff.tsx `canPage`, menus.ts' `fileMenu`): `GET /worktree/<the workspace's wtKey>/<ws>/<path>` (files.ts `worktreeFile`: `inside`, nothing of `.git`, never a host's nor a Terminals or Browsers workspace's, whose folder is your home: `pageable`, no `wtKey` in the view then; the viewer's *Reload* for a change to its CSS or script, the stamp being the HTML file's; the artifacts' CSP without any `connect-src`, no CORS for its JSON, and only at the daemon's own address: `artPage` gives none over remote access). An HTML or Markdown one (`VIEWED`) opens in `ArtifactView` (panels.tsx, a
+  time; `ArtifactView` looks at `fileRead`'s `stat` every 1.5 s, a change reads it or loads the page again). An HTML
+  one's *Comment* (#3, panels.tsx `useArtComment`, the viewer's and the gallery's): the page again with `?pick=1`
+  (shared/artPick.ts' picker, added by the daemon), each click a numbered mark (`pickOf` checks the frame's message),
+  a note each, `artNotes` into the agent's prompt (`toPrompt`); a reload's numbers go on (`artBase`). *View as page* is the same viewer on a worktree's HTML file (`artView.wt`; `PanelApi.page`, Diff.tsx `canPage`, menus.ts' `fileMenu`): `GET /worktree/<the workspace's wtKey>/<ws>/<path>` (files.ts `worktreeFile`: `inside`, nothing of `.git`, never a host's nor a Terminals or Browsers workspace's, whose folder is your home: `pageable`, no `wtKey` in the view then; the viewer's *Reload* for a change to its CSS or script, the stamp being the HTML file's; the artifacts' CSP without any `connect-src`, no CORS for its JSON, and only at the daemon's own address: `artPage` gives none over remote access). An HTML or Markdown one (`VIEWED`) opens in `ArtifactView` (panels.tsx, a
   `Modal`; App's `artView`) unless `settings.artifactsIn` is `browser` (Settings › General › Storage; then main's
   `open-path`, as any other): HTML in an iframe `sandbox="allow-scripts"` from the daemon's `GET
   /artifact/<the workspace's artKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through
@@ -1062,7 +1068,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   Rail `railShells` and `railBrowsers`.
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Info (`PanelTab` `info`, first, any project: App passes `InfoTab` as
   `info`), Files (tree from the daemon's file list, search, new
-  file/folder, changed files marked), Changes (the diff by file, each file's row sticky over its diff as it scrolls, Expand all / Collapse all (one button: collapse while any is open), each line with its old and new numbers from the
+  file/folder, changed files marked; the eye, `laki.filesIgnored`, ⌘K's too by `laki-ignored`: git's ignored ones dimmed,
+  `.ign`, an ignored folder's entries a level at a time as it opens, `files`' `under`), Changes (the diff by file, each file's row sticky over its diff as it scrolls, Expand all / Collapse all (one button: collapse while any is open), each line with its old and new numbers from the
   hunks (the Files preview's own: FilePreview's `comment`, a line number's click or a selection's *Comment*: `FileNote`,
   Body's `add` into `reviewNotesSet`'s list with side RIGHT, `send` as `fileNoteText` through `toAgent`); a click opens `CommentBox`: the PR, or the agent (a paste or drop: PromptInput's `keepFile`, imageSave or
   fileSave, its path a `📎 ` line of the text, reviewNotes.ts `attachments` drawn as chips; `forGitHub` leaves them out of
@@ -1771,5 +1778,8 @@ and its 39px-round pill would show it as a frame.
   no-preference media and off with Motion none. The side panel's and the sidebar's entrances take `--spring-soft` too.
 - **The Reader**: a folded run of tool calls is `.rd-tool-pill` (`text.ts` `toolSummary`: each tool once, a count or
   its file's name, three at most), `ai-shimmer` on the last row while the tab runs; a chat's code block
-  (`MarkdownView.tsx` `Code` with `InChat`) has `.md-code-head` (its language, lines, ▷ Run, Copy with a check); a new
+  (`MarkdownView.tsx` `Code` with `InChat`) has `.md-code-head` (its language, lines, ▷ Run, Copy with a check; a whole
+  HTML page, Code | Preview: `.md-code-page`, `sandbox=""`, `text.ts` `sealed`); its paths (`pathAt`, `BARE_PATH`; none
+  in a link's words) are `.md-file` links where `FileRefs` knows the files (the Reader's `ReaderApi.files`, read again
+  every 15 s at most as it says more), a click opens the Preview at the line (`openAt`), ⌘-click the editor; a new
   `.rd-agent` or `.rd-you` comes in by `@starting-style` (180 ms); prose keeps 68ch (`.rd-agent .md` p, li…).
