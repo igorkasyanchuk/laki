@@ -14,6 +14,8 @@ export function nextStep(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean
   const waits = mine.find(t => t.status === 'waiting')
   if (waits?.planAsk) return { id: 'plan', label: 'Approve the plan', tip: `${waits.name} asks you to approve its plan, or change it`, tab: waits.id, tone: 'ask' }
   if (waits) return { id: 'answer', label: `Answer ${waits.name}`, tip: waits.ask?.question || waits.ask?.options.map(x => x.label).join(' / ') || 'It waits for you', tab: waits.id, tone: 'ask' }
+  const loops = mine.find(t => t.loop) // failing the same command (shared/loop.ts): Needs you's Nudge, Stop, Let it work
+  if (loops?.loop) return { id: 'answer', label: `${loops.name} loops`, tip: `Ran ${loops.loop.cmd} ${loops.loop.n} times with the same error: open it to nudge or stop it`, tab: loops.id, tone: 'bad' }
   const runs = mine.find(t => t.status === 'running' && (t.kind === 'agent' || t.runs))
   if (runs) return { id: 'working', label: (runs.plan && !runs.plan.stale && planNow(runs.plan)) || `${runs.name} works`, tip: 'Nothing for you yet: it tells you when it needs you', tab: runs.id, busy: true }
   const failed = mine.find(t => t.failed)
@@ -99,7 +101,7 @@ export type BoardCol = (typeof BOARD)[number][0]
 export function boardCol(w: WorkspaceView, tabs: TabView[], o: { merge?: boolean; git?: boolean } = {}): BoardCol {
   const mine = tabs.filter(t => t.workspace === w.id)
   if (w.waitingOn) return 'waiting' // Waiting on…: its line on the card; a new ask or turn clears it
-  if (mine.some(t => t.status === 'waiting' || t.secret || t.failed)) return 'answer'
+  if (mine.some(t => t.status === 'waiting' || t.secret || t.failed || t.loop)) return 'answer' // loop: an agent failing the same command
   const needs = mine.some(needsTab) // a finish you haven't looked at
   const st = nextStep(w, tabs, o)
   if (!needs && (w.setup || st?.id === 'working')) return 'working'

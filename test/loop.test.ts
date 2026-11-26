@@ -60,3 +60,12 @@ test('loop: the command normalized', () => {
   loopFeed(s, fail('npm test', 'in /tmp/t-22/x'))
   assert.deepEqual(loopFeed(s, fail('cd /b && npm test', 'in /tmp/t-333/x')), { cmd: 'npm test', n: 3 })
 })
+
+test('loop: a looping tab needs you: Needs you, the Board\'s Answer, its next step', async () => {
+  const { boardCol, needsTab, nextStep } = await import('../src/shared/nextStep.ts')
+  const w = { id: 'w1', name: 'w1', kind: 'worktree' } as never
+  const t = { id: 't1', workspace: 'w1', name: 'claude', kind: 'agent', status: 'running', done: false, loop: { cmd: 'npm test', n: 3, since: 1 } } as never
+  assert.equal(needsTab(t), true)
+  assert.equal(boardCol(w, [t]), 'answer')
+  assert.deepEqual((s => s && [s.id, s.label, s.tab])(nextStep(w, [t])), ['answer', 'claude loops', 't1'])
+})

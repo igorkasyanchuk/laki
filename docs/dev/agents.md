@@ -426,7 +426,8 @@ false, the tab is on screen and focused, or muted; Quiet: `notify`'s) and `phone
 without macOS's disabled state; held at the Mac, `holding`; its title the workspace and tab, the command, redacted,
 the push's question: *titles only* drops it). Needs you's card (`failedNeed`, `needsTab`): *Nudge* (askText with the message, then `send`
 steer), *Stop* (`stopAll` with its tab), *Let it work*; no ✕ or Snooze (any hook of a running turn ends a snooze). The
-sidebar row's `ws-loop` mark says *looping ×n*. Only claude's hooks say a call failed: codex's notify, OpenCode's plugin
+sidebar row's `ws-loop` mark says *looping ×n*; the Board puts it under Answer (`boardCol`), its next step is *<tab>
+loops* (opens the tab), ⌘K's Needs you item says it loops; a running loop is never stale (`isStale`). Only claude's hooks say a call failed: codex's notify, OpenCode's plugin
 (busy, idle, asks, errors), Antigravity and Grok (no hooks) and ACP (its `tool_call_update` failed is the Reader's, not
 a hook's) never set it. Tested in `test/loop.test.ts` and `test/loop-daemon.test.ts`.
 

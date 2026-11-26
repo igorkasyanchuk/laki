@@ -217,7 +217,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   // Needs you: every other tab of needsYou, in its order
   for (const t of needsSorted(needing, staleMin)) {
     const w = t.workspace !== ws?.id && live.find(w => w.id === t.workspace)
-    if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : t.failed ? `${wsName(w)} stopped: ${t.failed}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', tab: t.id, acts: { changes: () => (selectTab(t.id), showPanel('changes')), ship: () => (selectTab(t.id), setDialog('ship')) }, mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
+    if (w) items.push({ label: t.status === 'waiting' ? `Answer ${wsName(w)}: ${t.ask?.question || t.ask?.options[0]?.label || 'it waits for you'}` : t.failed ? `${wsName(w)} stopped: ${t.failed}` : t.loop ? `${wsName(w)} loops: ${t.loop.cmd}` : `${wsName(w)} is done`, hint: t.name, glyph: tabGlyph(t), kind: 'needs', tab: t.id, acts: { changes: () => (selectTab(t.id), showPanel('changes')), ship: () => (selectTab(t.id), setDialog('ship')) }, mark: <ProjectMark p={projOf(w)} />, run: () => selectTab(t) })
   }
   // the Review tab's Next (shared/nextStep.ts reviewQueue): the next workspace to review, its Review tab open
   const rq = settings.fullReview !== false ? reviewQueue(view!, ws?.id) : []
