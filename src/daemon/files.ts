@@ -720,11 +720,12 @@ export async function files(ref: string, project?: string, more: { ignored?: boo
   const all = [...new Set(list.filter(Boolean))]
   return { files: all.slice(0, MAX_FILES), changed, cut: all.length > MAX_FILES, ...(more.ignored && { ignored: ign.filter(Boolean).slice(0, MAX_FILES) }) }
 }
-// a folder's entries, its folders ending in / (an ignored one opened in Files: git lists nothing in it)
+// a folder's entries, its folders ending in / (a link to one too: pnpm's node_modules) (an ignored one opened in Files:
+// git lists nothing in it)
 async function oneLevel(ws: Workspace, rel: string) {
   const at = rel.replace(/\/+$/, '')
   const abs = inside(ws, at)
-  const names = ws.host ? (await exec(ws, 'ls', ['-Ap', abs])).stdout.split('\n').filter(Boolean) : readdirSync(abs, { withFileTypes: true }).map(e => (e.isDirectory() ? `${e.name}/` : e.name))
+  const names = ws.host ? (await exec(ws, 'ls', ['-Ap', abs])).stdout.split('\n').filter(Boolean) : readdirSync(abs, { withFileTypes: true }).map(e => (e.isDirectory() || (e.isSymbolicLink() && statSync(join(abs, e.name), { throwIfNoEntry: false })?.isDirectory()) ? `${e.name}/` : e.name))
   return names.slice(0, MAX_LEVEL).map(n => `${at}/${n}`)
 }
 const MAX_LEVEL = 5000 // ponytail: one folder's first 5,000 entries

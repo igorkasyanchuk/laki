@@ -2,7 +2,7 @@
 // timers, the view's sends (remote access: api-remote.test.ts; workspaces and projects: api-workspaces.test.ts)
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { basename, dirname, extname, join } from 'node:path'
@@ -318,11 +318,12 @@ test('files: a plain folder\'s (no dependencies), git\'s renamed, deleted and ad
   writeFileSync(join(ws.path, '.env'), 'X=1\n')
   mkdirSync(join(ws.path, 'build/sub'), { recursive: true })
   writeFileSync(join(ws.path, 'build/out.js'), '')
+  symlinkSync('sub', join(ws.path, 'build/link')) // a link to a folder (pnpm's node_modules) is a folder
   assert.equal((await rig.rpc('files', { ws: ws.id })).ignored, undefined, 'not asked: none')
   const ig = await rig.rpc('files', { ws: ws.id, ignored: true })
   assert.deepEqual(ig.ignored.sort(), ['.env', 'build/'])
   assert.ok(!ig.files.includes('.env'))
-  assert.deepEqual((await rig.rpc('files', { ws: ws.id, under: 'build' })).files.sort(), ['build/out.js', 'build/sub/'])
+  assert.deepEqual((await rig.rpc('files', { ws: ws.id, under: 'build' })).files.sort(), ['build/link/', 'build/out.js', 'build/sub/'])
   await assert.rejects(rig.rpc('files', { ws: ws.id, under: '../..' }), /not a path inside the workspace/)
 })
 

@@ -1092,7 +1092,7 @@ const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg',
 const pictures = new Map<string, string>()
 export function pictureOf(p: Project) {
   if (p.host || p.kind || p.git === false) return ''
-  let got = pictures.get(p.id)
+  let got = pictures.get(p.path) // by its folder: an id is given again to the next project of that name
   if (got === undefined) {
     got = ''
     for (const f of PICTURES)
@@ -1102,7 +1102,7 @@ export function pictureOf(p: Project) {
         got = `data:image/${f.endsWith('.svg') ? 'svg+xml' : 'png'};base64,${readFileSync(join(p.path, f)).toString('base64')}`
         break
       } catch {}
-    pictures.set(p.id, got)
+    pictures.set(p.path, got)
   }
   return got
 }
@@ -1924,7 +1924,7 @@ export async function projectClone(url: unknown, into?: unknown): Promise<Projec
   const gh = !local && GH_REPO.test(u)
   if (!local && !gh && !CLONE_URL.test(u)) throw new Error('what to clone: https://…, ssh://…, git@host:owner/repo.git, or owner/repo on GitHub')
   const last = state.projects.findLast(p => !p.host && !p.kind)
-  const parent = typeof into === 'string' && into.trim() ? resolve(tilde(into.trim())) : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
+  const parent = typeof into === 'string' && into.trim() ? resolve(homedir(), tilde(into.trim())) /* a relative one: under your home */ : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
   const name = (u.split(/[/:]/).filter(Boolean).at(-1) ?? '').replace(/\.git$/, '')
   if (!name || name.startsWith('.') || name.startsWith('-')) throw new Error(`no folder name in ${JSON.stringify(u)}`)
   const dest = join(parent, name)
@@ -1949,7 +1949,7 @@ export async function projectNew(name: unknown, into?: unknown): Promise<Project
   const n = typeof name === 'string' ? name.trim() : ''
   if (!/^\w(?:[\w .-]*\w)?$/.test(n) || n.length > 100) throw new Error('a folder name: letters, digits, spaces, . _ or -, starting and ending with a letter or digit')
   const last = state.projects.findLast(p => !p.host && !p.kind)
-  const parent = typeof into === 'string' && into.trim() ? resolve(tilde(into.trim())) : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
+  const parent = typeof into === 'string' && into.trim() ? resolve(homedir(), tilde(into.trim())) /* a relative one: under your home */ : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
   const dest = join(parent, n)
   if (existsSync(dest) && (!statSync(dest).isDirectory() || readdirSync(dest).length)) throw new Error(`${dest} is already there with files in it: open it as a project, or pick another name`)
   const made = !existsSync(dest)
@@ -3883,7 +3883,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   try {
     if (o.startAt !== undefined && preset !== 'none') {
       // its agent later (schedule.ts pendingTick): what addTab would get, kept in state.json
-      ws.pending = { ...(o.startAt === 'limit' ? { limit: true } : { at: o.startAt }), preset, cmd: o.cmd, prompt: o.prompt, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, sandbox: o.sandbox, vars: o.vars, agent: by }
+      ws.pending = { ...(o.startAt === 'limit' ? { limit: true } : { at: o.startAt }), preset, cmd: o.cmd, prompt: o.prompt, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, sandbox: o.sandbox, vars: o.vars, agent: by, ...(lead && { permFrom: lead.from }) }
       save()
       step(`agent: ${preset} later, ${o.startAt === 'limit' ? 'as its plan limit resets' : new Date(o.startAt).toISOString()}`)
       if (o.startAt === 'limit') void pendingTick() // its reset read now, for the view

@@ -2102,6 +2102,8 @@ function useArtComment(path: string, page: string | undefined, onComment?: (text
     return () => window.removeEventListener('message', f)
   }, [commenting])
   const unmark = (n: number) => frame.current?.contentWindow?.postMessage({ laki: 'artUnmark', n }, '*')
+  // the page loaded again (its file changed, the agent still at it): its numbers go on from the notes' last, none twice
+  const load = () => commenting && frame.current?.contentWindow?.postMessage({ laki: 'artBase', n: Math.max(0, draft?.n ?? 0, ...marks.map(m => m.n)) }, '*')
   const addDraft = () => draft?.note.trim() && (setMarks(m => [...m, draft]), setDraft(null))
   const draftNow = useRef(draft)
   draftNow.current = draft
@@ -2149,7 +2151,7 @@ function useArtComment(path: string, page: string | undefined, onComment?: (text
         Comment
       </button>
     ))
-  return { on: commenting, src: pageNow, frame, notes, buttons }
+  return { on: commenting, src: pageNow, frame, load, notes, buttons }
 }
 
 export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExternal, onFile, onReveal, onSource, onComment, onClose }: { onComment?: (text: string) => Promise<unknown>; path: string; page?: string; wt?: boolean; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; hosts?: () => Promise<{ blocked: ArtBlocked[] }>; allow?: (hosts: string[], always: boolean) => Promise<unknown>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
@@ -2199,7 +2201,7 @@ export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExte
       )}
       <div className="art-big">
         {html ? (
-          cm.src ? <iframe key={`${n}:${cm.on}`} ref={cm.frame} className="art-frame" title={path} sandbox="allow-scripts" src={cm.src} /> : <span className="muted small">Loading…</span>
+          cm.src ? <iframe key={`${n}:${cm.on}`} ref={cm.frame} onLoad={cm.load} className="art-frame" title={path} sandbox="allow-scripts" src={cm.src} /> : <span className="muted small">Loading…</span>
         ) : md === null ? (
           <span className="muted small">Loading…</span>
         ) : typeof md === 'string' ? (
@@ -2328,7 +2330,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     if (!c) return full || f.size <= 2 << 20 ? <span className="muted small">Loading…</span> : <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
     if ('error' in c) return <span className="warn small">{c.error}</span>
     if (c.image) return <img src={c.image} alt={f.path} />
-    if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe key={`${f.at}:${cm.on}`} ref={cm.frame} className="art-frame" title={f.path} sandbox="allow-scripts" src={cm.src ?? a.page(f.path)} />
+    if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe key={`${f.at}:${cm.on}`} ref={cm.frame} onLoad={cm.load} className="art-frame" title={f.path} sandbox="allow-scripts" src={cm.src ?? a.page(f.path)} />
     if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} html /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
     if (full)
       return (

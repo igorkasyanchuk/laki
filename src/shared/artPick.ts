@@ -2,7 +2,8 @@
 // ?pick=1 (main.ts artifactPage): a hover outline, and a click on an element (its own click held back) numbers it on the
 // page and tells the viewer its selector, markup and text by postMessage. The page is sandboxed (an opaque origin): the
 // script reads nothing but the page; the viewer takes only those strings from that frame (panels.tsx ArtifactView)
-// and makes the message for the agent (artNotes). A note taken back: { laki: 'artUnmark', n } from the viewer
+// and makes the message for the agent (artNotes). A note taken back: { laki: 'artUnmark', n } from the viewer; the page
+// loaded again (the file changed): { laki: 'artBase', n }, its numbers go on from the viewer's last
 export const ART_PICK = `<script>(() => {
   let n = 0, over
   const st = document.createElement('style')
@@ -40,7 +41,9 @@ export const ART_PICK = `<script>(() => {
     el.classList.add('__laki-over')
   }, true)
   addEventListener('message', e => {
-    if (e.source === parent && e.data && e.data.laki === 'artUnmark') for (const m of document.querySelectorAll('.__laki-mark')) if (m.textContent === String(e.data.n)) m.remove()
+    if (e.source !== parent || !e.data) return
+    if (e.data.laki === 'artUnmark') for (const m of document.querySelectorAll('.__laki-mark')) if (m.textContent === String(e.data.n)) m.remove()
+    if (e.data.laki === 'artBase' && Number.isInteger(e.data.n)) n = Math.max(n, e.data.n)
   })
 })()</script>`
 
