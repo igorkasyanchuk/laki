@@ -266,7 +266,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
   if (plain && (api.phone ? !shown : api.rows && !opened.has(id))) {
     const expand = () => (api.phone ? show?.() : (opened.add(id), grow(n => n + 1)))
     return (
-      <div className="need need-done need-row" data-flip={flip} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: done. ${api.phone ? 'Tap shows more, a swipe marks it seen' : 'Space shows more'}`} onClick={() => swipe.moved() || expand()} onKeyDown={e => (e.key === ' ' && e.target === e.currentTarget ? (e.preventDefault(), expand()) : key(e))} {...(api.phone && api.seenUndo && swipe.props)}>
+      <div className="need need-done need-row" data-flip={flip} data-swipe-tab={t.id} data-key={next ? 'next' : undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: done. ${api.phone ? 'Tap shows more, a swipe marks it seen' : 'Space shows more'}`} onClick={() => swipe.moved() || expand()} onKeyDown={e => (e.key === ' ' && e.target === e.currentTarget ? (e.preventDefault(), expand()) : key(e))} {...(api.phone && api.seenUndo && swipe.props)}>
         <Glyph s="done" />
         <span className="need-row-line">
           <b className="need-ws">
@@ -285,7 +285,7 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
     )
   }
   return (
-    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-flip={flip} data-key={next ? 'next' : undefined} data-newest={newest || undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : t.loop ? 'looping' : 'done'}`} onClick={e => api.open(t, e.currentTarget)} onKeyDown={key}>
+    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-flip={flip} data-swipe-tab={t.id} data-key={next ? 'next' : undefined} data-newest={newest || undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : t.loop ? 'looping' : 'done'}`} onClick={e => api.open(t, e.currentTarget)} onKeyDown={key}>
       <div className="need-head">
         <Glyph s={waiting ? 'waiting' : t.loop ? 'running' : 'done'} />
         <b className="need-ws">

@@ -115,6 +115,7 @@ export type AppSettings = Paint & {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  rowSwipe?: boolean // two fingers across a row: Snooze, Archive, Seen (swipe.ts; unset: on on a Mac)
   termClip?: 'ask' | 'all' | 'never' // OSC 52: a program's copy to the clipboard (Body's clipCopy; unset: ask, shells only)
   termPictures?: boolean // a terminal's recent pictures as chips (unset: on)
   editKeys?: boolean // ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
@@ -2510,6 +2511,9 @@ export function SettingsPage(p: {
               </Switch>
               <Switch className="switch-row" on={s.projectBadges !== false} onChange={on => set({ projectBadges: on })}>
                 <Says title="Project badges" hint="A project with no icon of its own shows its repo's logo, else two letters on a color. Off: a plain mark (a branch, a folder) as before; an icon or emoji you picked still shows" />
+              </Switch>
+              <Switch className="switch-row" on={s.rowSwipe ?? /Mac/.test(navigator.userAgent)} onChange={on => set({ rowSwipe: on })}>
+                <Says title="Swipe on rows" hint="Two fingers across a workspace's row or a Needs you card: left Snooze (an hour), further left Archive, right Seen. Every one is in the row's menu too. Not with Motion: None" />
               </Switch>
               <div className="field">
                 <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">

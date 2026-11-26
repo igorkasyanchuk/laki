@@ -131,6 +131,7 @@ export const FIND: [string, string, string?][] = [
   ['appearance', 'High contrast mode', 'contrast accessibility readable legible stronger muted lines text hard to see'],
   ['appearance', 'Icons', 'icon pack set library tabler lucide laki line width stroke thickness thin bold size bigger smaller'],
   ['layout', 'Finished turns as rows', 'needs you finished done turn row compact card seen changes'],
+  ['layout', 'Swipe on rows', 'swipe trackpad two fingers gesture sideways snooze archive seen row card'],
   ['layout', 'Project badges', 'badge letters initials logo favicon picture avatar project icon color off plain mark'],
   ['layout', 'Sidebar', 'project names font case letter spacing size weight rows text'],
   ['layout', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],

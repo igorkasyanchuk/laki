@@ -61,6 +61,7 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
   let before = 0 // the quick bar's step: workspaces before it sends
   let clipWas: string | undefined // the osc52 step's: the clipboard before it, put back after, pass or fail
   let clipDone = false
+  let swiped = '' // row-swipe's tab
   let designWas: View['settings']['design'] = 'classic' // schedule-title's: the design before it
   const cart = () => readFileSync(join(ws.cart.path, 'src/cart.js'), 'utf8')
   const checkout = () => join(ws.co.path, 'src/checkout.js')
@@ -379,6 +380,13 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
       await rpc('input', { tab: t, data: "printf '\\033]52;c;%s\\007' aGkgdGhlcmU=\r" })
       await answer('Allow')
     }, async () => (clipDone ||= (await clipboard.readText()) === 'hi there' && (await hasText('.status .sb-say', 'Copied 1 line')))],
+    // two fingers left across a Needs you card (swipe.ts: a trackpad's sideways wheel, 90px): Snooze, an hour; then
+    // back, so the steps after see Needs you as it was
+    ['row-swipe', async () => {
+      const ids = (await rpc<View>('state')).tabs.filter(t => t.status !== 'running').map(t => t.id)
+      swiped = await js<string>(`(ids => { const e = [...document.querySelectorAll('.side-scroll [data-swipe-tab]')].find(e => ids.includes(e.dataset.swipeTab)); if (!e) return ''; for (let i = 0; i < 3; i++) e.dispatchEvent(new WheelEvent('wheel', { deltaX: 30, deltaY: 0, bubbles: true })); return e.dataset.swipeTab })(${q(ids)})`)
+    }, async () => !!swiped && ((await rpc<View>('state')).tabs.find(t => t.id === swiped)?.snoozed ?? 0) > Date.now()],
+    ['row-swipe-off', () => rpc('tabSnooze', { tab: swiped, until: null }), async () => !(await rpc<View>('state')).tabs.find(t => t.id === swiped)?.snoozed],
     ['osc52-off', async () => clipWas !== undefined && (await clipboard.writeText(clipWas)), async () => clipWas === undefined || (await clipboard.readText()) === clipWas],
     // the phone (390×844): its bottom bar (five columns, each a finger's size, one lit, a capsule floating over the
     // bottom, in from both sides), nothing wider

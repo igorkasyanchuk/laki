@@ -684,6 +684,7 @@ export type Settings = {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  rowSwipe?: boolean // two fingers across a sidebar row or a Needs you card: Snooze, Archive, Seen (renderer swipe.ts; unset: on on a Mac)
   termClip?: 'ask' | 'all' | 'never' // OSC 52, a program's copy to the clipboard: shells ask once each (unset), shells and agents, or never
   termPictures?: boolean // a terminal's last pictures pasted or dropped, as chips at its top (Term.tsx TermPics; unset: on)
   editKeys?: boolean // the terminal's ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)

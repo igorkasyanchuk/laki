@@ -500,6 +500,18 @@ are tested in `test/units-more.test.ts`.
   resizes it). Over a plain terminal, no chat open and not a page, it fades to 55% (`.far`) while the pointer is over
   120px away (back on approach or focus; Motion off, never). Pages keep `--fab-room` at their bottom
   (`.page-body`, `.settings-main`). test:ui's README run checks it meets no `data-dock` element on the Done check's still.
+- **Row swipes** (`swipe.ts` `useRowSwipe`, Sidebar's): one listener on `.side-scroll` for its workspace rows
+  (`data-row` ws:…) and Needs you's cards and rows (`data-swipe-tab`): a trackpad's sideways wheel (`deltaX` over
+  `deltaY`; none within 300 ms of a vertical one: a scroll under way stays one; the fingers off after `SWIPE_IDLE` with
+  no wheel) or a finger (touch, pen: pointer events, its lift's click eaten) moves the row by `transform` from `--swipe`
+  (no React state a frame). `swipeMove` settles the direction after `SWIPE_LOCK` (10px, Phone.tsx' drawer's);
+  `swipeAct`: past `SWIPE_ARM` (64px) left Snooze (an hour: `needsApi.snooze`, not a running tab's), past `SWIPE_ARM2`
+  (160px) Archive (App's `archive`: its confirm and Undo), past 64px right Seen (a finished turn's: `seenUndo`); short
+  of them it springs back (`--spring-soft`; Motion: None or Reduce motion at once). The strip it uncovers is a fixed
+  element over the row's first place, clipped to the uncovered part, styled inline (the first load's CSS has no room):
+  the action's name in `--waiting`, `--error` or `--accent`. A drag (`data-lifted`) cancels it. Settings › Layout ›
+  *Swipe on rows* (`rowSwipe`, unset: on on a Mac), off on a phone (its own swipes) and with Motion: None. Tested in
+  `test/swipe.test.ts` and test:ui's `row-swipe`.
 - **Page titles** (`ui.tsx` `usePageTitle`, `pagetitle.css`): `Page`'s `big` (Schedule, Board) draws its title large
   at the top of its body (`.page-title-l`) and small in its head (`.page-title-s`); Settings' are its section's h2 and
   its name after *Settings* (`.page-title-sub`). One passive capture `scroll` listener on the frame sets `data-scrolled`

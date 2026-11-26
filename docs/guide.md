@@ -375,7 +375,9 @@ selected workspace's PR is in the status bar.
   click answers it there. A done one's shows its answer's first line and diff size, *Changes* (the side panel's
   Changes) and *Seen* (clears its ●); it's one line by default (its workspace, its last words, how long ago; *Changes* and
   *Seen* on hover or focus), a click or Space opens it into its card, and a failed Done check, a plan limit, a sandbox's
-  stop or an API error stay cards (Settings › Layout › Sidebar › *Finished turns as rows*; a phone always has rows). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
+  stop or an API error stay cards (Settings › Layout › Sidebar › *Finished turns as rows*; a phone always has rows). On a Mac, two fingers across a card or a workspace's row
+  pull it: left *Snooze* (an hour), further left *Archive*, right *Seen* (a finished turn's); each is in its menu too
+  (Settings › Layout › Sidebar › *Swipe on rows*; not with Motion: None). Ones done more than 30 minutes ago fold under *Earlier* (a click unfolds them,
   dimmed; *Seen all* clears them). Ones finished over a day ago that you never opened fold under *Probably done*,
   counted nowhere. On hover, a card's ✕ takes it out of Needs you and every count (the Dock's, the menu bar's, the
   rail's) until it asks something new or works again (the agent still waits in its tab: an agent that says it waits

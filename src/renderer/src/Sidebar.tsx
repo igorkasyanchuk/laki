@@ -20,7 +20,8 @@ import { planCount } from '../../shared/todos'
 import { phVars, sideVars, sideAttrs } from './SettingsLook'
 import { Video, TimerBar, StopwatchBar, stepsOf, OnboardBar } from './panels'
 import type { StepId } from '../../shared/nextStep'
-import { usualText } from '../../shared/nextStep'
+import { snoozeTimes, usualText } from '../../shared/nextStep'
+import { useRowSwipe } from './swipe'
 import type { SpendView } from './Spend'
 import { hasCap } from '../../shared/caps'
 import { fresh } from './motion'
@@ -678,6 +679,24 @@ export function Sidebar({ app }: { app: AppCtx }) {
     if (stop) rove(t, stop)
   })
   const { addMenu, busiest, dialog, find, lastAt, view, narrow, fitFoot, fold, folded, footButtons, found, groupMoves, histNav, kt, labels, listed, listOff, live, making, makingRows, needing, needNext, needsApi, newIn, newWord, onboard, onboardDone, openMenu, ownWidgets, pause, picked, pickedArchive, pickedMute, pickedRm, pickedWs, picking, pickKey, pins, plusMenu, projectActions, quickNew, rail, railBar, railKind, reminder, rows, sendTo, setDialog, setFind, setOnboard, setPicked, setPicking, setSideOpen, setStrip, setTimer, settings, setVideo, setWatch, shownRows, shows, sideOpen, sideStyle, sideW, staleMin, strip, termIn, termsOk, timerMenu, timers, toast, video, watches, wideBar, widgetApi, ws, wsRow } = app
+  // two fingers across a row (swipe.ts): a Needs you card's or a workspace row's tab that needs you: left Snooze (an
+  // hour; not one at work: its next hook would end it), further Archive (its workspace), right Seen (a finished turn's);
+  // Settings › Layout › Swipe on rows (a Mac's default on), never on a phone (its own swipes)
+  useRowSwipe(
+    tree,
+    el => {
+      const id = el.dataset.swipeTab
+      const w = live.find(x => x.id === (id ? view.tabs.find(t => t.id === id)?.workspace : el.dataset.row?.slice(3)))
+      const t = id ? view.tabs.find(x => x.id === id) : needing.find(x => x.workspace === w?.id)
+      if (!w) return
+      return {
+        ...(t && t.status !== 'running' && app.needsApi.snooze && { left: () => app.needsApi.snooze!(t, snoozeTimes()[0].at) }),
+        ...(!w.archived && !app.projOf(w)?.kind && { left2: () => void app.archive(w) }),
+        ...(t?.done && t.status === 'idle' && app.needsApi.seenUndo && { right: () => app.needsApi.seenUndo!(t) }),
+      }
+    },
+    (settings.rowSwipe ?? /Mac/.test(navigator.userAgent)) && !narrow,
+  )
   // Delete (⌫ or ⌦) with workspaces picked: Delete them… (a field's or a terminal's keys stay theirs)
   const rmNow = useRef(pickedRm)
   rmNow.current = pickedRm
