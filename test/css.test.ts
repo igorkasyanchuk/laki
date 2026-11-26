@@ -210,3 +210,12 @@ test('a lifted drag (.lift) is drawn from tokens: its shadow, fill and stacking;
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ \.lift \{ transform: none; \} \}/)
   assert.match(css, /\[data-lifted\] \{ visibility: hidden; \}/, 'the item a gap of its height, not gone')
 })
+
+// as `w ? import('./NewWindow').then(…) : import('./App').then(…)` the minifier merged the two preloads into one with
+// App's files only: a floated window (the AI window) never loaded its own chunks' CSS, ai.css (its thread past the window)
+test("main.tsx awaits each window's import on its own: each preloads its own CSS", () => {
+  const src = readFileSync(new URL('../src/renderer/src/main.tsx', import.meta.url), 'utf8')
+  assert.match(src, /= await import\('\.\/App'\)/)
+  assert.match(src, /= await import\('\.\/NewWindow'\)/)
+  assert.doesNotMatch(src, /[?:]\s*import\('\.\/(App|NewWindow)'\)/, 'no import of either in a ternary')
+})

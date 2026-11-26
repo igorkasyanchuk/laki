@@ -66,9 +66,17 @@ vv?.addEventListener('resize', () => (root.style.setProperty('--vh', `${vv.heigh
 const MORE = ['Fira Code', 'Cascadia Code', 'Source Code Pro', 'IBM Plex Mono', 'Geist Mono', 'Hack', 'Iosevka', 'Inconsolata', 'Roboto Mono', 'Victor Mono'].flatMap(f => [`13px "${f}"`, `bold 13px "${f}"`])
 const w = new URLSearchParams(location.search).get('window') // main's new-workspace, AI and floating tab windows: the page alone
 // E8: each window loads only what it draws (the app window App, a floated one NewWindow.tsx), while the fonts load
-const page: Promise<ReactNode> = w
-  ? import('./NewWindow').then(m => (w === 'new' ? <m.NewWindow /> : w === 'ai' ? <><m.AiWindow /><FloatNotices /></> : w === 'tab' ? <><m.TabWindow /><FloatNotices /></> : w === 'sim' ? <><m.SimWindow /><FloatNotices /></> : w === 'quick' ? <m.QuickWindow /> : w === 'panel' ? <><m.PanelWindow /><FloatNotices /></> : null))
-  : import('./App').then(m => <m.App />)
+// each import awaited on its own: as `w ? import(a).then(…) : import(b).then(…)` the minifier merged the two preloads into
+// one, given b's files only, so a floated window never loaded its own chunks' CSS (ai.css: the AI window's thread grew
+// past it, no scrolling, no box). test/css.test.ts keeps it so
+const page: Promise<ReactNode> = (async () => {
+  if (!w) {
+    const m = await import('./App')
+    return <m.App />
+  }
+  const m = await import('./NewWindow')
+  return w === 'new' ? <m.NewWindow /> : w === 'ai' ? <><m.AiWindow /><FloatNotices /></> : w === 'tab' ? <><m.TabWindow /><FloatNotices /></> : w === 'sim' ? <><m.SimWindow /><FloatNotices /></> : w === 'quick' ? <m.QuickWindow /> : w === 'panel' ? <><m.PanelWindow /><FloatNotices /></> : null
+})()
 Promise.all([...['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter', ...MORE].map(f => document.fonts.load(f, 'aĀЖ')), lookStart()])
   .catch(() => {})
   .then(() => page)

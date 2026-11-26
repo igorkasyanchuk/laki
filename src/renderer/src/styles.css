@@ -676,8 +676,9 @@ html[data-ui-size] :is(.menu-sub, .menu-hint, .menu-head, .menu-none) { font-siz
 .drop-into { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); } /* a group's head: first in it */
 .ws-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 4em; } /* a row's marks and chips don't squeeze it out */
 /* T6: ui.tsx MidText: the cut name over the whole one (transparent: still read aloud), in one grid cell: the box is as wide
-   as the whole name until its room is less */
-.mid { display: inline-grid; min-width: 0; overflow: hidden; }
+   as the whole name until its room is less. Its column no wider than the box (an auto one is the whole name's width: the
+   cut stretched past the box, centered in a button, the status bar's branch, with a gap before it), the cut at its start */
+.mid { display: inline-grid; grid-template-columns: minmax(0, 1fr); min-width: 0; overflow: hidden; text-align: start; }
 .mid > span { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mid > .mid-whole { justify-self: start; overflow: visible; color: transparent; pointer-events: none; user-select: none; }
 .listen { background: none; border: none; padding: 0; color: var(--done); font-family: var(--mono); font-size: var(--fs-2); }
