@@ -165,6 +165,23 @@ test('a secret by its value (DATABASE_URL with a password) leaves state.json too
   assert.ok(!onDisk(rig.data).includes('fake_db_pass'), 'still not in state.json')
 })
 
+test("kcWarm: a start asks the Keychain for its values together (KC_AT_ONCE at a time, async), not one sync spawn each", async t => {
+  const rig = await fresh(t, { env: { LAKI_KEYCHAIN: '1' } })
+  writeFileSync(join(rig.home, 'bin', 'security'), SECURITY, { mode: 0o755 })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { env: { GH_TOKEN: SECRETS[0], OTHER_TOKEN: SECRETS[2] } })
+  await rig.rpc('projectSet', { id: p.id, config: { env: { API_KEY: SECRETS[1] } } })
+  await rig.stop()
+  writeFileSync(join(rig.home, 'security-slow'), '300')
+  writeFileSync(rig.env.FAKE_LOG, '')
+  await rig.start()
+  const log = readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n')
+  const first = log.findIndex(l => l.startsWith('security found '))
+  assert.ok(log.slice(0, first).filter(l => /^security find-generic-password .*-a env:/.test(l)).length >= 3, `asked together: ${log.join(' / ')}`)
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await echoed(rig, ws.id, `[${SECRETS[0]}|${SECRETS[1]}]`)
+})
+
 test("the app's window wraps the Keychain's values (keychain.ts): the item holds the wrapped one, a tab still gets the secret; with no window, plain, and diagnostics say so", async t => {
   const rig = await fresh(t, { env: { LAKI_KEYCHAIN: '1' } })
   writeFileSync(join(rig.home, 'bin', 'security'), SECURITY, { mode: 0o755 })

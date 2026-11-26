@@ -281,7 +281,10 @@ PATH), else their 0600 files. `/usr/bin/security`, 5 s per call: `find-generic-p
 and backslashes escaped; a name or key with `\r`, `\n` or a NUL never: `-i` takes a command a line, the rest would run
 as another command, so `kcSet` is false and the file keeps it), then read back. A file's write is `writeAtomic`. Also
 `widget-secrets` (widgets.ts `readSecrets`/`setSecrets`: every extension's secret settings as one JSON, its file
-`<data>/widget-secrets.json`). A file there is the key to keep (not moved yet, or written when the Keychain
+`<data>/widget-secrets.json`). `kcWarm(names)` (main.ts, before `core.load`: the state's secret env names, `envKeys.ts` `envNames`, and
+`openrouter`, `endpoint`, `widget-secrets`, `telegram`): each asked with `execFile`, 4 at a time, 5 s each, so the start
+waits on none in turn; `keyRead` takes a warmed answer once, `keyWrite` drops it (`test/env-keys.test.ts`, the fake's
+`security-slow`). A file there is the key to keep (not moved yet, or written when the Keychain
 failed): moved in when it reads back equal, then removed; else the file is used. Read once, then kept in memory; a
 read the Keychain didn't answer is asked again after a minute.
 `keysWhere()` is the diagnostics' *Keys and secret values* line: the Keychain, a key *in file* with why, or files, by

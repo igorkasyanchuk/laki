@@ -47,6 +47,14 @@ const stored = new Map<string, string>() // what the store has, by key: written 
 // null in state.json, never removed from the store, until it's set again; its tabs miss it until then
 const unread = new Set<string>()
 
+// kcWarm's (main.ts, before load): the names a state's nulls will be read by
+export const envNames = (s: unknown) => {
+  try {
+    return spots(s as S).filter(p => p.at[p.field] === null).map(p => p.key)
+  } catch {
+    return []
+  }
+}
 // load: each null filled from the store; a value still in state.json (from before, or a restored v1 backup) moved into
 // it (keychain.ts reads it back), and the caller saves at once so it leaves the file. true: something moved
 export function envRestore(s: S): boolean {

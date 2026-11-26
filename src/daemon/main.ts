@@ -70,7 +70,8 @@ import { reviewDiff, reviewMark, longStop, longTurnTick, sideAsk, sideNew, sideS
 import { alertAnswer, alertMacOnly, alertShow, alertsSeen, noticesTo } from './alerts.ts'
 import { capRaises, capTick } from './cap.ts'
 import { suggest, suggestAnswer } from './suggest.ts'
-import { keychainOn, setWrapper, wrapping } from './keychain.ts'
+import { kcWarm, keychainOn, setWrapper, wrapping } from './keychain.ts'
+import { envNames } from './envKeys.ts'
 import { secretAsk, secretForget, secretGive, secretKeep, secretsTidy } from './secrets.ts'
 import { flowAnswer, flowEvent, flowTest, flowForget, flowGet, flowHistory, flowList, flowPause, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowHold, flowFirst, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust, flowTrustDiff, flowWaitEnd, flowExport, flowImport, flowImportSave } from './workflow.ts'
 import { eventsWait, factsTick, scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetFromTerm, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetAnnotations, widgetStore, widgetTerm, termStop, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetFull, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
@@ -138,6 +139,7 @@ safeStart() // safe mode after three young deaths in a row (safe.ts)
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
 if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
+await kcWarm([...envNames(readJson(join(dir, 'state.json'))), 'openrouter', 'endpoint', 'widget-secrets', 'telegram']) // the Keychain's values read together, not one sync spawn each as the state loads
 core.load()
 policyTick() // a managed policy: before any tab starts again (spawnTab checks it), then every 5 minutes
 core.writeHooks()

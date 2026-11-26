@@ -121,14 +121,23 @@ test('S11: a webhook delivery sent again after a restart is still refused: the r
   const gh = (id: string) => ({ 'x-hub-signature-256': `sha256=${createHmac('sha256', g.secret).update(body).digest('hex')}`, 'x-github-event': 'issues', 'x-github-delivery': id })
   const lin = JSON.stringify({ type: 'Issue', webhookTimestamp: Date.now() })
   const linH = { 'linear-signature': createHmac('sha256', l.secret).update(lin).digest('hex') }
+  const k = await rig.rpc('hookAdd', { name: 'k', kind: 'key' })
+  const key = (id?: string, ts: number | string = Date.now()) => ({ 'x-laki-key': k.secret, 'x-laki-timestamp': String(ts), ...(id && { 'x-laki-id': id }) })
   assert.equal(await post('/hook/gh', body, gh('d-1')), 202)
   assert.equal(await post('/hook/lin', lin, linH), 202)
+  assert.equal(await post('/hook/k', body, key('k-1')), 202)
   assert.equal(statSync(join(rig.data, 'hook-deliveries.json')).mode & 0o777, 0o600)
   await rig.stop()
   await rig.start()
   assert.equal(await post('/hook/gh', body, gh('d-1')), 409, 'a GitHub delivery replayed after a restart')
   assert.equal(await post('/hook/lin', lin, linH), 409, 'a Linear one too')
   assert.equal(await post('/hook/gh', body, gh('d-2')), 202, 'a new one goes')
+  // an X-Laki-Key hook's own: X-Laki-Id once, X-Laki-Timestamp within 10 minutes (ms or seconds); neither: as before
+  assert.equal(await post('/hook/k', body, key('k-1')), 409, 'its X-Laki-Id again')
+  assert.equal(await post('/hook/k', body, key('k-2', Date.now() - 11 * 60e3)), 409, 'too old')
+  assert.equal(await post('/hook/k', body, key('k-3', 'soon')), 409, 'not a time')
+  assert.equal(await post('/hook/k', body, key('k-4', Math.floor(Date.now() / 1000))), 202, 'seconds')
+  for (let i = 0; i < 2; i++) assert.equal(await post('/hook/k', body, { 'x-laki-key': k.secret }), 202, 'neither: each goes')
 })
 
 test('a scheduled task on a webhook: a signed POST runs it at once, its body fenced as data; another event of it, or none signed, runs nothing', async t => {

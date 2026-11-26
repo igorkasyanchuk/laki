@@ -18,8 +18,10 @@
 // plain one is there that long); a plain one read is wrapped then too. A wrapped one read with no app open: unread
 // until the app is (keyUnread; onKeys tells core, which fills what it missed). Headless (no window ever): plain, as
 // before, and keysWhere says so
-// ponytail: the first read is a sync spawn (a few ms; 5 s at worst) on the event loop
-import { spawnSync } from 'node:child_process'
+// kcWarm (main.ts, before the state loads): the names it will read asked for together, KC_AT_ONCE at a time, async, 5 s
+// each, so the start doesn't wait on one sync spawn per name; keyRead takes a warmed answer once (keyWrite drops it).
+// ponytail: a name not warmed is still a sync spawn on its first read (a few ms; 5 s at worst)
+import { execFile, spawnSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -36,7 +38,27 @@ export function keychainOn() {
   const r = spawnSync('/usr/bin/codesign', ['-dv', process.execPath], { encoding: 'utf8', timeout: 5000 })
   return (on = /^Authority=Developer ID Application:/m.test(r.stderr ?? ''))
 }
-const sec = (args: string[], input?: string) => spawnSync(forced() ? 'security' : '/usr/bin/security', args, { encoding: 'utf8', timeout: 5000, ...(input !== undefined && { input }) })
+const bin = () => (forced() ? 'security' : '/usr/bin/security')
+const sec = (args: string[], input?: string) => spawnSync(bin(), args, { encoding: 'utf8', timeout: 5000, ...(input !== undefined && { input }) })
+const KC_AT_ONCE = 4
+const warm = new Map<string, string>() // kcWarm's answers, each taken once by keyRead ('': no such item)
+export async function kcWarm(names: string[]) {
+  if (!keychainOn()) return
+  const todo = [...new Set(names)].filter(n => typeof n === 'string' && !kept.has(n) && !warm.has(n))
+  const one = (name: string) =>
+    new Promise<void>(done =>
+      execFile(bin(), ['find-generic-password', '-s', SERVICE, '-a', name, '-w'], { encoding: 'utf8', timeout: 5000 }, (e, out) => {
+        const code = e ? (e as { code?: unknown }).code : 0
+        if (code === 0) warm.set(name, out.replace(/\n$/, ''))
+        else if (code === 44) warm.set(name, '')
+        done() // not answered (a timeout, a locked Keychain): keyRead asks again itself
+      }),
+    )
+  await Promise.all(Array.from({ length: Math.min(KC_AT_ONCE, todo.length) }, async () => {
+    for (let n = todo.shift(); n !== undefined; n = todo.shift()) await one(n)
+  }))
+}
+const warmed = (name: string) => (v => (warm.delete(name), v))(warm.get(name))
 // undefined: the Keychain didn't answer; '': no such item (44: errSecItemNotFound)
 export function kcGet(name: string): string | undefined {
   const r = sec(['find-generic-password', '-s', SERVICE, '-a', name, '-w'])
@@ -103,7 +125,7 @@ export function keyRead(name: string, path: string): string {
   if (!keychainOn()) where.set(name, 'file')
   else if (v) kcSet(name, v) ? (rmSync(path, { force: true }), where.set(name, 'Keychain')) : where.set(name, "file (the Keychain didn't take it)")
   else {
-    const got = kcGet(name)
+    const got = warm.has(name) ? warmed(name) : kcGet(name)
     if (got === undefined) where.set(name, "file (the Keychain didn't answer)"), retry.set(name, Date.now() + RETRY())
     else if (got.startsWith(WRAP)) {
       // wrapped: '' until the app unwraps it (now, if its window is open)
@@ -123,6 +145,7 @@ export const keyUnread = (name: string) => retry.has(name)
 // '': none (removed)
 export function keyWrite(name: string, path: string, key: string) {
   wrappedRaw.delete(name)
+  warm.delete(name)
   if (keychainOn() && (key ? kcSet(name, key) : kcRm(name))) {
     rmSync(path, { force: true })
     where.set(name, key ? 'Keychain (not wrapped)' : 'Keychain')

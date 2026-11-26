@@ -96,8 +96,9 @@ export function signed(kind: InHook['kind'], secret: string, raw: Buffer, h: Inc
 
 // S11: a signed request sent again (one captured on its way) runs nothing: GitHub's X-GitHub-Delivery and Linear's
 // signature are remembered REPLAY_MS, and Linear's webhookTimestamp must be within it; on disk too, so a restart forgets
-// none (<data>/hook-deliveries.json, 0600, as main.ts' e2e-salts.json). ponytail: an X-Laki-Key hook has no id to tell one
-// request from its copy
+// none (<data>/hook-deliveries.json, 0600, as main.ts' e2e-salts.json). An X-Laki-Key hook's sender may say both too:
+// X-Laki-Timestamp (Unix ms, or seconds) within REPLAY_MS, X-Laki-Id once. ponytail: optional, and not signed (the key
+// itself goes in clear): a sender that sends neither has no copy told apart
 const REPLAY_MS = 600_000
 const DELIVERIES = join(dir, 'hook-deliveries.json')
 const deliveries = new Map<string, number>(Object.entries((readJson<Record<string, unknown>>(DELIVERIES) ?? {}) as Record<string, unknown>).filter((e): e is [string, number] => typeof e[1] === 'number' && Date.now() - e[1] <= REPLAY_MS))
@@ -109,6 +110,15 @@ export function replayed(name: string, kind: InHook['kind'], h: IncomingMessage[
     const at = Number((body as { webhookTimestamp?: unknown } | null)?.webhookTimestamp)
     if (!Number.isFinite(at) || Math.abs(now - at) > REPLAY_MS) return 'too old: webhookTimestamp past 10 minutes'
     id = String(h['linear-signature'] ?? '')
+  }
+  if (kind === 'key') {
+    const ts = h['x-laki-timestamp']
+    if (ts !== undefined) {
+      const n = Number(ts)
+      const at = n < 1e12 ? n * 1000 : n
+      if (!Number.isFinite(at) || Math.abs(now - at) > REPLAY_MS) return 'too old: X-Laki-Timestamp past 10 minutes'
+    }
+    id = String(h['x-laki-id'] ?? '').slice(0, 200)
   }
   if (!id) return
   const key = `${name}\0${id}`

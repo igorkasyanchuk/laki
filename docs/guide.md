@@ -1869,7 +1869,7 @@ Two come from outside Laki. **`issue.labeled`**: someone labels an issue of one 
 issue events once a minute while a workflow or an extension listens; a restart doesn't fire old ones):
 `event.project`, `event.number`, `.title`, `.url`, `.label`, `.by`, `.body`. **`webhook`**: a POST to one of Settings ›
 Tunnels › *Webhooks* (a name and a secret each: GitHub's signature, Linear's, or an `X-Laki-Key` header for anything
-else): `event.name`, `event.event` (GitHub's `X-GitHub-Event`), `event.body` (the request's JSON). They run on a small
+else, with `X-Laki-Timestamp` and `X-Laki-Id` if the sender can: a copy, or one over 10 minutes old, runs nothing): `event.name`, `event.event` (GitHub's `X-GitHub-Event`), `event.body` (the request's JSON). They run on a small
 server of their own, never Laki's; *Expose to the internet* puts it, and only it, on a Cloudflare quick tunnel (its
 address changes when it starts again) or Tailscale Funnel. Their text is someone else's: put it in a prompt as quoted
 context, and a run they start can't run commands, webhooks, extensions or an agent in bypass permissions. The

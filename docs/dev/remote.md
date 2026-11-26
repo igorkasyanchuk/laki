@@ -123,7 +123,10 @@ Tested in `test/share.test.ts`.
 never the daemon's; only `POST /hook/<name>` (404 else, `/rpc` too), `BODY_MAX` 1 MB (413), `RATE` 60 signed ones a minute per hook (an outsider's unsigned ones don't count)
 (429 with Retry-After). Each request's check (`signed`, `timingSafeEqual`): `github` `X-Hub-Signature-256`
 (`sha256=` + HMAC-SHA256 of the raw body), `linear` `Linear-Signature` (its hex), `key` `X-Laki-Key`; a failure 401,
-logged once a minute per hook (`told`). Then `webhook` `{ name, event, body, project? }`, 202. `hookAdd` (a name,
+logged once a minute per hook (`told`). A copy runs nothing (`replayed`, 409): GitHub's `X-GitHub-Delivery` and
+Linear's signature once each within `REPLAY_MS` (10 minutes), Linear's `webhookTimestamp` within it, a `key` hook's
+optional `X-Laki-Timestamp` (Unix ms or seconds) within it and `X-Laki-Id` once; `<data>/hook-deliveries.json` (0600)
+keeps them through a restart (`test/inbound.test.ts`). Then `webhook` `{ name, event, body, project? }`, 202. `hookAdd` (a name,
 `NAME`; a kind; a project) writes its secret to `<data>/hooks/<name>` (0600, never state.json) and returns it once;
 `hookSecret` reads it again, `hookRm` drops both, `hookList` the hooks with their local and public URLs. `hookExpose`:
 remote.ts' `hookPublish`, a quick cloudflared tunnel to that port (`cloudflare`) or `tailscale funnel` (`tailscale`,
