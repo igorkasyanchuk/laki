@@ -2224,8 +2224,9 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
     argv.push('-c', 'notify=' + JSON.stringify([...h.argv, 'hook', 'done']))
-    // ponytail: Laki's note (project memory too) goes on argv, which ps shows to every account: codex 0.171 takes
-    // developer_instructions from config only (model_instructions_file replaces its own prompt, not this); SECURITY.md
+    // ponytail: Laki's note (project memory too) goes on argv, which ps shows to every account (SECURITY.md). codex
+    // 0.171 has no env var or per-run file for developer_instructions: -p reads $CODEX_HOME/<name>.config.toml (~/.codex,
+    // never written), model_instructions_file replaces its own prompt. Move it once codex takes a file of ours
     if (told && !pr?.args?.includes('developer_instructions') && !codexOwn()) argv.push('-c', 'developer_instructions=' + JSON.stringify(told)) // a JSON string is a TOML one
     const m = codexMcpArgs(mcp)
     argv.push(...m.args)

@@ -156,7 +156,7 @@ export function Terminals() {
                 <td className="mono small">{t.tty}</td>
                 <td className="small" title={t.chain.join(' ‹ ')}>
                   {t.cmd}
-                  {t.start && <span className="muted"> · started Laki</span>}
+                  {t.start && <span className="muted"> · started Laki: stays allowed, no 12-hour limit</span>}
                 </td>
                 <td className="small">{when(t.at)}</td>
                 <td className="small">{when(t.lastAt)}</td>

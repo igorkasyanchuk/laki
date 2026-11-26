@@ -503,7 +503,8 @@ TOML strings quoted by `tomlString`); an env's values never on argv: `codexMcpAr
 `LAKI_MCP_<i>_<NAME>` (the server's index), which `agentCmd` puts in codex's environment, with `env_vars` naming them
 (codex 0.171: names forwarded from its environment, not renamed, so the server's command is `/bin/sh -c 'export
 NAME="$LAKI_MCP_<i>_<NAME>"; unset …; exec "$0" "$@"' <command> <args…>`, names only). Laki's note
-(`developer_instructions`) stays on argv: codex reads it from config only (`model_instructions_file` replaces its own
+(`developer_instructions`) stays on argv: codex reads it from config only (checked on 0.171: no env var or per-run file;
+`-p` reads `$CODEX_HOME/<name>.config.toml`, in `~/.codex`, never written; `model_instructions_file` replaces its own
 prompt instead); SECURITY.md says so; gemini, grok and opencode none yet (the page says so). What it sees lists them as
 `scope: 'laki'`, *from Laki*.
 

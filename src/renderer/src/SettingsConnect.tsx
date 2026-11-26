@@ -684,6 +684,7 @@ export function RemoteSection({ api, opts, set, other }: { api: RemoteApi; opts:
         tunnel's changes every time.
       </p>
       <p className="warn-soft small">Whoever gets in has a shell on this Mac as you: use an address only you read.</p>
+      <p className="muted small">The tunnel serves the page itself too, its code included (a phone paired at a stable address keeps the code it first loaded).</p>
       {r?.link ? (
         <div className="remote-on">
           <QR text={r.link} label="the remote access link" />
