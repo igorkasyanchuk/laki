@@ -161,6 +161,7 @@ export type AppSettings = Paint & {
   storageDays?: number // a storage folder's file not changed for this many days goes (unset: STORAGE_DAYS; 0: never)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   finishedRows?: boolean // Needs you's finished turns as rows
+  projectBadges?: boolean // #5: badges (a repo's picture, two letters) for projects with no icon; on unless false
   density?: 'compact' | 'regular' | 'roomy' // space and control heights (themes.ts)
   pointerHand?: boolean // the pointing hand over buttons (unset: on)
   backdrop?: BackdropKind // an empty page's background (Backdrop.tsx; unset: stars)
@@ -2499,6 +2500,9 @@ export function SettingsPage(p: {
               <SidePreview sl={s.sideLook} pl={s.projectLook} style={s.sideStyle} />
               <Switch className="switch-row" on={s.finishedRows !== false} onChange={on => set({ finishedRows: on })}>
                 <Says title="Finished turns as rows" hint="In Needs you, a finished turn is one line (its workspace, its last words, Changes and Seen on hover); a click opens its card. Asks stay cards" />
+              </Switch>
+              <Switch className="switch-row" on={s.projectBadges !== false} onChange={on => set({ projectBadges: on })}>
+                <Says title="Project badges" hint="A project with no icon of its own shows its repo's logo, else two letters on a color. Off: a plain mark (a branch, a folder) as before; an icon or emoji you picked still shows" />
               </Switch>
               <div className="field">
                 <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">

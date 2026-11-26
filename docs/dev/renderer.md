@@ -313,7 +313,8 @@ are tested in `test/units-more.test.ts`.
     unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`), or their own `icon` in
     their `color` (ui.tsx `ProjectMark`, `.p-mark`: an emoji with a line in it; none (#5): the view's `picture`, the
     daemon's `pictureOf` (a new Rails app's red-circle stand-in skipped: `PLACEHOLDERS`), else `.p-letters`, `setBadges`'
-    `badgeLetters` on `autoColor`; a click on the sidebar's badge: `projectActions(p, true)`, `badgeItems`: what it shows,
+    `badgeLetters` on `autoColor`; Settings › Layout › *Project badges* off (`settings.projectBadges` false, `setBadges`'
+    second argument): neither, the plain mark (`or`), and the sidebar's mark no button; a click on the sidebar's badge: `projectActions(p, true)`, `badgeItems`: what it shows,
     that one checked, a pick making it shown, then the color of its letters or icon (*Color: auto*: the auto one picked); also the new-workspace page's project
     menu (a menu item's `mark`), the palette's workspaces and tabs (`PaletteItem` `mark`), Settings' nav, a rail pin's
     corner); App's `tint`: a workspace's color, else its project's (the peek card, rail pins, the bubbles).

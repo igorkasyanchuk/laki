@@ -3,6 +3,10 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- Settings › Layout › Project badges turns the badges off: a project with no icon of its own shows a plain mark again.
+
 ## 0.66.0 · Nov 26, 2026
 
 - Phone pushes wait while you're at the Mac: a finished turn shows here only, and an ask reaches the phone only if nobody answers it here in 90 s (Settings › Phone pushes).

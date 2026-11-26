@@ -821,6 +821,7 @@ export type Settings = {
   density?: 'compact' | 'regular' | 'roomy' // Appearance's Density: space and control heights (renderer's themes.ts, styles.css --density); unset: regular
   pointerHand?: boolean // Appearance's Pointing hand over buttons (--cur-act); unset: on
   finishedRows?: boolean // Needs you: a finished turn as a compact row (Needs.tsx), on unless false
+  projectBadges?: boolean // #5: a project with no icon of its own shows its repo's picture or two letters (ui.tsx ProjectMark); false: the plain mark
   toolbar?: string[] | null // the tab bar's buttons shown, in order (renderer's toolbar.ts ids; unset: its default); ⋯ and Run always
   toolbarSeen?: string[] | null // every id there was as it was set: one new since shows at its default place
   iconPack?: string // Appearance's Icons (icons.ts lookOf, ICON_PACKS): tabler (unset), lucide or laki; iconWidth: its stroke as at a 24 grid (ICON_WIDTHS, unset: 2, each pack's own); iconSize: the app's icons (ICON_SIZES, unset: 14)

@@ -2395,7 +2395,7 @@ export function App() {
       </div>
     )
 
-  setBadges(view.projects.filter(p => !p.kind)) // #5: each project's badge letters, distinct across them (ui.tsx ProjectMark); Terminals' and Browsers' are icons
+  setBadges(view.projects.filter(p => !p.kind), settings.projectBadges !== false) // #5: each project's badge letters, distinct across them (ui.tsx ProjectMark); Terminals' and Browsers' are icons
   // wsMenu: declared below (app's), called later
   const {
     achAll, achHidden, achN, AI_TIP, aiFab, aiNames, calOn, costsOn, ctxLook, ctxOn, deskOn, doStep, footButtons,

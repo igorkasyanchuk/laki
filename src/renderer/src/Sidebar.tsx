@@ -6,7 +6,7 @@ import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { aiOn, capSpent, capText, costWords, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
-import { Num, ask, cardMorph, choose, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
+import { Num, ask, badgesShown, cardMorph, choose, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { bulkAnswer, type NeedsApi, NeedsList } from './Needs'
@@ -820,7 +820,7 @@ export function Sidebar({ app }: { app: AppCtx }) {
               <span className="project-chev">
                 <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
               </span>
-              {p.kind ? (
+              {p.kind || !badgesShown() /* Project badges off: the plain mark, as before */ ? (
                 <span className="project-icon">
                   <ProjectMark p={p} or={markOf(p)} />
                 </span>

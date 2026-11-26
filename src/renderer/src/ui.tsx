@@ -716,7 +716,9 @@ export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(
 // #5: a project with no icon of its own: its repo's picture (the daemon's pictureOf), else two letters on its color,
 // distinct across your projects (App sets them from each view: setBadges)
 let badges = new Map<string, string>()
-export const setBadges = (ps: { id: string; name: string; letters?: string }[]) => void (badges = badgeLetters(ps))
+let badgesOn = true // Settings › Layout › Project badges (settings.projectBadges): off, the plain mark (or)
+export const setBadges = (ps: { id: string; name: string; letters?: string }[], on = true) => void ((badges = badgeLetters(ps)), (badgesOn = on))
+export const badgesShown = () => badgesOn
 // the two letters its badge shows: yours, else its own
 export const lettersOf = (p: { id: string; name: string; letters?: string }) => p.letters || badges.get(p.id) || badgeLetters([{ id: p.id, name: p.name }]).get(p.id)!
 export function ProjectMark({ p, size = 12, or }: { p?: { id?: string; name?: string; icon?: string; color?: string; letters?: string; picture?: string | false; kind?: string }; size?: number; or?: IconName }) {
@@ -724,7 +726,7 @@ export function ProjectMark({ p, size = 12, or }: { p?: { id?: string; name?: st
   const e = emojiOf(i)
   const name = isIconName(i) ? i : or
   const l = useSyncExternalStore(onIconLook, iconLook) // an emoji as big as an icon would be
-  if (!e && !isIconName(i) && p?.id && p.name && !p.kind) {
+  if (badgesOn && !e && !isIconName(i) && p?.id && p.name && !p.kind) {
     const px = iconPx(size, l) + 4
     if (typeof p.picture === 'string' && p.picture) return <img className="p-mark p-pic" src={p.picture} alt="" width={px} height={px} aria-hidden />
     return (
