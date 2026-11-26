@@ -196,7 +196,7 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
     }
   }
   const query = q.trim().toLowerCase()
-  const found = query ? (d?.files ?? []).filter(f => f.toLowerCase().includes(query)).slice(0, 300) : []
+  const found = query ? [...(d?.files ?? []), ...(d?.ignored ?? []).filter(f => !f.endsWith('/'))].filter(f => f.toLowerCase().includes(query)).slice(0, 300) : [] // the ignored ones shown too
   if (!query) walk('', 0)
   const dot = (p: string, dir: boolean) =>
     dir ? changedDirs.has(p) && <span className="sp-dot" /> : changed[p] && <span className={`sp-dot st-${changed[p]}`} data-tip={ST[changed[p]]} />

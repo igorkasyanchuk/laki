@@ -216,7 +216,9 @@ test('U7: Clone a repository: a local repo or a URL into a folder, added as a pr
   mkdirSync(join(rig.home, 'code/empty'))
   writeFileSync(join(rig.home, 'code/empty/.DS_Store'), '') // Finder's: still an empty folder
   assert.equal((await rig.rpc('projectAdd', { path: join(rig.home, 'code/empty') })).git, false, 'added before as a plain folder')
-  assert.ok((await rig.rpc('projectNew', { name: 'empty', into: join(rig.home, 'code') })).git, 'a git project now')
+  const made = await rig.rpc('projectNew', { name: 'empty', into: join(rig.home, 'code') })
+  assert.ok(made.git, 'a git project now')
+  assert.equal((await rig.rpc('state')).projects.find((x: { id: string }) => x.id === made.id).git, true, 'in the view too')
   assert.equal(execFileSync('git', ['ls-files'], { cwd: join(rig.home, 'code/empty'), encoding: 'utf8' }), 'README.md\n')
   assert.equal((await rig.rpc('projectNew', { name: 'rel', into: 'code' })).path, realpathSync(join(rig.home, 'code/rel')), 'a relative Into: under your home')
   await assert.rejects(rig.rpc('projectNew', { name: 'shop', into: join(rig.home, 'code') }), /already there with files in it/)

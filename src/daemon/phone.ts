@@ -86,6 +86,7 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
     const latest = waits.get(tab.id) === wait
     if (wait && latest) waits.delete(tab.id)
     if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited || !latest)) return
+    if (hold && (quiet(ws, true) || tab.muted || mutedWs(ws) || hidden(ws))) return void log(`push held: ${tab.name}'s ask, Quiet, muted or hidden since`) // set while it was held
     const ask = kind === 'waiting' ? s!.ask() : undefined
     // a permission ask's command or file (claude's PermissionRequest), its secrets' shapes masked: it leaves the Mac
     // (Settings' titles only: pushRequest drops it, as any question)

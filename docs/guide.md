@@ -87,6 +87,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   agents can sleep to give their memory back, and resume their chat when you look.
 - **Clone a repository**: Welcome's *Clone a repository…* (⌘K too) takes a URL (`https://`, `ssh://`, `git@host:…`) or
   `owner/repo`, clones it into `~/code` (or the folder you name) and adds it as a project.
+- **New project**: Welcome's *New project…* (⌘K too) takes a name (and optionally where): a folder by that name in
+  `~/code` (else beside your last project), `git init` with a README as its first commit, added as a project, its
+  new-workspace page open. An empty folder already there is taken; one with files in it is refused.
 - **Stop all agents**: ⌘K › *Stop all agents* (File menu too; give it a key in Settings › Keys) names the turns under
   way, asks once and interrupts each (Esc; nothing is closed). A queue it held shows *Resume queue*.
 - **Quiet** (was Do not disturb): the menu bar's menu › *Quiet › For 30 Minutes / For 1 Hour / Until Tomorrow 9:00*, ⌘K ›
@@ -1184,7 +1187,8 @@ line, after the tab restarts.
 
 **Side panel** (⌥⌘B, the panel icon; drag its edge to resize; ⌘I or ⓘ opens it on *Info*, below):
 - *Files*: the workspace's files (git's, ignored ones left out; a plain folder's, without `node_modules` and
-  the like). Search filters by path. New file and new folder go in the selected folder; a new file opens in
+  the like). The eye (⌘K › *Show ignored files* too) shows what git ignores as well, dimmed (`.env`, build output); an
+  ignored folder such as `node_modules` lists its entries as you open it. Search filters by path. New file and new folder go in the selected folder; a new file opens in
   your editor. A click on a file previews it next to the terminal (text with line numbers, code in color up
   to 50 KB, or an image),
   with *Open in editor*; a double-click opens it in the editor. The pencil edits a text file right there, for small

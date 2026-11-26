@@ -681,7 +681,9 @@ export function Sidebar({ app }: { app: AppCtx }) {
     if (!picked.length) return
     const f = (e: KeyboardEvent) => {
       if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('.menu, .overlay')) return
-      if ((e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable], .xterm')) return
+      // the sidebar's or the page's own (a canvas, Builder's rows: theirs), never a field or a terminal
+      const at = e.target as Element | null
+      if (!(at === document.body || at?.closest?.('aside.sidebar')) || at?.closest?.('input, textarea, select, [contenteditable], .xterm')) return
       e.preventDefault()
       e.stopPropagation()
       void rmNow.current()

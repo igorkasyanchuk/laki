@@ -454,6 +454,13 @@ test("#1: at the Mac a turn's end isn't pushed and an ask only if it still waits
   await rig.rpc('hook', { tab: tab.id, state: 'running' }) // answered here meanwhile
   await sleep(1500)
   assert.equal(got.length, 1, 'answered on the Mac: dropped, never sent late')
+  await turn('waiting')
+  await sleep(300)
+  await rig.rpc('dndSet', { minutes: 30 }) // Quiet while it's held
+  await sleep(1500)
+  assert.equal(got.length, 1, 'Quiet since the ask: not pushed when the hold ends')
+  await rig.rpc('dndSet', { off: true })
+  await rig.rpc('hook', { tab: tab.id, state: 'running' })
   await turn('waiting') // answered, then a new ask before the first one's hold ends: pushed once, after its own hold
   await sleep(200)
   await rig.rpc('hook', { tab: tab.id, state: 'running' })

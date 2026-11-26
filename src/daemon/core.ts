@@ -1970,7 +1970,7 @@ export async function projectNew(name: unknown, into?: unknown): Promise<Project
     throw new Error(`new project failed: ${firstLine(e)}`)
   }
   const had = state.projects.find(p => !p.host && !p.kind && p.git === false && p.path === realpathSync(dest)) // that empty folder added before: a plain folder until now
-  if (had) had.git = true
+  if (had) (had.git = true), save(), changed()
   return projectAdd(dest)
 }
 
