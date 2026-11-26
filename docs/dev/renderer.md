@@ -500,6 +500,14 @@ are tested in `test/units-more.test.ts`.
   resizes it). Over a plain terminal, no chat open and not a page, it fades to 55% (`.far`) while the pointer is over
   120px away (back on approach or focus; Motion off, never). Pages keep `--fab-room` at their bottom
   (`.page-body`, `.settings-main`). test:ui's README run checks it meets no `data-dock` element on the Done check's still.
+- **Page titles** (`ui.tsx` `usePageTitle`, `pagetitle.css`): `Page`'s `big` (Schedule, Board) draws its title large
+  at the top of its body (`.page-title-l`) and small in its head (`.page-title-s`); Settings' are its section's h2 and
+  its name after *Settings* (`.page-title-sub`). One passive capture `scroll` listener on the frame sets `data-scrolled`
+  while `.page-body` or `.settings-main` is past 40px; the large one fades and shrinks over those 40px on the `--page`
+  scroll timeline (a transition on `data-scrolled` without one), the small one fades in; Motion: None and Reduce motion
+  at once. Only with a glass head: `.app[data-design]` (not Classic, a phone or full screen), not `html.opaque`,
+  `.glass-full` or Reduce transparency. The CSS is each page's own import (lazy); Usage's page is in the first load
+  (the status bar's), so not it. test:ui's `schedule-scrolled` (under Soft) and the sheet's page of that name.
 - **`Term.tsx`**: one xterm per pane. OSC 52 (a program's copy: vim's, tmux's, one over ssh): `registerOscHandler(52)`
   hands `shared/osc52.ts`' parse (`<targets>;<base64>`: c, s or none, at most `OSC52_MAX` 100 KB decoded, else
   dropped silently; a read, `?`, never answered) to `onClip`, only in the app's own window (`bridge`: a phone's page

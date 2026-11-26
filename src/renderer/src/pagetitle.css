@@ -1,0 +1,25 @@
+/* A page's title, large then small (ui.tsx usePageTitle; Page's big: Schedule, Board; Settings: its section's h2, its
+   name small after Settings): large at the top of the content, a small one in the glass head once the page scrolls past
+   40px (data-scrolled on the frame). The large one fades and shrinks over those 40px (scroll-driven on the page's
+   --page timeline, else a transition on data-scrolled), the small one fades in, on the duration and spring tokens;
+   Motion: None and Reduce motion swap them at once. Only the title moves: the head's buttons stay. Only where the head
+   is glass: a Design other than Classic (data-design: none on a phone, with its own bar, or in full screen), not a flat
+   look, the window's full glass or Reduce transparency; elsewhere the head as it was, the small title always, no large
+   one. Imported by each page that has one (lazy). Usage's page is in the first load (the status bar's): not on it */
+.page-title-l, .page-title-sub { display: none; }
+@media (prefers-reduced-transparency: no-preference) {
+  html:not(.opaque, .glass-full) .app[data-design] .page-title-l { display: block; margin: 0 0 var(--sp-5); font-size: calc(var(--fs-5) * 1.4); font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; transform-origin: 0 100%; }
+  html:not(.opaque, .glass-full) .app[data-design] .page-title-sub { display: inline; color: var(--muted); font-weight: 500; }
+  html:not(.opaque, .glass-full) .app[data-design] .settings-main > h2:first-child { transform-origin: 0 100%; }
+  html:not(.opaque, .glass-full) .app[data-design] .settings-head > .page-title-s { opacity: 0; }
+  html:not(.opaque, .glass-full) .app[data-design] .settings-page[data-scrolled] > .settings-head > .page-title-s { opacity: 1; }
+  html:not(.opaque, .glass-full) .app[data-design] .settings-page[data-scrolled] :is(.page-title-l, .settings-main > h2:first-child) { opacity: 0; scale: 0.92; }
+}
+@media (prefers-reduced-transparency: no-preference) and (prefers-reduced-motion: no-preference) {
+  html:not(.opaque, .glass-full, [data-motion='none']) .app[data-design] .settings-head > .page-title-s { transition: opacity var(--t-mid) var(--ease-out); }
+  html:not(.opaque, .glass-full, [data-motion='none']) .app[data-design] :is(.page-title-l, .settings-main > h2:first-child) { transition: opacity var(--t-mid) var(--ease-out), scale var(--t-spring-soft) var(--spring-soft); }
+  @supports (animation-timeline: scroll()) {
+    html:not(.opaque, .glass-full, [data-motion='none']) .app[data-design] :is(.page-title-l, .settings-main > h2:first-child) { transition: none; animation: page-title-l linear both; animation-timeline: --page; animation-range: 0 40px; }
+  }
+}
+@keyframes page-title-l { to { opacity: 0; scale: 0.92; } }

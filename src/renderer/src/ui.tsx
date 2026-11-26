@@ -578,7 +578,20 @@ export function usePageMark() {
   return el
 }
 
-export function Page({ title, head, tools, onClose, children, wide, esc = true, backdrop }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean; backdrop?: ReactNode /* Backdrop.tsx's: behind the page's body */ }) {
+// a page's large title (Page's big, Settings' section head): data-scrolled on its frame while its scroller (the page's
+// body, Settings' main) is past 40px, which pagetitle.css (the page's own import: lazy) turns into the small title in its
+// glass head. One passive listener, no React state per frame
+export function usePageTitle(ref: { current: HTMLElement | null }, on = true) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !on) return
+    const f = (e: Event) => (t => t instanceof HTMLElement && t.matches('.page-body, .settings-main') && el.toggleAttribute('data-scrolled', t.scrollTop > 40))(e.target)
+    el.addEventListener('scroll', f, { capture: true, passive: true })
+    return () => (el.removeEventListener('scroll', f, true), el.removeAttribute('data-scrolled'))
+  }, [ref, on])
+}
+
+export function Page({ title, head, tools, onClose, children, wide, esc = true, backdrop, big }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean; backdrop?: ReactNode /* Backdrop.tsx's: behind the page's body */; big?: boolean /* its title large over its content, small in its head once scrolled (usePageTitle; the page imports pagetitle.css) */ }) {
   useEffect(() => {
     if (!esc) return
     const f = (e: KeyboardEvent) => escapes(e) && onClose()
@@ -587,15 +600,16 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true, 
   }, [onClose, esc])
   const [onScroll, toTop] = useToTop()
   const el = usePageMark()
+  usePageTitle(el, big)
   return (
     <div ref={el} className="settings-page" role="dialog" aria-label={title} onScrollCapture={onScroll}>
       <div className="settings-head edge-blur" onDoubleClick={titleDbl}>
-        {head ?? <b>{title}</b>}
+        {head ?? <b className={big ? 'page-title-s' : undefined}>{title}</b>}
         <span className="grow" />
         {tools}
         <IconButton icon="x" title={esc ? 'Close (Esc)' : 'Close'} onClick={onClose} />
       </div>
-      {(body => (backdrop ? <div className="page-frame">{backdrop}{body}</div> /* under the body, in its card (a chrome design's), never under the head */ : body))(<div className={`page-body ${wide ? 'wide' : ''}`}>{children}</div>)}
+      {(body => (backdrop ? <div className="page-frame">{backdrop}{body}</div> /* under the body, in its card (a chrome design's), never under the head */ : body))(<div className={`page-body ${wide ? 'wide' : ''}`}>{big && !head && <h1 className="page-title-l" aria-hidden>{title}</h1>}{children}</div>)}
       {toTop}
     </div>
   )

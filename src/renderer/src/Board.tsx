@@ -14,6 +14,7 @@ import { completeOf, FileChip, type Img, PromptInput } from './PromptInput'
 import { wsShown } from './text'
 import { Icon, IconButton, Page, TurnTime, act, useLift } from './ui'
 import './board.css'
+import './pagetitle.css'
 
 export type BoardApi = {
   open: (ws: string) => void
@@ -75,7 +76,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
     },
   })
   return (
-    <Page title="Board" esc={false} /* a page to stay on, as the rail's others */ onClose={onClose} wide>
+    <Page title="Board" big esc={false} /* a page to stay on, as the rail's others */ onClose={onClose} wide>
       <div className="board">
         <section className="board-col">
           <h3>

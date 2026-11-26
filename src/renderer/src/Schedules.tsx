@@ -10,6 +10,7 @@ import { describe, nextRun, parseAfter, parseWhen, partsOf, type Rule, stamp, ws
 import { runIcon, runLine } from './runs'
 import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu, act } from './ui'
 import './schedules.css'
+import './pagetitle.css'
 
 export type SchedulesApi = {
   set(s: { [K in keyof Omit<Schedule, 'archived'>]?: Schedule[K] | null } & { archived?: boolean; dependents?: 'off' }): Promise<Schedule> // archived: Archive (true) or Restore (false); null: unset (missed, catchUntil, onlyIf)
@@ -498,7 +499,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     </>
   )
   return (
-    <Page title="Scheduled tasks" esc={false} onClose={onClose}>
+    <Page title="Scheduled tasks" big esc={false} onClose={onClose}>
       <div className="schedules">
         <header className="sched-hero">
           <span className="sched-hero-icon">

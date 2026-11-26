@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Schedule, Board and Settings show their title large at the top, and small in the glass head as you scroll (a Design other than Classic).
 - A copy inside vim, tmux or an ssh session reaches your Mac's clipboard: a terminal asks once (Settings › Terminal › Programs may copy to the clipboard).
 - An agent that keeps failing the same command shows *looping ×n* on its row and in Needs you, with Nudge, Stop and Let it work (Settings › Notifications › An agent loops).
 - Settings › Layout › Project badges turns the badges off: a project with no icon of its own shows a plain mark again.

@@ -20,9 +20,10 @@ import { DOCK_ICONS } from './dock'
 import { applyTheme, BG, GLASS, GLASS_LEVELS, glassLevelOf, macApp, type Paint, paintKey, paintOf, paintTheme, preview, systemAccent, termTheme, themeFor, THEMES, transparent } from './themes'
 import './floater.css'
 import './settings.css'
+import './pagetitle.css'
 import { ICON_PACKS, ICON_SIZES, ICON_WIDTHS, lookOf } from '../../shared/icons'
 import { Backdrop, BACKDROP, BACKDROPS, type BackdropKind } from './Backdrop'
-import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, useToTop } from './ui'
+import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, usePageTitle, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, cmdClash, cmdMap, cmdOthers, COMMANDS, hotkeyClash, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
 import { USAGE_AGENTS, USAGE_HINTS, USAGE_HOSTS } from './Usage'
@@ -1079,6 +1080,7 @@ export function SettingsPage(p: {
 }) {
   const [onScroll, toTop] = useToTop() // ↑ back to the top once well down
   const pageEl = usePageMark() // its frame says a page is over it (the chrome look)
+  usePageTitle(pageEl) // its section's h2 the large title, its name small in the head once scrolled
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
@@ -1445,6 +1447,9 @@ export function SettingsPage(p: {
     <div ref={pageEl} className="settings-page" style={{ zoom: scale, '--zoomed': scale } as CSSProperties} onScrollCapture={onScroll}>
       <div className="settings-head edge-blur">
         <b>Settings</b>
+        <b className="page-title-s page-title-sub" aria-hidden>
+          {basic?.label ?? sections.find(x => x.id === sec)?.label ?? p.projects?.find(y => `project:${y.id}` === sec)?.name}
+        </b>
         <span className="grow" />
         <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
       </div>

@@ -99,6 +99,15 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
     // behind a rail page the sidebar is hidden but keeps its box (its scroll with it), the main area over it
     ['board-sidebar', null, () => js<boolean>(`(([s, m]) => getComputedStyle(s).visibility === 'hidden' && s.getBoundingClientRect().width > 0 && Math.abs(s.getBoundingClientRect().height - m.getBoundingClientRect().height) < 2 && m.getBoundingClientRect().left < s.getBoundingClientRect().right)([document.querySelector('.sidebar'), document.querySelector('.main')])`)],
     ['schedule', link('laki://schedules'), '.sched-empty, .sched-row, .ghosts'],
+    // a page's title large, then small in its glass head once scrolled past 40px (ui.tsx usePageTitle): room to scroll
+    // under it (the demo's few tasks fit), then 200px down: the frame's data-scrolled and the small title shown
+    // (Classic, the demo's, has no glass head: Soft for it, the large title shown at the top and the small one hidden first)
+    ['schedule-scrolled', async () => {
+      await rpc('settingsSet', { design: 'soft' })
+      await waitFor(() => js<boolean>("(t => !!t && getComputedStyle(t).display === 'block' && getComputedStyle(document.querySelector('.settings-head > .page-title-s')).opacity === '0')(document.querySelector('.page-title-l'))"), 'its large title, the small one hidden')
+      await js("(b => b && (b.style.paddingBottom = '100vh', b.scrollTop = 200))(document.querySelector('.settings-page > .page-body'))")
+    }, () => js<boolean>("(p => !!p?.hasAttribute('data-scrolled') && getComputedStyle(p.querySelector('.settings-head > .page-title-s')).opacity === '1' && getComputedStyle(p.querySelector('.page-title-l')).opacity === '0')(document.querySelector('.settings-page'))")],
+    ['schedule-scrolled-off', () => rpc('settingsSet', { design: 'classic' }), async () => !(await has('.app[data-design]'))],
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
     // place more: an extension's item in the foot's ⋯ menu, with Video, Meme and Timer (ui-smoke.ts' Docs)
