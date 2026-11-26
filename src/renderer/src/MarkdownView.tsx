@@ -430,7 +430,8 @@ function mdInline(x: Inline, k: number): React.ReactNode {
     case 'img': {
       const href = x.t === 'a' ? x.href : x.src
       const web = /^(https?:|mailto:|laki:)/i.test(href) // a relative one is a file of the repo: opened where the chat knows the files, else shown, not followed; laki://: in the app
-      const kids = x.t === 'a' ? x.kids.map(mdInline) : `🖼 ${x.alt || 'image'}`
+      // a link's own words: no file links in them (a click would open the file, then follow this link too)
+      const kids = x.t === 'a' ? <FileRefs.Provider value={undefined}>{x.kids.map(mdInline)}</FileRefs.Provider> : `🖼 ${x.alt || 'image'}`
       if (!web && x.t === 'a' && pathAt(href)) return <FileRef key={k} text={href} kids={kids} />
       return (
         <a key={k} href={web ? href : undefined} data-tip={href} onClick={e => (e.preventDefault(), web && openExternal(href))}>

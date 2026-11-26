@@ -87,14 +87,15 @@ export function WebhookSection({ w, onChange: put, test, mac, onMac }: { w: Webh
             <div className="grid2">
               <label>
                 Push an unanswered ask after
+                {/* a value set elsewhere (laki settings) is among them, as it is */}
                 <select value={mac.pushAfter ?? 90} onChange={e => onMac({ pushAfter: Number(e.target.value) })}>
-                  {[30, 60, 90, 180, 300].map(n => <option key={n} value={n}>{n < 120 ? `${n} s` : `${n / 60} min`}</option>)}
+                  {[...new Set([30, 60, 90, 180, 300, mac.pushAfter ?? 90])].sort((a, b) => a - b).map(n => <option key={n} value={n}>{n < 120 || n % 60 ? `${n} s` : `${n / 60} min`}</option>)}
                 </select>
               </label>
               <label>
                 At the Mac: input in the last
                 <select value={mac.pushIdle ?? 120} onChange={e => onMac({ pushIdle: Number(e.target.value) })}>
-                  {[60, 120, 300, 600].map(n => <option key={n} value={n}>{n / 60} min</option>)}
+                  {[...new Set([60, 120, 300, 600, mac.pushIdle ?? 120])].sort((a, b) => a - b).map(n => <option key={n} value={n}>{n % 60 ? `${n} s` : `${n / 60} min`}</option>)}
                 </select>
               </label>
             </div>

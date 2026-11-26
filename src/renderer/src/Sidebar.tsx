@@ -87,7 +87,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     setPicked([])
     const ok = await busyWith(ws_.map(w => w.id), 'deleting', () => Promise.all(ws_.map(w => call('wsRm', { id: w.id, ...(drop?.on && { dropArtifacts: true }) }).then(() => true, () => false))))
     const n = ok.filter(Boolean).length
-    done(`Deleted ${one ? wsName(ws_[0]) : `${n} workspaces`}${drop?.on ? ` and ${one ? 'its' : 'their'} artifacts` : ''}: ${one ? 'its branch stays' : 'their branches stay'}`)
+    if (!n) return // each failure said by call's toast
+    const wt = ws_.some((w, i) => ok[i] && w.kind === 'worktree')
+    done(`Deleted ${one ? wsName(ws_[0]) : `${n} workspace${n === 1 ? '' : 's'}`}${drop?.on ? ` and ${n === 1 ? 'its' : 'their'} artifacts` : ''}${wt ? `: ${n === 1 ? 'its branch stays' : 'their branches stay'}` : ''}`)
   }
   const pickedMute = () => {
     const ws_ = pickedWs()

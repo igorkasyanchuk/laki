@@ -1204,16 +1204,18 @@ export const wholePage = (s: string) => /^\s*(<!doctype html|<html[\s>])/i.test(
 export const sealed = (s: string) =>
   s.replace(/http-equiv\s*=\s*(["']?)refresh\1/gi, 'data-refresh').replace(/<!doctype html[^>]*>|<html[^>]*>|<head[^>]*>/i, m => `${m}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">`)
 
-// #8: a file's path as an agent writes it: src/app.ts, ./a/b.md, src/app.ts:42 (:42:7), src/app.ts#L42; a bare name
-// only with an extension (app.ts). Not a URL, a flag or a sentence
+// #8: a file's path as an agent writes it: src/app.ts, ./a/b.md, src/app.ts:42 (:42:7), src/app.ts#L42, an absolute
+// one (/Users/me/app/src/a.ts: the Reader maps it into the workspace); a bare name only with an extension (app.ts).
+// Not a URL, a flag or a sentence
 export function pathAt(s: string): { path: string; line?: number } | undefined {
-  const m = /^(?:\.\/)?((?:[\w@.+-]+\/)*[\w@+-][\w@.+-]*?)(?::(\d+)(?::\d+)?|#L(\d+)(?:-L?\d+)?)?$/.exec(s.trim())
+  const m = /^(?:\.\/)?(\/?(?:[\w@.+-]+\/)*[\w@+-][\w@.+-]*?)(?::(\d+)(?::\d+)?|#L(\d+)(?:-L?\d+)?)?$/.exec(s.trim())
   if (!m || /^\.+$/.test(m[1]) || (!m[1].includes('/') && !/\.\w{1,8}$/.test(m[1]))) return undefined
   const line = Number(m[2] ?? m[3]) || undefined
   return { path: m[1], ...(line && { line }) }
 }
-// a bare path in prose: a / in it, ending in a letter or digit (a sentence's full stop after it isn't the path's)
-export const BARE_PATH = /(?<![\w/.:@-])(?:\.\/)?[\w@.+-]+(?:\/[\w@.+-]+)+(?::\d+(?::\d+)?)?(?<=[\w])(?![\w/])/g
+// a bare path in prose: a / in it (an absolute one too), ending in a letter or digit (a sentence's full stop after it
+// isn't the path's); never inside a URL
+export const BARE_PATH = /(?<![\w/.:@-])(?:\.\/|\/)?[\w@.+-]+(?:\/[\w@.+-]+)+(?::\d+(?::\d+)?)?(?<=[\w])(?![\w/])/g
 // #5: each project's badge letters, distinct across them: a picked one first, then the name's first two letters or
 // digits (orca: OR), else its first with a later one (OC, OA), else with any (OB…); upper case
 export function badgeLetters(ps: { id: string; name: string; letters?: string }[]) {

@@ -1804,10 +1804,12 @@ test('#8: a path in an answer: in backticks or bare in prose, its line, never a 
   assert.deepEqual(pathAt('src/app.ts#L9-L12'), { path: 'src/app.ts', line: 9 })
   assert.deepEqual(pathAt('README.md'), { path: 'README.md' })
   assert.deepEqual(pathAt('docs/guide'), { path: 'docs/guide' })
+  assert.deepEqual(pathAt('/Users/me/wt/src/a.ts:42'), { path: '/Users/me/wt/src/a.ts', line: 42 }) // the Reader maps it into the workspace
   for (const no of ['npm test', 'useState', '--force', 'https://x.io/a.ts', '..', 'a b/c.ts', '']) assert.equal(pathAt(no), undefined, no)
   const bare = (s: string) => [...s.matchAll(BARE_PATH)].map(m => m[0])
   assert.deepEqual(bare('Fixed src/cart.js and test/cart.test.js:12. See https://x.io/a/b too.'), ['src/cart.js', 'test/cart.test.js:12'])
   assert.deepEqual(bare('read ./docs/a.md, then and/or'), ['./docs/a.md', 'and/or'])
+  assert.deepEqual(bare('see /Users/me/wt/src/a.ts:3. Or https://x.io/b/c'), ['/Users/me/wt/src/a.ts:3'])
 })
 
 test('#5: project badges: two letters each, distinct across projects, a picked one kept; a color never grey', async () => {

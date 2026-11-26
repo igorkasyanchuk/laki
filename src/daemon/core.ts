@@ -1951,14 +1951,14 @@ export async function projectNew(name: unknown, into?: unknown): Promise<Project
   const last = state.projects.findLast(p => !p.host && !p.kind)
   const parent = typeof into === 'string' && into.trim() ? resolve(homedir(), tilde(into.trim())) /* a relative one: under your home */ : existsSync(join(homedir(), 'code')) ? join(homedir(), 'code') : last ? dirname(last.path) : homedir()
   const dest = join(parent, n)
-  if (existsSync(dest) && (!statSync(dest).isDirectory() || readdirSync(dest).length)) throw new Error(`${dest} is already there with files in it: open it as a project, or pick another name`)
+  if (existsSync(dest) && (!statSync(dest).isDirectory() || readdirSync(dest).some(f => f !== '.DS_Store'))) throw new Error(`${dest} is already there with files in it: open it as a project, or pick another name`)
   const made = !existsSync(dest)
   mkdirSync(dest, { recursive: true })
   const at = { path: dest }
   try {
     writeFileSync(join(dest, 'README.md'), `# ${n}\n`)
     await git(at, 'init', '-q', '-b', 'main')
-    await git(at, 'add', '-A')
+    await git(at, 'add', 'README.md') // a Finder's .DS_Store left out
     const commit = (...who: string[]) => git(at, ...who, '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'First commit')
     await commit().catch(() => commit('-c', 'user.name=Laki', '-c', 'user.email=new@laki.invalid')) // no identity set
   } catch (e) {

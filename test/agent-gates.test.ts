@@ -3,7 +3,7 @@
 // and Recording mode's private workspaces. test/caller.test.ts proves the from is its process's, whatever it says
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -214,7 +214,10 @@ test('U7: Clone a repository: a local repo or a URL into a folder, added as a pr
   assert.equal(execFileSync('git', ['log', '--format=%s'], { cwd: np.path, encoding: 'utf8' }).trim(), 'First commit')
   assert.equal(readFileSync(join(np.path, 'README.md'), 'utf8'), '# idea\n')
   mkdirSync(join(rig.home, 'code/empty'))
+  writeFileSync(join(rig.home, 'code/empty/.DS_Store'), '') // Finder's: still an empty folder
   assert.ok((await rig.rpc('projectNew', { name: 'empty', into: join(rig.home, 'code') })).git)
+  assert.equal(execFileSync('git', ['ls-files'], { cwd: join(rig.home, 'code/empty'), encoding: 'utf8' }), 'README.md\n')
+  assert.equal((await rig.rpc('projectNew', { name: 'rel', into: 'code' })).path, realpathSync(join(rig.home, 'code/rel')), 'a relative Into: under your home')
   await assert.rejects(rig.rpc('projectNew', { name: 'shop', into: join(rig.home, 'code') }), /already there with files in it/)
   for (const name of ['', '.x', '-x', 'a/b', '../up']) await assert.rejects(rig.rpc('projectNew', { name, into: join(rig.home, 'code') }), /a folder name/, name)
   await assert.rejects(rig.rpc('projectNew', { name: 'two', into: join(rig.home, 'code'), from: { ws: ws.id, tab: tab.id } }), /make a new project/)

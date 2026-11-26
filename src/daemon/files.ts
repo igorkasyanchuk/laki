@@ -680,9 +680,9 @@ const MAX_FILES = 50000
 // under: such a folder's own entries, one level (opened in Files: node_modules lists nothing until then)
 export async function files(ref: string, project?: string, more: { ignored?: boolean; under?: string } = {}) {
   const ws = project ? (p => ({ path: p.path, host: p.host, project: p.id }))(findProject(project)) : findWs(ref)
-  if (more.under !== undefined) return { files: await oneLevel(ws as Workspace, more.under), changed: {}, cut: false }
   // Terminals and Browsers: your home folder, whose walk would be junk and macOS's prompts (Desktop, Documents…)
   if (state.projects.find(p => p.id === ws.project)?.kind) return { files: [], changed: {}, cut: false }
+  if (more.under !== undefined) return { files: await oneLevel(ws as Workspace, more.under), changed: {}, cut: false }
   if (ws.host && state.projects.find(p => p.id === ws.project)?.git === false) {
     const skip = [...SKIP_DIRS].flatMap((d, i) => [...(i ? ['-o'] : []), '-name', d])
     const { stdout } = await exec(ws, 'find', ['.', '(', ...skip, ')', '-prune', '-o', '-type', 'f', '-print'])
