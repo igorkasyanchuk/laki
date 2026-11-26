@@ -28,7 +28,7 @@ function SbSay() {
     window.addEventListener('laki-sb-say', on)
     return () => (clearTimeout(t), window.removeEventListener('laki-sb-say', on))
   }, [])
-  return say ? <span className="sb-say" role="status">{say}</span> : null
+  return say ? <span className="sb-say muted small" role="status">{say}</span> : null
 }
 
 export function statusBarOf(app: AppCtx) {

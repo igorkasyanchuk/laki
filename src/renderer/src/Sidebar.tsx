@@ -338,7 +338,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             <Icon name="hourglass" size={11} />
           </span>
         )}
-        {(t => t?.loop && <span className="ws-mark ws-loop" data-tip={`${t.name} ran ${t.loop.cmd} ${t.loop.n} times with the same error: Needs you has Nudge, Stop and Let it work`}>looping ×{t.loop.n}</span>)(wt.find(t => t.loop))}
+        {(t => t?.loop && <span className="ws-mark ws-loop small" data-tip={`${t.name} ran ${t.loop.cmd} ${t.loop.n} times with the same error: Needs you has Nudge, Stop and Let it work`}>looping ×{t.loop.n}</span>)(wt.find(t => t.loop))}
         {w.capOver && (
           <span className="ws-mark err" data-tip={`Over its spend cap${w.spend ? ` (${capSpent(w.spend)} of ${capText(w.spend.cap)})` : ''}: its agents are stopped and what you send waits. Its menu's Spend cap… raises it`}>
             <Icon name="alertCircle" size={11} />

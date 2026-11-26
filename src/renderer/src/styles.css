@@ -2877,10 +2877,8 @@ html.away .dim-panes .pane.multi:not(.active) .pane-body { opacity: 1; } /* the 
 .ready-later .ready-start-text { flex: 1; min-width: 0; text-align: left; display: flex; flex-direction: column; }
 .ready-later .ready-start-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-mark.err { color: var(--error); }
-.ws-mark.ws-cost.yellow { color: var(--waiting); opacity: 1; }
+.ws-mark:is(.ws-cost.yellow, .ws-loop) { color: var(--waiting); opacity: 1; } /* ws-loop: an agent failing the same command, looping ×n */
 .ws-mark.ws-cost.red { color: var(--error); opacity: 1; }
-.status .sb-say { align-self: center; padding: 0 var(--sp-3); color: var(--muted); font-size: var(--fs-1); white-space: nowrap; } /* StatusBar's sbSay: two seconds */
-.ws-mark.ws-loop { color: var(--waiting); opacity: 1; font-size: var(--fs-1); align-items: center; white-space: nowrap; } /* an agent failing the same command: looping ×n */
 .ready-starts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--sp-4); width: 100%; }
 /* even rows: 4 in two columns, 5 or more in three (up to 3: one row) */
 .ready-starts:has(> :nth-child(4)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
