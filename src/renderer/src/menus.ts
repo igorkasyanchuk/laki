@@ -185,7 +185,15 @@ export function menusOf(app: AppBase) {
     if (name === null || name.trim() === p.name) return
     call('projectSet', { id: p.id, name: name.trim() }).then(() => done(name.trim() ? `Renamed to ${name.trim()}` : "Named after its folder again"), () => {})
   }
-  const projectActions = (p: Project): MenuItem[] => {
+  // #5: its badge's own menu (a click on it in the sidebar): its color, letters, an icon or emoji, its repo's picture
+  const badgeItems = (p: Project): MenuItem[] => [
+    { colors: TAB_COLORS, value: p.color, pick: c => call('projectSet', { id: p.id, color: c }) },
+    { label: 'Letters…', icon: 'pencil', hint: p.letters, tip: 'One or two letters or digits on its color', run: () => void askText(`${p.name}'s badge`, { text: 'One or two letters or digits. Empty: its own again.', value: p.letters ?? '', placeholder: 'OR', ok: 'Set' }).then(x => x !== null && call('projectSet', { id: p.id, letters: x })) },
+    ...iconItems(p.icon, icon => call('projectSet', { id: p.id, icon: icon ?? '' })),
+    ...(typeof p.picture === 'string' ? [{ label: 'No picture: its letters', icon: 'x', tip: "Its repo's logo or favicon out of its badge", run: () => call('projectSet', { id: p.id, picture: false }) } as MenuItem] : p.picture === false ? [{ label: "Its repo's picture", icon: 'image', tip: 'Its logo or favicon as its badge again', run: () => call('projectSet', { id: p.id, picture: true }) } as MenuItem] : []),
+  ]
+  const projectActions = (p: Project, badge?: boolean): MenuItem[] => {
+    if (badge) return badgeItems(p)
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { colors: TAB_COLORS, value: p.color, pick: c => call('projectSet', { id: p.id, color: c }) },
@@ -241,5 +249,5 @@ export function menusOf(app: AppBase) {
     // a head or a line with nothing of its own left under it goes too
     return kept.filter((i, n) => (i === null ? n > 0 && kept[n - 1] !== null && n < kept.length - 1 : 'head' in i ? !!kept[n + 1] && !('head' in kept[n + 1]!) : true))
   }
-  return { wsMenu: (w: WorkspaceView) => only(wsMenu(w), true), tabMenu: (ids: string[]) => only(tabMenu(ids)), fileMenu: (w: WorkspaceView, file: string, dir: boolean, page?: boolean) => only(fileMenu(w, file, dir, page)), projectActions: (p: Project) => only(projectActions(p)), showItems: () => only(showItems()), canOverlap, checkOverlaps }
+  return { wsMenu: (w: WorkspaceView) => only(wsMenu(w), true), tabMenu: (ids: string[]) => only(tabMenu(ids)), fileMenu: (w: WorkspaceView, file: string, dir: boolean, page?: boolean) => only(fileMenu(w, file, dir, page)), projectActions: (p: Project, badge?: boolean) => only(projectActions(p, badge)), showItems: () => only(showItems()), canOverlap, checkOverlaps }
 }

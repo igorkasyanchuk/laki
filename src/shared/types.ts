@@ -227,6 +227,8 @@ export type Project = {
   allow?: { tool: string; pattern: string; addedAt: number; hits?: number }[] // F14: its auto-answer rules (shared/ask.ts allowRuleOf): the user's only
   alwaysAsk?: string[] // F15: path globs an ask that touches one is never auto-answered for (shared/ask.ts alwaysAskOf): the user's only, never a phone's
   icon?: string // an ICONS name or an emoji (icons.ts emojiOf): before its name in the sidebar, menus, the palette, the window's title
+  letters?: string // #5: its badge's two letters, picked (none: text.ts badgeLetters' own, distinct across projects)
+  picture?: string | false // #5: false: its badge shows no picture of the repo's (the view's picture: core.ts pictureOf)
   private?: boolean // Recording mode (settings.recording) hides it and its workspaces (veiled)
   muted?: boolean // Mute project: none of its workspaces notifies, sounds, shows a card, pushes or counts in Needs you (wsView's muted, mutedBy), ones made later too; the user's (AGENT_NO)
   netAllow?: string[] // hosts a sandboxed agent's list (net: list) has here beyond netList's own: the user's alone (projectNetAllow, a card's Allow this domain)

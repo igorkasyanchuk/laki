@@ -48,7 +48,7 @@ import { type ShownPop, type ShownWin, useNotices } from './Shown'
 import { type AgentUsage, USAGE_AGENTS } from './Usage'
 import { menuModel } from './menuModel'
 import { SNAP_KEY, snapOf, snapshotOf } from './snapshot'
-import { ask, AskHost, askText, choose, copyImage, type Fact, HOTKEY, Icon, keep as store, keyTip, load, type MenuItem, morph, moveId, moveIds, ON, QUICK_KEY, SHOT_KEY, TAB_COLORS, TALK_KEY, TELL_KEY, tipKeys, Tips, Toasts, unchoose, useMenu, useRowDrag, type Verdict } from './ui'
+import { ask, AskHost, askText, choose, copyImage, type Fact, HOTKEY, Icon, keep as store, setBadges, keyTip, load, type MenuItem, morph, moveId, moveIds, ON, QUICK_KEY, SHOT_KEY, TAB_COLORS, TALK_KEY, TELL_KEY, tipKeys, Tips, Toasts, unchoose, useMenu, useRowDrag, type Verdict } from './ui'
 import { away as awayNow } from './motion'
 import { emojiOf } from '../../shared/icons'
 import { type Action, type AppBase, type AppCtx, appIcon, clip, type Dialog, EDITOR_IDS, type Find, flowsOf, MINUTES, notesOf, type Opened, PAGE_WORDS, type Place, type RailKind, SCRIPT_ICONS, settingsOf, span, specsOf, type Timer, TIMER_THEN, type Watch, type Where, wsName } from './appCtx'
@@ -2395,6 +2395,7 @@ export function App() {
       </div>
     )
 
+  setBadges(view.projects) // #5: each project's badge letters, distinct across them (ui.tsx ProjectMark)
   // wsMenu: declared below (app's), called later
   const {
     achAll, achHidden, achN, AI_TIP, aiFab, aiNames, calOn, costsOn, ctxLook, ctxOn, deskOn, doStep, footButtons,

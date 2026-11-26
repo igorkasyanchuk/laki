@@ -793,9 +793,15 @@ export function Sidebar({ app }: { app: AppCtx }) {
               <span className="project-chev">
                 <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
               </span>
-              <span className="project-icon">
-                <ProjectMark p={p} or={markOf(p)} />
-              </span>
+              {p.kind ? (
+                <span className="project-icon">
+                  <ProjectMark p={p} or={markOf(p)} />
+                </span>
+              ) : (
+                <button type="button" className="project-icon" aria-label={`${p.name}'s badge`} data-tip="Its badge: letters, an icon or emoji, its picture, a color" onClick={e => openMenu(e, projectActions(p, true))}>
+                  <ProjectMark p={p} or={markOf(p)} />
+                </button>
+              )}
               <span className="project-name">{p.name}</span>
               {p.sample && <span className="tag project-sample" data-tip="Laki's sample repo: Remove sample in its menu">sample</span>}
               {p.muted && (

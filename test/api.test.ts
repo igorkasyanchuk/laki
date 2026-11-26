@@ -518,3 +518,18 @@ test("an extension's https picture comes through the daemon's /img, behind its o
   for (const name of ['pics.example', 'v6.example']) assert.equal((await img(v.imgKey, `https://${name}:${(hit.address() as AddressInfo).port}/a.png`)).status, 400, name)
   assert.equal(hits, 0, 'nothing reached this Mac')
 })
+
+test("#5: a project's badge: its repo's logo as a picture (or none), letters of yours", async t => {
+  const rig = await fresh(t)
+  writeFileSync(join(rig.repo, 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"/>')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const view = async () => (await rig.rpc('state')).projects.find((x: { id: string }) => x.id === p.id)
+  assert.match((await view()).picture, /^data:image\/svg\+xml;base64,/)
+  await rig.rpc('projectSet', { id: p.id, picture: false, letters: 'sh' })
+  assert.equal((await view()).picture, false)
+  assert.equal((await view()).letters, 'SH')
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, letters: 'abc' }), /one or two letters or digits/)
+  await rig.rpc('projectSet', { id: p.id, picture: true, letters: '' })
+  assert.match((await view()).picture, /^data:image/)
+  assert.equal((await view()).letters, undefined)
+})

@@ -1214,3 +1214,21 @@ export function pathAt(s: string): { path: string; line?: number } | undefined {
 }
 // a bare path in prose: a / in it, ending in a letter or digit (a sentence's full stop after it isn't the path's)
 export const BARE_PATH = /(?<![\w/.:@-])(?:\.\/)?[\w@.+-]+(?:\/[\w@.+-]+)+(?::\d+(?::\d+)?)?(?<=[\w])(?![\w/])/g
+// #5: each project's badge letters, distinct across them: a picked one first, then the name's first two letters or
+// digits (orca: OR), else its first with a later one (OC, OA), else with any (OB…); upper case
+export function badgeLetters(ps: { id: string; name: string; letters?: string }[]) {
+  const out = new Map<string, string>()
+  const taken = new Set<string>()
+  for (const p of ps) if (p.letters) out.set(p.id, p.letters), taken.add(p.letters)
+  for (const p of ps) {
+    if (out.has(p.id)) continue
+    const w = p.name.toUpperCase().match(/[A-Z0-9]/g) ?? ['P']
+    const tries = [w.slice(0, 2).join(''), ...w.slice(2).map(c => w[0] + c), ...[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'].map(c => w[0] + c)]
+    const l = tries.find(x => x.length === 2 && !taken.has(x)) ?? w[0]
+    out.set(p.id, l)
+    taken.add(l)
+  }
+  return out
+}
+// a project's color when none is picked: one of the bright ones by its id, never grey (or brown)
+export const autoColor = (id: string, colors: readonly string[]) => (c => c[[...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % c.length])(colors.filter(c => c !== 'gray' && c !== 'brown'))

@@ -1086,11 +1086,33 @@ function wsView(w: Workspace) {
 
 // a project as the view has it: a Terminals or Browsers one as it is; else what it waits on, its setup script, GitHub,
 // and (B6) the memory and notes in its checkout
+// #5: a project's picture for its badge: the repo's own logo or favicon (an SVG or PNG of 12 KB at most, the first of
+// PICTURES there), as a data URL; read once per project and daemon (a new one: restart, or Refresh in its menu ponytail)
+const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg', 'favicon.png', 'public/favicon.svg', 'public/favicon.png', 'public/logo.svg', 'public/logo.png', 'public/icon.svg', 'app/icon.svg', 'app/icon.png', 'src/app/icon.svg', 'src/app/icon.png', 'static/favicon.svg', 'static/favicon.png', 'assets/logo.svg', 'assets/logo.png', 'docs/logo.svg', 'docs/logo.png', '.github/logo.svg', '.github/logo.png', 'build/icon.png', 'resources/icon.png']
+const pictures = new Map<string, string>()
+export function pictureOf(p: Project) {
+  if (p.host || p.kind || p.git === false) return ''
+  let got = pictures.get(p.id)
+  if (got === undefined) {
+    got = ''
+    for (const f of PICTURES)
+      try {
+        const st = statSync(join(p.path, f), { throwIfNoEntry: false })
+        if (!st?.isFile() || st.size > 12 << 10 || !st.size) continue
+        got = `data:image/${f.endsWith('.svg') ? 'svg+xml' : 'png'};base64,${readFileSync(join(p.path, f)).toString('base64')}`
+        break
+      } catch {}
+    pictures.set(p.id, got)
+  }
+  return got
+}
 function projectView(p: Project) {
   if (p.kind) return p
   const h = cfgWait(p)
+  const pic = p.picture === false ? '' : pictureOf(p)
   return {
     ...p,
+    ...(pic && { picture: pic }),
     ...(h && { cfgWait: h }),
     ...((c => c.setup && { hasSetup: true })(projectConfig({ project: p.id } as Workspace))),
     ...((t => t?.length && { repoTemplates: t })(projectConfig({ project: p.id } as Workspace).prompts)),
@@ -1593,7 +1615,7 @@ function slugActions(first?: RunAction[]) {
 
 // a group's own model, effort, permission mode and base (Edit group): short words, a branch's characters
 const sepWords = (x: Sep) => Object.fromEntries((['perm', 'model', 'effort', 'base'] as const).flatMap(k => (typeof x[k] === 'string' && (k === 'perm' || x[k]!.trim()) && /^[\w./:@[\]-]{0,120}$/.test(x[k]!.trim()) ? [[k, x[k]!.trim()]] : [])))
-export function projectSet(ref: string, o: { muted?: boolean; name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean; cap?: unknown; costWarn?: unknown }) {
+export function projectSet(ref: string, o: { muted?: boolean; name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[]; color?: string; icon?: string; letters?: string; picture?: boolean; private?: boolean; allow?: unknown; alwaysAsk?: unknown; inRepo?: boolean; cap?: unknown; costWarn?: unknown }) {
   const p = findProject(ref)
   if (o.costWarn !== undefined) p.costWarn = costWarnParse(o.costWarn) // #3: its own amounts over Settings' (cap.ts costWarnOf); null: Settings'
   if (o.cap !== undefined) p.cap = (c => (c.usd || c.tokens ? c : undefined))(capParse(o.cap)) // its new workspaces' spend cap (cap.ts); not an agent's (main.ts)
@@ -1622,8 +1644,13 @@ export function projectSet(ref: string, o: { muted?: boolean; name?: string; con
   // refused before any change
   if (o.color !== undefined && !['', 'none', ...TAB_COLORS].includes(o.color)) throw new Error(`${o.color} isn't a color: one of ${TAB_COLORS.join(', ')}`)
   if (o.icon !== undefined && o.icon !== '' && !isIconName(o.icon) && !emojiOf(o.icon)) throw new Error("a project's icon is an icon's name or an emoji")
+  const letters = o.letters === undefined ? undefined : String(o.letters).trim().toUpperCase()
+  if (letters && !/^[A-Z0-9]{1,2}$/.test(letters)) throw new Error("a project's badge is one or two letters or digits")
   if (o.color !== undefined) p.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.icon !== undefined) p.icon = isIconName(o.icon) ? o.icon : emojiOf(o.icon)
+  // #5: its badge: two letters or digits of yours ('' its own again), its repo's picture or not
+  if (letters !== undefined) p.letters = letters || undefined
+  if (o.picture !== undefined) p.picture = o.picture === false ? false : undefined
   if (o.private !== undefined) p.private = o.private === true || undefined // Recording mode hides it and its workspaces
   if (o.muted !== undefined) p.muted = o.muted === true || undefined // Mute project: wsView's muted for each of its workspaces
   if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined

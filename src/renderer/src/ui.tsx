@@ -5,7 +5,7 @@ import { flipMoves } from './flip'
 import { EMOJIS, emojiOf, ICONS, iconLook, type IconLook, type IconName, iconOf, iconPx, isIconName, onIconLook } from '../../shared/icons'
 import { TAB_COLORS } from '../../shared/types'
 import { createPortal, flushSync } from 'react-dom'
-import { inAim, liftAt, menuKeys, midCut, rollCols, snap, stackOrder, tipDelay, tipParts } from './text'
+import { autoColor, badgeLetters, inAim, liftAt, menuKeys, midCut, rollCols, snap, stackOrder, tipDelay, tipParts } from './text'
 import { keyShow, type KeyId } from '../../shared/keys'
 import { overUsual } from '../../shared/nextStep'
 import { morphOk, moving, namer } from './motion'
@@ -713,11 +713,24 @@ export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(
 
 // a project's own mark (projectSet's icon in its color, or its emoji, a line under it in the color); none set: or (the
 // sidebar's kind icon), else nothing
-export function ProjectMark({ p, size = 12, or }: { p?: { icon?: string; color?: string }; size?: number; or?: IconName }) {
+// #5: a project with no icon of its own: its repo's picture (the daemon's pictureOf), else two letters on its color,
+// distinct across your projects (App sets them from each view: setBadges)
+let badges = new Map<string, string>()
+export const setBadges = (ps: { id: string; name: string; letters?: string }[]) => void (badges = badgeLetters(ps))
+export function ProjectMark({ p, size = 12, or }: { p?: { id?: string; name?: string; icon?: string; color?: string; letters?: string; picture?: string | false; kind?: string }; size?: number; or?: IconName }) {
   const i = p?.icon
   const e = emojiOf(i)
   const name = isIconName(i) ? i : or
   const l = useSyncExternalStore(onIconLook, iconLook) // an emoji as big as an icon would be
+  if (!e && !isIconName(i) && p?.id && p.name && !p.kind) {
+    const px = iconPx(size, l) + 2
+    if (typeof p.picture === 'string' && p.picture) return <img className="p-mark p-pic" src={p.picture} alt="" width={px} height={px} aria-hidden />
+    return (
+      <span className="p-mark p-letters" style={{ ...colorVar(p.color || autoColor(p.id, TAB_COLORS)), width: px, height: px, fontSize: Math.round(px * 0.5) }} aria-hidden>
+        {p.letters || badges.get(p.id) || badgeLetters([{ id: p.id, name: p.name }]).get(p.id)}
+      </span>
+    )
+  }
   if (!e && !name) return null
   return (
     <span className={`p-mark ${e ? 'emoji' : ''} ${p?.color ? 'tinted' : ''}`} style={{ ...colorVar(p?.color), ...(e && { fontSize: iconPx(size, l) }) }} aria-hidden>

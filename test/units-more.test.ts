@@ -1808,3 +1808,13 @@ test('#8: a path in an answer: in backticks or bare in prose, its line, never a 
   assert.deepEqual(bare('Fixed src/cart.js and test/cart.test.js:12. See https://x.io/a/b too.'), ['src/cart.js', 'test/cart.test.js:12'])
   assert.deepEqual(bare('read ./docs/a.md, then and/or'), ['./docs/a.md', 'and/or'])
 })
+
+test('#5: project badges: two letters each, distinct across projects, a picked one kept; a color never grey', async () => {
+  const { badgeLetters, autoColor } = await import('../src/renderer/src/text.ts')
+  const b = badgeLetters([{ id: 'a', name: 'orca' }, { id: 'b', name: 'orca-web' }, { id: 'c', name: 'ocean' }, { id: 'd', name: 'next.js' }, { id: 'e', name: 'mine', letters: 'OR' }, { id: 'f', name: '🛒' }])
+  assert.deepEqual(Object.fromEntries(b), { e: 'OR', a: 'OC', b: 'OA', c: 'OE', d: 'NE', f: 'PA' })
+  assert.equal(new Set(b.values()).size, b.size)
+  const cs = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray']
+  for (const id of ['a', 'shop', 'laki', 'x1', 'zz']) assert.ok(!['gray', 'brown'].includes(autoColor(id, cs)), id)
+  assert.equal(autoColor('shop', cs), autoColor('shop', cs))
+})
