@@ -1302,7 +1302,8 @@ was), *+ Row*, *+ Column*, × on a row's number deletes it, ⌘S saves. Only the
 its quotes and line ends stay as they were. The first 2,000 rows show; Raw has the rest. An Excel workbook (`.xlsx`,
 `.xlsm`, up to 20 MB) shows as tables too, read only: a tab per sheet over it, each cell's value (a formula's last
 result, dates as dates), the first 2,000 rows and 100 columns (fewer rows for a wide one). Open it in its app to change it.
-A SQLite database (`db/development.sqlite3`, an app's `.db`) opens as its tables, each with its row count: a click
+A SQLite database (`db/development.sqlite3`, an app's `.db`) opens as its tables, each with its row count (*10,000+*
+past that): a click
 shows a table's first 200 rows (a column's head sorts them, again the other way; the filter finds words in any column)
 or its *Schema* (its CREATE statement, indexes and triggers), and *Query* runs a SELECT of yours (⌘⏎, 1,000 rows at most),
 with *Copy as CSV*. It's opened read-only: nothing here changes the database, so you can check what a migration or a

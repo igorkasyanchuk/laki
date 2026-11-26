@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { test } from 'node:test'
-import { dbRead, DB_ROWS } from '../src/daemon/db.ts'
+import { DB_COUNT_MAX, dbRead, DB_ROWS } from '../src/daemon/db.ts'
 import { fresh } from './helpers.ts'
 
 const make = (file: string) => {
@@ -54,6 +54,17 @@ test('db: tables with their rows and schema; a table sorted and filtered; SELECT
   const tmp = mkdtempSync(join(tmpdir(), 'laki-db-'))
   assert.deepEqual((dbRead(wal, { op: 'query', sql: 'SELECT x FROM t' }, tmp) as any).rows, [['1']])
   assert.deepEqual(readdirSync(dir), ['app.db'])
+})
+
+test("db: a table's count stops past DB_COUNT_MAX: 10,000 and more, not a whole scan; at it exactly, no more", () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'laki-db-')), 'big.sqlite3')
+  const d = new DatabaseSync(file)
+  d.exec(`CREATE TABLE big (x); CREATE TABLE even (x);
+    WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${DB_COUNT_MAX + 500}) INSERT INTO big SELECT i FROM n;
+    WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${DB_COUNT_MAX}) INSERT INTO even SELECT i FROM n;`)
+  d.close()
+  const { tables } = dbRead(file, { op: 'tables' }) as { tables: any[] }
+  assert.deepEqual(tables.map(t => [t.name, t.rows, t.more]), [['big', DB_COUNT_MAX, true], ['even', DB_COUNT_MAX, undefined]])
 })
 
 test('db: Files gives a database its tables, and dbRead its rows, through the worker; a .db that is not one is a file', async t => {

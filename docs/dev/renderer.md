@@ -917,7 +917,8 @@ are tested in `test/units-more.test.ts`.
   past either or a limit a file card with *Too big to show as a table* (`why`), so a crafted workbook never stalls the
   daemon, shown read only by
   `CsvTable`'s `grid`, a `.seg` tab per sheet (`.pv-sheets`). A SQLite database (#1: `.sqlite`, `.sqlite3`, `.db`,
-  `.db3` with SQLite's header, 2 GB at most; `daemon/db.ts`) comes with its tables (`fileRead`'s `db`), and `DbView`
+  `.db3` with SQLite's header, 2 GB at most; `daemon/db.ts`) comes with its tables (`fileRead`'s `db`; each count stops
+  past `DB_COUNT_MAX`, 10,000: `more`, *10,000+ rows*), and `DbView`
   asks `dbRead` (FilePreview's `db`, the `file.db` cap) for a table's rows (`DB_ROWS`, sorted by a column's head,
   filtered by words in any column: `LIKE` with `%` and `_` escaped), its schema (its CREATE, indexes and triggers) or a
   query (SELECT or WITH only, one statement, `DB_QUERY_ROWS`), opened read-only, in a worker (`files.ts` `dbOf`,

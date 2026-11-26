@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- A huge SQLite table opens at once, its count shown as *10,000+ rows*, and a shell tab's screen brought back after a restart starts at a whole line, with no stray characters at its top.
 - Laki starts without waiting on the Keychain one value at a time, and an `X-Laki-Key` webhook may send `X-Laki-Timestamp` and `X-Laki-Id` so a copy of a request runs nothing.
 - The daemon's log is cut back past 10 MB every half hour while it runs, not every hour.
 - A restore that fails midway puts your data back as it was, and a hung daemon no longer makes the terminals' host hold their output in memory without end.

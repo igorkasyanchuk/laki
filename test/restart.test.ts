@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { get } from 'node:http'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -464,4 +465,15 @@ test('#S1: a stop keeps the screens too, between ticks', async t => {
   assert.ok(!existsSync(join(rig.data, 'screens', `${one.id}.txt`)))
   await rig.stop()
   assert.match(readFileSync(join(rig.data, 'screens', `${one.id}.txt`), 'utf8'), /STOP-42/)
+})
+
+test("#S1: a saved screen's tail starts at a line: no half escape sequence or character at its top", async () => {
+  process.env.LAKI_HOME = mkdtempSync(join(tmpdir(), 'laki-screens-')) // screens.ts' import: never yours
+  const { screenTail } = await import('../src/daemon/screens.ts')
+  assert.equal(screenTail('short\r\n', 100), 'short\r\n', 'under the cap: as it is')
+  const text = `\x1b[38;5;196mред one\r\n\x1b[1mtwo\r\nthree\r\n`
+  const cut = screenTail(text, Buffer.byteLength(text) - 6) // inside the first line's escape sequence
+  assert.equal(cut, '\x1b[1mtwo\r\nthree\r\n')
+  assert.equal(screenTail('x'.repeat(50), 10), 'x'.repeat(10), 'no line break: the bytes')
+  assert.equal(screenTail(`ab\n${'ж'.repeat(3)}`, 5), 'жж', 'no line break, a cut through a character: from the first whole one')
 })

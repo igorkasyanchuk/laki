@@ -5,12 +5,13 @@
 // connection. In: a clone of it (and its -wal) in a temp folder, as agyRead does: a read-only open of a WAL database
 // would leave its -shm and -wal in the worktree, and the app writing it never waits on Laki's lock. Cells as text: NULL,
 // a blob's size. Pure (test/db.test.ts); the daemon runs it in a worker (dbWorker.ts, files.ts' dbOf: a time and a heap
-// cap, the temp folder its, gone however the worker ends). ponytail: a huge table's count(*) is a scan; the worker's
-// time cap ends it
+// cap, the temp folder its, gone however the worker ends). A table's count stops at DB_COUNT_MAX (more: past it, the
+// badge's "10,000+"), so a huge one isn't scanned whole
 import { constants, copyFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-export type DbTable = { name: string; kind: 'table' | 'view'; rows?: number; sql: string }
+export const DB_COUNT_MAX = 10_000
+export type DbTable = { name: string; kind: 'table' | 'view'; rows?: number; more?: true; sql: string }
 export type DbRows = { cols: string[]; rows: string[][]; cut?: boolean; nulls?: [number, number][] } // nulls: the cells that are NULL (row, column), not the text
 export type DbAsk = { op: 'tables' } | { op: 'rows'; table: string; sort?: string; desc?: boolean; filter?: string } | { op: 'query'; sql: string }
 export const DB_ROWS = 200
@@ -56,8 +57,9 @@ export function dbRead(path: string, q: DbAsk, tmp?: string): { tables: DbTable[
           .filter(t => (t.type === 'table' || t.type === 'view') && !t.name.startsWith('sqlite_'))
           .map(t => {
             const extra = all.filter(x => x.type !== 'table' && x.type !== 'view' && x.tbl_name === t.name).map(x => x.sql) // its indexes and triggers
-            const rows = t.type === 'table' ? Number((d.prepare(`SELECT count(*) AS n FROM ${name(t.name)}`).get() as { n: number }).n) : undefined
-            return { name: t.name, kind: t.type as 'table' | 'view', ...(rows !== undefined && { rows }), sql: [t.sql, ...extra].map(s => `${s.trim()};`).join('\n\n') }
+            const n = t.type === 'table' ? Number((d.prepare(`SELECT count(*) AS n FROM (SELECT 1 FROM ${name(t.name)} LIMIT ${DB_COUNT_MAX + 1})`).get() as { n: number }).n) : undefined
+            const rows = n === undefined ? undefined : Math.min(n, DB_COUNT_MAX)
+            return { name: t.name, kind: t.type as 'table' | 'view', ...(rows !== undefined && { rows }), ...(n !== undefined && n > DB_COUNT_MAX && { more: true as const }), sql: [t.sql, ...extra].map(s => `${s.trim()};`).join('\n\n') }
           }),
       }
     }

@@ -4,7 +4,8 @@
 // SCREEN_MAX at most (its tail). Not an agent's (its chat is resumed), nor a Private workspace's or project's. When the
 // tab comes back with no terminal behind it (restoreNow), that screen goes into the new one first, dimmed, then a line
 // with when it was, then its shell. A tab closed for good, or gone, takes its file with it (the next save's prune)
-// ponytail: the tail is cut by bytes: a cut escape sequence at its start may draw a stray character or two
+// The tail is cut at a line's start (screenTail: past the first \n after the cut, so no half escape sequence or character
+// is left at its top), and its replay starts with a reset (\x1b[0m: colors set before the cut are gone)
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeAtomic } from '../shared/conn.ts'
@@ -30,14 +31,24 @@ export function screensSave(all = false) {
     const text = s.saved()
     if (text === undefined) continue
     mkdirSync(folder(), { recursive: true, mode: 0o700 })
-    const buf = Buffer.from(text)
-    writeAtomic(fileOf(t.id), buf.length > SCREEN_MAX ? buf.subarray(buf.length - SCREEN_MAX).toString() : text, 0o600)
+    writeAtomic(fileOf(t.id), screenTail(text), 0o600)
     savedAt.set(t.id, s.lastOutput)
   }
   // a tab closed for good (or its workspace gone): its file too
   try {
     for (const f of readdirSync(folder())) if (f.endsWith('.txt') && !ids.has(f.slice(0, -4))) rmSync(join(folder(), f), { force: true })
   } catch {}
+}
+// SCREEN_MAX bytes at most: a longer one's tail from the first line that starts after the cut (none: from its first
+// whole character)
+export function screenTail(text: string, max = SCREEN_MAX) {
+  const buf = Buffer.from(text)
+  if (buf.length <= max) return text
+  const tail = buf.subarray(buf.length - max)
+  const nl = tail.indexOf(10)
+  let at = nl + 1
+  if (nl < 0) while (at < tail.length && (tail[at] & 0xc0) === 0x80) at++ // no line break: past a cut character's rest
+  return tail.subarray(at).toString()
 }
 export const screenForget = (id: string) => (rmSync(fileOf(id), { force: true }), savedAt.delete(id))
 // what a restored shell tab shows first: its saved screen dimmed (each color change keeps the dim), then when it was
@@ -51,7 +62,7 @@ export function screenBack(id: string): string | undefined {
     return undefined
   }
   if (!text.trim()) return undefined
-  const dim = `\x1b[2m${text.replace(/\x1b\[[0-9;:]*m/g, m => `${m}\x1b[2m`)}\x1b[0m`
+  const dim = `\x1b[0m\x1b[2m${text.replace(/\x1b\[[0-9;:]*m/g, m => `${m}\x1b[2m`)}\x1b[0m`
   const when = new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
   return `${dim}\r\n\x1b[2m──── before the restart, ${when} ────\x1b[0m\r\n`
 }
