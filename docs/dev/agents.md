@@ -414,6 +414,21 @@ whole CLI; `laki hook` through the CLI imports it), and map to states:
 
 Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.
 
+Looping (`shared/loop.ts`, core.ts `loopCount`): claude's Bash PostToolUse and PostToolUseFailure (not a subagent's,
+not a late one, not an Esc's `is_interrupt`) feed `loopFeed` through `setImmediate`, after the hook has its answer. The
+command normalized (`loopCmd`: whitespace collapsed, a leading `cd … &&` dropped, numbers in `/tmp` and `/var/folders`
+paths masked) failing with the same first 200 characters of error (normalized the same way) 3 times in a row (among
+Bash calls) or 5 times in a turn sets `Runtime.loop` `{ cmd, n, since }` once per spell, `n` kept up after; the view's
+`tab.loop` while it runs (`needAt` its `since`). A success of that command clears it, `failDismiss` (Needs you's *Let it
+work*) clears it and sets `loopLet` (none again this turn), a turn's start or end (`loopEnd`) forgets everything. As it's
+set: a line in the workspace's log, the `loop` event (useDaemon: a notification unless `settings.notifyOn.loop` is
+false, the tab is on screen and focused, or muted; Quiet: `notify`'s) and `phoneLong(…, 'loop')` (the same switch; held
+at the Mac, `holding`). Needs you's card (`failedNeed`, `needsTab`): *Nudge* (askText with the message, then `send`
+steer), *Stop* (`stopAll` with its tab), *Let it work*; no ✕ or Snooze (any hook of a running turn ends a snooze). The
+sidebar row's `ws-loop` mark says *looping ×n*. Only claude's hooks say a call failed: codex's notify, OpenCode's plugin
+(busy, idle, asks, errors), Antigravity and Grok (no hooks) and ACP (its `tool_call_update` failed is the Reader's, not
+a hook's) never set it. Tested in `test/loop.test.ts` and `test/loop-daemon.test.ts`.
+
 Hooks not heard (core.ts `hookTick`, every 30 s; `daemon/hookHealth.ts`): a live tab on this Mac of an agent whose hooks
 say as a turn starts (`HEARS`: claude, opencode; codex's notify comes only as one ends), its session started
 `DEAF_AFTER` (2 minutes) ago, given a prompt (`prompted`, per Session: `typeInto`'s Enter, a typed Enter in `input`, its

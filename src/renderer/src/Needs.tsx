@@ -22,7 +22,9 @@ import { ask, Elapsed, Icon, type MenuItem, MidText, Num } from './ui'
 export type Need = { t: TabView; w: WorkspaceView }
 export type NeedsApi = {
   keep: (t: TabView) => void // a turn that ended on an API error: goes on
-  dismiss: (t: TabView) => void
+  dismiss: (t: TabView) => void // a failed turn's Dismiss; a loop's Let it work (core's failDismiss: no mark again this turn)
+  nudge?: (t: TabView) => void // a loop's Nudge: a message to it, yours to change first
+  stop?: (t: TabView) => void // a loop's Stop: its interrupt (stopAll's tab)
   open: (t: TabView, from?: HTMLElement) => void // from: the card clicked (it flies into the tab: ui.tsx cardMorph)
   answer: (t: TabView, n: number, label: string, say?: string) => void // say: No, and say why (Diff.tsx useSayWhy)
   answerFor?: (t: TabView, n: number, label: string) => Promise<unknown> // a group's choice, one tab at a time: its failure that tab's own
@@ -53,7 +55,7 @@ export type NeedsApi = {
 
 // a phone's order and groups: asks (waiting), failures (a turn ended on an error, a limit, a sandbox's stop, a failed
 // Done check), then the finished ones
-export const failedNeed = ({ t, w }: Need) => t.status !== 'waiting' && (!!t.failed || !!t.limit || !!t.boxed || (w.proof?.tab === t.id && w.proof.checks.some(c => !c.ok)))
+export const failedNeed = ({ t, w }: Need) => t.status !== 'waiting' && (!!t.failed || !!t.loop || !!t.limit || !!t.boxed || (w.proof?.tab === t.id && w.proof.checks.some(c => !c.ok)))
 export function phoneGroups(items: Need[]) {
   const asks = items.filter(x => x.t.status === 'waiting')
   const fails = items.filter(failedNeed)
@@ -283,15 +285,15 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
     )
   }
   return (
-    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-flip={flip} data-key={next ? 'next' : undefined} data-newest={newest || undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : 'done'}`} onClick={e => api.open(t, e.currentTarget)} onKeyDown={key}>
+    <div className={`need ${waiting ? 'need-wait' : 'need-done'}${stale ? ' need-stale' : ''}${shown ? ' need-shown' : ''}`} data-flip={flip} data-key={next ? 'next' : undefined} data-newest={newest || undefined} tabIndex={0} role="button" aria-label={`${api.name(w)} · ${t.name}: ${waiting ? 'waiting for you' : t.loop ? 'looping' : 'done'}`} onClick={e => api.open(t, e.currentTarget)} onKeyDown={key}>
       <div className="need-head">
-        <Glyph s={waiting ? 'waiting' : 'done'} />
+        <Glyph s={waiting ? 'waiting' : t.loop ? 'running' : 'done'} />
         <b className="need-ws">
           <MidText text={api.name(w)} />
         </b>
         <span className="need-tab">{t.name}</span>
         {t.needAt && <Elapsed since={t.needAt} />}
-        {api.snooze && api.menu && (
+        {api.snooze && api.menu && !t.loop && (
           <>
             <button type="button" className="need-x" aria-label="Not now" data-tip={waiting ? "Out of Needs you till it asks something new or works again (it still waits in its tab)" : 'Out of Needs you till its next turn'} onClick={e => (e.stopPropagation(), api.snooze!(t))}>
               <Icon name="x" size={12} />
@@ -343,6 +345,18 @@ function NeedCard({ t, w, api, next, newest, stale, shown, show, err }: Need & {
             </div>
           )}
           {why.box}
+        </>
+      ) : t.loop ? (
+        <>
+          <div className="need-q">
+            Ran <code>{t.loop.cmd}</code> {t.loop.n} times with the same error
+          </div>
+          <div className="need-acts" onClick={stop}>
+            <span className="spacer" />
+            {api.nudge && <button className="on" onClick={() => api.nudge!(t)}>Nudge</button>}
+            {api.stop && <button onClick={() => api.stop!(t)}>Stop</button>}
+            <button data-tip="Out of Needs you till its turn ends" onClick={() => api.dismiss(t)}>Let it work</button>
+          </div>
         </>
       ) : (
         <>

@@ -2879,6 +2879,7 @@ html.away .dim-panes .pane.multi:not(.active) .pane-body { opacity: 1; } /* the 
 .ws-mark.err { color: var(--error); }
 .ws-mark.ws-cost.yellow { color: var(--waiting); opacity: 1; }
 .ws-mark.ws-cost.red { color: var(--error); opacity: 1; }
+.ws-mark.ws-loop { color: var(--waiting); opacity: 1; font-size: var(--fs-1); align-items: center; white-space: nowrap; } /* an agent failing the same command: looping ×n */
 .ready-starts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--sp-4); width: 100%; }
 /* even rows: 4 in two columns, 5 or more in three (up to 3: one row) */
 .ready-starts:has(> :nth-child(4)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }

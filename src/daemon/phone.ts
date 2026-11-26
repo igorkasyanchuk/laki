@@ -103,12 +103,14 @@ export function phone(tab: Tab, kind: 'waiting' | 'done', text: string, bell = f
   else go()
 }
 
-// a turn running too long (turns.ts longTurnTick): told, nothing to tap (Stop is the Mac's: a stray tap ends no turn)
-export function phoneLong(tab: Tab, text: string) {
+// a turn running too long (turns.ts longTurnTick), or an agent failing the same command (loop: core's loopCount, held
+// at the Mac as a turn's end is): told, nothing to tap (Stop is the Mac's: a stray tap ends no turn)
+export function phoneLong(tab: Tab, text: string, event: 'long' | 'loop' = 'long') {
   const ws = state.workspaces.find(x => x.id === tab.workspace)
   const t = to('any')
   if ((!t.hook && !t.tg) || tab.muted || mutedWs(ws) || hidden(ws) || quiet(ws)) return
-  send(t, { event: 'long', workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, title: text })
+  if (event === 'loop' && holding()) return void log(`push held: ${tab.name} loops, you're at the Mac`)
+  send(t, { event, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, title: text })
 }
 
 // what signs ntfy's taps (push.ts tapSig): Laki's own, in its data folder (0600), never in settings or state.json

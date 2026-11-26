@@ -8,7 +8,7 @@ import { createCipheriv, createECDH, createHmac, createPrivateKey, type ECDH, ge
 import { type Webhook, webhookUrl } from '../shared/types.ts'
 
 export type Option = { n: number; label: string }
-export type Push = { event: 'waiting' | 'done' | 'test' | 'long' | 'remote'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; key?: string; title?: string; url?: string; badge?: number } // badge: Web Push's, the remote page's icon count (webPush.badge); title: its own (a workflow's, remote access's); key: what signs ntfy's taps; url: D4, what a tap on it opens (remote access's link)
+export type Push = { event: 'waiting' | 'done' | 'test' | 'long' | 'loop' | 'remote'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; key?: string; title?: string; url?: string; badge?: number } // badge: Web Push's, the remote page's icon count (webPush.badge); title: its own (a workflow's, remote access's); key: what signs ntfy's taps; url: D4, what a tap on it opens (remote access's link)
 
 // an ntfy tap is nonce:n:<sig>, signed with a key in Laki's data folder (never in settings): a tap made up without it
 // is ignored. ponytail: anyone who reads the pushed topic sees the taps too, so answers need a topic only you read (answerOk)

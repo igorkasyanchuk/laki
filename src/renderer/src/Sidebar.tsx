@@ -6,7 +6,7 @@ import { PwaBar } from './pwa'
 import type { menusOf } from './menus'
 import type { WorkspaceView, GateHeld, Stat, Project, Sep, TabView, PR } from '../../shared/types'
 import { aiOn, capSpent, capText, costWords, FOLD_AFTER, GOAL_SAYS } from '../../shared/types'
-import { Num, ask, badgesShown, cardMorph, choose, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
+import { Num, ask, askText, badgesShown, cardMorph, choose, type IconName, type MenuItem, TAB_COLORS, colorVar, Icon, TurnTime, IconButton, Elapsed, ProjectMark, act, ScrollEdge, MidText, useFlip, Kept } from './ui'
 import { type AppBase, type AppCtx, clip, STEP_ICON, MINUTES, ONLY, prNum, span, STATE_WORDS, type Timer, TIMER_THEN, wsName } from './appCtx'
 import { clock, forgeName, rowFact, prName, prPill, pendingWords, csWord, shortPath, spins, needsSorted, pickProject } from './text'
 import { bulkAnswer, type NeedsApi, NeedsList } from './Needs'
@@ -155,6 +155,9 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
     explain: aiOn(view.settings) && hasCap(view, 'ask.explain') ? t => call('askExplain', { tab: t.id }) : undefined, // a command ask's ?: Laki AI's words for it
     keep: t => void call('send', { target: t.id, text: 'continue' }).catch(() => {}),
     dismiss: t => void call('failDismiss', { tab: t.id }).catch(() => {}),
+    // a loop's Nudge: its message in a box first (yours to change), then into the running turn (steer: claude reads it as it works)
+    nudge: t => void askText(`Nudge ${t.name}`, { value: `You've run ${t.loop?.cmd ?? 'that command'} ${t.loop?.n ?? 'several'} times with the same error. Stop and say what you think is wrong.`, multi: true, ok: 'Send' }).then(text => text?.trim() && call('send', { target: t.id, text, steer: true })).catch(() => {}),
+    stop: t => void call('stopAll', { tab: t.id }).catch(() => {}),
     open: (t, from) => cardMorph(from, () => (setDialog(null), selectTab(t), narrow && setSideOpen(false)), () => document.querySelector<HTMLElement>('.ask-bar') ?? document.querySelector<HTMLElement>('.tab-list > .tab.sel')),
     answer: (t, n, label, say) => void api.call('answer', { tab: t.id, n, label, ...(say && { say }) }).catch(() => toast('It asks something else now: open it', () => needsApi.open(t), 'Open')),
     answerFor: (t, n, label) => api.call('answer', { tab: t.id, n, label }),
@@ -335,6 +338,7 @@ export function sideOf(app: AppBase & ReturnType<typeof menusOf>) {
             <Icon name="hourglass" size={11} />
           </span>
         )}
+        {(t => t?.loop && <span className="ws-mark ws-loop" data-tip={`${t.name} ran ${t.loop.cmd} ${t.loop.n} times with the same error: Needs you has Nudge, Stop and Let it work`}>looping ×{t.loop.n}</span>)(wt.find(t => t.loop))}
         {w.capOver && (
           <span className="ws-mark err" data-tip={`Over its spend cap${w.spend ? ` (${capSpent(w.spend)} of ${capText(w.spend.cap)})` : ''}: its agents are stopped and what you send waits. Its menu's Spend cap… raises it`}>
             <Icon name="alertCircle" size={11} />

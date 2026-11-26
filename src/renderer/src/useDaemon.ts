@@ -226,6 +226,12 @@ export function useDaemon(a: DaemonCtx) {
           if (v?.settings.notify !== false) notify('Laki', String(m.text), m.tab, open, v?.settings.notifySound, [{ text: 'Stop', stop: true }])
           toast(String(m.text), open, 'Open')
         }
+      } else if (m.ev === 'loop') {
+        // an agent failing the same command (core's loopCount), once a spell: settings.notifyOn.loop; Quiet: notify's
+        const v = viewRef.current
+        const t = v?.tabs.find(x => x.id === m.tab)
+        const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
+        if (t && !shown && !t.muted && !v?.workspaces.find(w => w.id === t.workspace)?.muted && v?.settings.notify !== false && v?.settings.notifyOn?.loop !== false) notify('Laki', String(m.text), m.tab, () => (setDialog(null), selectTab(m.tab)), v?.settings.notifySound)
       } else if (m.ev === 'focus') {
         selectTab(m.tab) // Laki AI's "show me": that tab, in its workspace
       } else if (m.ev === 'ui') {

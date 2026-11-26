@@ -5,6 +5,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- An agent that keeps failing the same command shows *looping ×n* on its row and in Needs you, with Nudge, Stop and Let it work (Settings › Notifications › An agent loops).
 - Settings › Layout › Project badges turns the badges off: a project with no icon of its own shows a plain mark again.
 
 ## 0.66.0 · Nov 26, 2026

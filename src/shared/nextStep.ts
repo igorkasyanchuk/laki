@@ -74,7 +74,7 @@ export function badgeOf(v: Pick<View, 'workspaces' | 'tabs' | 'projects' | 'sett
 }
 // U5: the Board's columns, from the same rules: what the sidebar's Needs you counts (needsTab) is always in Answer, Review
 // or Fix, never in Working, Merge or Done. setup: its setup script runs
-export const needsTab = (t: TabView) => (t.status === 'waiting' || !!t.secret || !!t.failed || (!!t.done && t.status === 'idle')) && !snoozedNow(t)
+export const needsTab = (t: TabView) => (t.status === 'waiting' || !!t.secret || !!t.failed || !!t.loop || (!!t.done && t.status === 'idle')) && !snoozedNow(t)
 // Needs you's ✕ and Snooze (core.ts tabSnooze): out of the list and every count till then. Probably done: a finished
 // turn nobody opened for a day, folded under Needs you's Probably done, counted nowhere (counted: the Dock's, the menu
 // bar's, the rail's, the page's badge)

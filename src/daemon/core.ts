@@ -25,7 +25,7 @@ import { AGENT_NAMES, agentBin, LIMIT_AGENTS, endpointOk, keyEvent, MASK, type T
   PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset,
   prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun,
   type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template,
-  type View, type TurnChanges, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort, VIEWPORTS, viewportOf } from '../shared/types.ts'
+  type View, type TurnChanges, type TabLoop, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort, VIEWPORTS, viewportOf } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { WALK_HEAD, walkFresh, walkMd, walkWithout } from '../shared/walk.ts'
@@ -34,6 +34,7 @@ import { VERSION } from '../shared/version.ts'
 import { emojiOf, isIconName, lookOf, setIconLook } from '../shared/icons.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { planDone, planFrom, type TabPlan } from '../shared/todos.ts'
+import { loopCmd, loopFeed, loopNew, type LoopSeen } from '../shared/loop.ts'
 import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { DATA_SECRETS, dir, flowTrustDrop, inRig, walkFile } from './dir.ts'
@@ -65,7 +66,7 @@ import { fillTemplate as fillPrTemplate, MR_TEMPLATES, PR_TEMPLATES, TEMPLATE_MA
 import { type GateBy, toolFlag, toolGate, toolGateOn, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 import { artifacts, keepPublished, links, LINKS, type Published, publishedBy } from './artifacts.ts'
 import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
-import { phone, prune, pushed } from './phone.ts'
+import { phone, phoneLong, prune, pushed } from './phone.ts'
 import { tgMigrate, tgView, tgWsGone } from './telegram.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
@@ -164,7 +165,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { inTool?: number /* claude's PreToolUse to its PostToolUse: a tool call under way (cap.ts waits for its end) */; held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
+export type Runtime = { loopSeen?: LoopSeen; loop?: TabLoop; loopLet?: boolean /* the same command failing (shared/loop.ts): this turn's failures, its mark, Let it work's (none till the turn ends) */; inTool?: number /* claude's PreToolUse to its PostToolUse: a tool call under way (cap.ts waits for its end) */; held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
   stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; mcpAuth?: McpAuth /* an MCP server that needs a sign-in (mcpAuth.ts) */; boxed?: Boxed /* a command its sandbox stopped this turn
   (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number;
   waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a
@@ -990,7 +991,8 @@ function tabView(t: Tab, status: Status): TabView {
   // usedAt: restoreAll's, moved by every hook: not the view's (a tool call would send one)
   const u = status === 'running' && tracked(t) ? usual(state.turnTimes?.[turnKey(t)] ?? []) : undefined
   const planOn = state.settings?.livePlan !== false
-  const needAt = waiting ? r.waitAt : r.done && idle ? r.idleAt : undefined
+  const looping = status === 'running' ? r.loop : undefined // the same command failing: Needs you's while it runs
+  const needAt = waiting ? r.waitAt : r.done && idle ? r.idleAt : looping?.since
   const signedOut = signedOutView(r)
   const mcpAuth = (a => a?.names.length ? { names: a.names, ...(a.login && { login: a.login.name }) } : undefined)(r?.mcpAuth) // the servers waiting, the one whose login runs (mcpAuth.ts)
   const card = cards.get(t.id)
@@ -1011,6 +1013,7 @@ function tabView(t: Tab, status: Status): TabView {
     ...(signedOut && { signedOut }),
     ...(mcpAuth && { mcpAuth }),
     ...(r.failed && idle && !r.signedOut && { failed: r.failed }),
+    ...(looping && { loop: looping }),
     ...(r.boxed && (waiting || idle) && { boxed: r.boxed }),
     // claude's permission mode, while it runs
     ...(t.preset === 'claude' && status !== 'exited' && !sleeping && r.mode && {
@@ -4822,7 +4825,29 @@ function continueLater(tab: Tab, r: Runtime) {
   }, CONTINUE_MS).unref()
 }
 export function failDismiss(p: { tab?: unknown }) {
-  rtOf(findTab(String(p.tab ?? '')).id).failed = undefined
+  const r = rtOf(findTab(String(p.tab ?? '')).id)
+  r.failed = undefined
+  if (r.loop) (r.loop = undefined), (r.loopLet = true) // Let it work: no mark again this turn
+  changed()
+}
+// an agent failing the same command (shared/loop.ts, claude's Bash: its PostToolUseFailure; no other agent's hooks say a
+// call failed): its mark once per spell (till that command works, Let it work, or the turn ends), the count kept up;
+// told once (settings.notifyOn.loop, the app's notification; the phone as phoneLong, held at the Mac)
+const loopEnd = (r: Runtime) => void (r.loopSeen = r.loop = r.loopLet = undefined)
+function loopCount(tab: Tab, r: Runtime, pl: { hook_event_name?: unknown; tool_input?: { command?: unknown }; error?: unknown }) {
+  if (!state.tabs.includes(tab) || r.status === 'idle') return
+  const command = String(pl.tool_input?.command ?? '')
+  const ok = pl.hook_event_name === 'PostToolUse'
+  const hit = loopFeed((r.loopSeen ??= loopNew()), { tool: 'Bash', command, ok, error: typeof pl.error === 'string' ? pl.error : '' })
+  if (ok && r.loop?.cmd === loopCmd(command).slice(0, 500)) return void ((r.loop = undefined), changed()) // it works now
+  if (!hit || r.loopLet) return
+  if (r.loop) return void ((r.loop = { ...r.loop, cmd: hit.cmd.slice(0, 500), n: hit.n }), changed())
+  r.loop = { cmd: hit.cmd.slice(0, 500), n: hit.n, since: Date.now() }
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  const text = `${ws?.name || tab.workspace} · ${tab.name} ran ${hit.cmd.slice(0, 120)} ${hit.n} times with the same error`
+  wsLog({ id: tab.workspace }, `${tab.name} loops: ${hit.cmd.slice(0, 200)} failed ${hit.n} times with the same error`)
+  broadcast({ ev: 'loop', tab: tab.id, ws: tab.workspace, text })
+  if (state.settings?.notifyOn?.loop !== false) phoneLong(tab, text, 'loop')
   changed()
 }
 // a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the
@@ -4897,6 +4922,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
               log(`turn ${tab.id}: ${(e as Error).message}`)
             }
         if (r.plan) r.plan.stale = true // the list it had is an earlier turn's until it writes one
+        loopEnd(r)
         r.planAsk = r.boxed = undefined
       }
       // its own to-do list (shared/todos.ts) and a plan it asks you to approve (ExitPlanMode's); a subagent's are its
@@ -4914,6 +4940,8 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
         if (got) (r.published ??= []).push(got)
       }
       if ((pl.hook_event_name === 'PostToolUseFailure' || pl.hook_event_name === 'PostToolUse') && sandboxed(tab)) r.boxed = sandboxStop(pl) ?? r.boxed
+      // the same command failing (shared/loop.ts): counted once the hook has its answer, never in its way
+      if (!late && !pl.agent_id && pl.tool_name === 'Bash' && pl.is_interrupt !== true && (pl.hook_event_name === 'PostToolUse' || pl.hook_event_name === 'PostToolUseFailure')) setImmediate(() => loopCount(tab, r, pl))
       break
     case 'waiting': {
       // claude's PermissionRequest comes as its menu is shown, before its Notification (if any: that one comes later,
@@ -4956,6 +4984,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       r.status = 'idle'
       r.limit = undefined
       r.planAsk = undefined
+      loopEnd(r)
       if (r.plan && planDone(r.plan)) r.plan = undefined // every step done: the list goes as the turn ends
       if (Array.isArray(pl['input-messages'])) titleFrom(tab, pl['input-messages'][0]) // codex's, at its first turn's end
       if (Array.isArray(pl['input-messages']) && typeof pl['input-messages'].at(-1) === 'string') r.asked = pl['input-messages'].at(-1).slice(0, 4000)
@@ -5007,6 +5036,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
     case 'interrupted':
       r.status = 'idle'
       r.turnFrom = r.waitFrom = r.waited = undefined
+      loopEnd(r)
       break
   }
   changed()

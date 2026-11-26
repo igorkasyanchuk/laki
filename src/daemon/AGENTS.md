@@ -8,7 +8,7 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 |---|---|
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, `GET /artifact/…` (the artifacts viewer), shutdown |
 | `src/daemon/gates.ts` | data only: every method's class for an agent's call (`AGENT_OK`, `AGENT_NO` with the why, `AGENT_OWN`) and for remote access (`REMOTE_OK`, `REMOTE_NO`), the ticks; main.ts' `classed` throws at load on one left out |
-| `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, run, ship, archive/fork, view; the modules below (hosts, pr, files, remote, resources…) import it and it them, and main.ts imports each directly; no module in the cycle reads another's const or let as it loads, so any of them can load first (`test/load-order.test.ts`), and the data folder, `dir`, is `dir.ts`', out of the cycle |
+| `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks (and `loopCount`: an agent failing the same command, `shared/loop.ts`), queue, limits, run, ship, archive/fork, view; the modules below (hosts, pr, files, remote, resources…) import it and it them, and main.ts imports each directly; no module in the cycle reads another's const or let as it loads, so any of them can load first (`test/load-order.test.ts`), and the data folder, `dir`, is `dir.ts`', out of the cycle |
 | `src/daemon/dir.ts` | the data folder, `dir` (`dataDir()`), in a module of its own: out of core's import cycle |
 | `src/daemon/hosts.ts` | SSH hosts (one ssh connection per host, `exec`/`sshIn` there, a tab's ssh) and cloud workspaces |
 | `src/daemon/pr.ts` | branches followed, PR scans, `autoPR` and the PR switches' messages, merge when green, the side panel's PR calls |

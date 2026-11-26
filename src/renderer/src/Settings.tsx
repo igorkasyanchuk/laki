@@ -1945,6 +1945,7 @@ export function SettingsPage(p: {
                   ['A turn finished', kind('done', 'A turn finished'), undefined, phone('done', s.webhook?.done === true, 'A turn finished')],
                   [<span data-tip="The same switch as An agent waits for you">CI keeps failing</span>, kind('waiting', 'CI keeps failing')],
                   ['A plan limit is hit', kind('limit', 'A plan limit is hit')],
+                  [<span data-tip="The same command failing with the same error 3 times in a row, or 5 times in one turn (Claude Code's hooks say so). Needs you shows it either way. Off: no phone push for it either">An agent loops</span>, kind('loop', 'Tell me when an agent loops')],
                   [
                     <span className="nt-when">
                       A plan limit is
