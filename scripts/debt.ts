@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 export type Debt = { line: number; text: string }
 // the files whose shortcuts are security's: the daemon's gates and remote access, its secrets, main's checks
-export const SECURITY = new Set(['src/daemon/envKeys.ts', 'src/daemon/main.ts', 'src/daemon/gates.ts', 'src/daemon/e2e.ts', 'src/daemon/remote.ts', 'src/daemon/clients.ts', 'src/daemon/secrets.ts', 'src/daemon/netProxy.ts', 'src/daemon/netAddr.ts', 'src/shared/wrap.ts', 'src/main/guards.ts', 'src/daemon/keychain.ts', 'src/daemon/inbound.ts', 'src/daemon/widgetTrust.ts', 'src/daemon/dataBackup.ts', 'src/ptyhost/main.ts', 'src/daemon/telegram.ts', 'src/shared/artHosts.ts'])
+export const SECURITY = new Set(['src/daemon/envKeys.ts', 'src/daemon/main.ts', 'src/daemon/gates.ts', 'src/daemon/e2e.ts', 'src/daemon/remote.ts', 'src/daemon/clients.ts', 'src/daemon/secrets.ts', 'src/daemon/netProxy.ts', 'src/daemon/netAddr.ts', 'src/shared/wrap.ts', 'src/main/guards.ts', 'src/daemon/keychain.ts', 'src/daemon/inbound.ts', 'src/daemon/widgetTrust.ts', 'src/daemon/dataBackup.ts', 'src/ptyhost/main.ts', 'src/daemon/telegram.ts', 'src/shared/artHosts.ts', 'src/shared/pins.ts', 'src/main/back.ts', 'src/shared/artPick.ts', 'src/daemon/cap.ts'])
 
 // git blame --line-porcelain's output: each line's author time (s), by its line in the file now. Pure
 export function blameTimes(porcelain: string): Map<number, number> {

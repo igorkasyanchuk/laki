@@ -3403,9 +3403,12 @@ export const CLOSED_MAX = 10
 // keep: a tab you closed (tabClose), kept for ⇧⌘T; not one that exited, nor a Run ▾ tab's or a workflow's cleanup
 export function closeTab(id: string, keep?: { cwd?: string }) {
   const t = findTab(id)
+  const spent = t.kind === 'agent' ? meterView(t).usage?.cost : undefined // its chat's cost stays in its workspace's cap (cap.ts)
+  const host = spent && state.workspaces.find(w => w.id === t.workspace)
+  if (host) host.spentClosed = Math.round(((host.spentClosed ?? 0) + spent) * 1e4) / 1e4
   const ws = keep && (t.kind === 'agent' || t.kind === 'shell') ? state.workspaces.find(w => w.id === t.workspace) : undefined
   if (ws) {
-    const c: ClosedTab = { name: t.name, kind: t.kind as ClosedTab['kind'], at: Date.now() }
+    const c: ClosedTab = { name: t.name, kind: t.kind as ClosedTab['kind'], at: Date.now(), ...(spent && { spent }) }
     for (const k of ['preset', 'profile', 'resumeId', 'model', 'effort', 'perm', 'fast', 'sandbox', 'account', 'cmd'] as const) if (t[k] !== undefined) (c as any)[k] = t[k]
     if (keep?.cwd) c.cwd = keep.cwd
     if (t.draft) c.draft = t.draft
@@ -3579,6 +3582,7 @@ export function tabReopen(p: { ws: string; index?: number; from?: { ws?: unknown
     agentNoCmd({ preset, cmd: c.cmd, perm: c.perm })
     if (c.sandbox === false) throw new Error("an agent can't start an agent outside its profile's sandbox: it's the user's (ask them)") // main.ts agentNo's for tabNew
   }
+  if (c.spent && !fresh && c.resumeId) ws.spentClosed = Math.max(0, Math.round(((ws.spentClosed ?? 0) - c.spent) * 1e4) / 1e4) // its chat's meter counts it again
   const tab = addTab(ws.id, c.kind === 'shell' ? { kind: 'shell', name: c.name, cwd: c.cwd, agent: by } : { preset, cmd: c.cmd, name: c.name, resume: fresh ? undefined : c.resumeId, model: c.model, effort: c.effort, perm: c.perm, fast: c.fast, sandbox: c.sandbox, account: c.account, agent: by })
   if (c.draft) state.tabs.find(t => t.id === tab.id)!.draft = c.draft
   ws.closed = ws.closed!.filter(x => x !== c)

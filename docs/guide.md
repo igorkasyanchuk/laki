@@ -79,6 +79,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   you; past it, it stops the workspace's agents as their tool call ends, marks the workspace, and asks: *Add $5 again*,
   *Leave it stopped* or *Remove the cap*. What you send meanwhile waits in the queue. Agents can lower a cap, never raise
   it; a workflow's own budget holds too, whichever comes first. With no meter for its agents the cap says *not measured*.
+  A tab you close keeps counting: what its chat cost stays in the workspace's spend.
 - **Cost warning**: Settings › Notifications › *A workspace costs over $5, then $20* (off until you turn it on; the
   amounts are yours). A workspace whose agents' chats pass the first amount (at API prices, its tabs together) shows its
   cost in the status bar in yellow and a yellow `$` on its row; past the second, red. Laki tells you once at each amount,

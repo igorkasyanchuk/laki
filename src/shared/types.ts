@@ -302,12 +302,13 @@ export const usageRow = (rows: AgentUsage[] | undefined, agent?: string, account
 // Search chats' hit (meters.ts chatSearch): its workspace and tab (none: a closed tab's chat), the tab's name and agent,
 // when it was said, who said it, 160 characters around the words, the transcript line's id (claude's uuid, else L<n>)
 export type ChatHit = { ws: string; tab?: string; name: string; agent: string; at?: number; who: 'you' | 'agent' | 'tool'; text: string; id: string }
-export type ClosedTab = { draft?: string; name: string; kind: 'agent' | 'shell'; preset?: string; profile?: string; resumeId?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; cmd?: string; cwd?: string; at: number }
+export type ClosedTab = { draft?: string; name: string; kind: 'agent' | 'shell'; preset?: string; profile?: string; resumeId?: string; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; account?: string; cmd?: string; cwd?: string; at: number; spent?: number /* its chat's cost as it closed: taken off the workspace's spentClosed if it's resumed */ }
 export type Workspace = {
   id: string
   cap?: Cap // its spend cap (cap.ts): its own, {} none; unset: its agent's profile's, else its project's
   capOver?: number // when it went over its cap: its turns stopped, sends wait in its tabs' queues until you add to it or remove it
   capTold?: boolean // its 80% notice sent (for the cap as it is)
+  spentClosed?: number // its closed agent tabs' cost, summed as each closed (core.ts closeTab): still in its cap and cost warning (cap.ts); the daemon's, never a call's
   costTold?: Partial<Record<CostLevel, number>> // #3: the cost warning's amounts it was told at (a higher one tells again)
   project: string
   path: string

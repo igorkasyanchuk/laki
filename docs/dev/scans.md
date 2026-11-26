@@ -753,8 +753,10 @@ stopped*, *Remove the cap* (`alertShow`'s `mac`: those two refused to remote acc
 from its PreToolUse, `capToolEnd`; another agent's, or a call past 60 s, at the tick). While over, `send` queues what it's
 given (`over: true`) and `deliver` holds the queue; `capSet` under the cap lets them go (`queueResume`). An agent may set a
 lower cap only (`capRaises`, main.ts' `agentNo`), never a project's or profile's; remote access at Answer only can't set
-one (`WS_SET`, `NEW_KEYS`). A workflow's budget holds in its runs too: whichever ends first stops it. ponytail: a closed
-tab's spend leaves the sum; a host's tabs aren't metered. `test/meter.test.ts`, `test/agent-gates.test.ts`. Grok's and Antigravity's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
+one (`WS_SET`, `NEW_KEYS`). A workflow's budget holds in its runs too: whichever ends first stops it. A closed
+tab's cost stays in the sum and the cost warning's: `Workspace.spentClosed`, added in core.ts `closeTab` (the daemon's,
+no call sets it), its `ClosedTab.spent` taken off again when ⇧⌘T resumes its chat (its meter counts it then); an
+unpriced chat's tokens leave it. ponytail: a host's tabs aren't metered. `test/meter.test.ts`, `test/agent-gates.test.ts`. Grok's and Antigravity's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
 their days and today's under their own chat ids: Grok's `~/.grok/sessions/<folder>/<id>/usage.json` (each turn's
 `endedAt`, per model `totalTokens` and `costUsdTicks`, 1e-10 USD, its own price; the folder `encodeURIComponent` of the
 worktree, else any holding the id), agy's `~/.gemini/antigravity-cli/conversations/<id>.db` (its id, else

@@ -414,6 +414,26 @@ test("cap: a workspace's spend cap: 80% one notice; 100% stops its turn and asks
   await until(async () => !(await rig.tab(ws.id)).queue?.length, 'its queue sent')
 })
 
+test("cap: a closed tab's cost stays in its workspace's spend; reopened, its chat counts it again, not twice", async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', cap: '$1' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(dir, { recursive: true })
+  // opus 4.6: $25 a million output tokens; 20k: $0.5
+  writeFileSync(join(dir, 'chat-3.jsonl'), line({ type: 'assistant', timestamp: new Date().toISOString(), message: { id: 'a', model: 'claude-opus-4-6', usage: { input_tokens: 0, output_tokens: 20000 } } }))
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'chat-3' } })
+  const w = async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === ws.id)
+  await until(async () => (await w()).spend?.usd === 0.5, 'its chat priced')
+  await rig.rpc('tabClose', { id: tab.id })
+  assert.deepEqual([(await w()).spentClosed, (await w()).spend.usd, (await w()).spend.share], [0.5, 0.5, 0.5], 'closed: still spent')
+  await rig.rpc('wsSet', { id: ws.id, spentClosed: 0 })
+  assert.equal((await w()).spentClosed, 0.5, "a call can't set it")
+  await rig.rpc('tabReopen', { ws: ws.id })
+  assert.equal((await w()).spentClosed, 0, 'its chat resumed: its meter has it')
+})
+
 test("cost warning: a workspace past yellow, then red: colored, told once each; a raised amount tells again; a project's own off", async t => {
   const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

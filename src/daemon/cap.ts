@@ -5,7 +5,8 @@
 // it's over (core's send and deliver). Only you raise or remove one: an agent may lower it (main.ts' agentNo), remote
 // access at Answer only can't change it (wsSet's keys) nor pick a choice that raises it (alerts.ts' mac). A workflow's
 // own budget holds in its runs too: whichever ends first stops it. core.ts imports it; capTick runs after meterTick.
-// ponytail: a closed tab's spend leaves the sum (its chat isn't read any more); a host's tabs aren't metered
+// A closed tab's cost stays in the sum (Workspace.spentClosed, core.ts closeTab; tokens of an unpriced one don't).
+// ponytail: a host's tabs aren't metered
 import { type Cap, type CapView, capSpent, capText, COST_WARN, type CostLevel, type CostWarn, type Tab, type Workspace } from '../shared/types.ts'
 import { alertShow } from './alerts.ts'
 import { changed, findWs, input, log, presetOf, queueResume, rtOf, save, sessions, state, wsLog } from './core.ts'
@@ -53,9 +54,9 @@ export function capOf(w: Workspace): Cap | undefined {
 export function capView(w: Workspace): CapView | undefined {
   const cap = capOf(w)
   if (!cap) return
-  let usd = 0
+  let usd = w.spentClosed ?? 0
   let tokens = 0
-  let priced = false
+  let priced = usd > 0
   let counted = false
   for (const t of agents(w)) {
     const u = meterView(t).usage
@@ -82,9 +83,9 @@ const tell = (w: Workspace, text: string, choices?: string[], mac?: string[]) =>
 // yellow, past red red; each amount is told once, as its cost goes past it while Laki watches: one passed while Laki
 // was off (a restart's first read) is marked told, never told late. A changed amount tells again.
 // ponytail: a claude chat's subagents count as its meter does (their own transcripts aren't read)
-export function wsUsd(w: { id: string }) {
-  let usd = 0
-  let priced = false
+export function wsUsd(w: { id: string; spentClosed?: number }) {
+  let usd = w.spentClosed ?? 0
+  let priced = usd > 0
   for (const t of agents(w)) {
     const c = meterView(t).usage?.cost
     if (c !== undefined) (usd += c), (priced = true)
