@@ -3339,10 +3339,16 @@ button.project-icon { padding: 0; border: none; background: none; min-height: 0;
 .rd-time.you { align-self: flex-end; }
 .md-code { position: relative; }
 .md-code-head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-1) var(--sp-3); border: 1px solid var(--line); border-bottom: none; border-radius: var(--r-m) var(--r-m) 0 0; background: color-mix(in srgb, var(--fg) 4%, var(--panel)); font-size: var(--fs-1); }
+.md-code-head { white-space: nowrap; min-width: 0; } .md-code-head > .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .md-code-head > :not(.muted, .grow) { flex: none; } /* a narrow pane: one line, its line count cut first */
 .md-code-head + pre { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .md-code-lang { padding: 0 var(--sp-2); border-radius: var(--r-pill); background: var(--sel); color: var(--fg); font-family: var(--mono); }
 .md-code-head .md-copy { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .md a.md-file { text-decoration: none; cursor: var(--cur-act); } .md a.md-file > svg { vertical-align: -1px; margin-right: var(--sp-1); opacity: 0.8; } .md a.md-file:hover code, .md a.md-file:hover { text-decoration: underline; } /* #8: a file of the workspace named in an answer */
+.art-notes { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 30vh; overflow-y: auto; padding: var(--sp-3) 0 0; } /* #3: an artifact's notes, Comment on */
+.art-note { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; font-size: var(--fs-2); }
+.art-note .art-n { flex: none; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--sp-2); border-radius: var(--r-pill); background: var(--accent); color: var(--accent-fg, #fff); font-size: var(--fs-1); }
+.art-note .art-sel { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.art-note input { flex: 1; min-width: 0; }
 .md-code-seg button { height: auto; min-height: 0; padding: 0 var(--sp-3); font-size: inherit; line-height: 1.6; } /* a whole page's Code | Preview */
 .md-code-page { display: block; width: 100%; height: 360px; resize: vertical; border: 1px solid var(--line); border-radius: 0 0 var(--r-m) var(--r-m); background: #fff; } /* its own colors, a browser's white under them */
 .rd-failed { align-self: flex-start; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); max-width: 100%; color: var(--error); }

@@ -199,7 +199,7 @@ export const act = <E extends Element>(f: ((e: MouseEvent<E>) => unknown) | fals
 
 export function IconButton({ icon, title, onClick, on, className = '', label, tip = true, disabled, onContextMenu, keyId }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string; tip?: boolean; disabled?: boolean; onContextMenu?: (e: MouseEvent<HTMLButtonElement>) => void; keyId?: string }) {
   return (
-    <button className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={tip ? title : undefined} data-key={keyId} aria-label={title} disabled={disabled} onClick={onClick} onContextMenu={onContextMenu}>
+    <button type="button" className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={tip ? title : undefined} data-key={keyId} aria-label={title} disabled={disabled} onClick={onClick} onContextMenu={onContextMenu}>
       <Icon name={icon} />
       {label && <span className="ib-label">{label}</span>}
     </button>
@@ -723,10 +723,10 @@ export function ProjectMark({ p, size = 12, or }: { p?: { id?: string; name?: st
   const name = isIconName(i) ? i : or
   const l = useSyncExternalStore(onIconLook, iconLook) // an emoji as big as an icon would be
   if (!e && !isIconName(i) && p?.id && p.name && !p.kind) {
-    const px = iconPx(size, l) + 2
+    const px = iconPx(size, l) + 4
     if (typeof p.picture === 'string' && p.picture) return <img className="p-mark p-pic" src={p.picture} alt="" width={px} height={px} aria-hidden />
     return (
-      <span className="p-mark p-letters" style={{ ...colorVar(p.color || autoColor(p.id, TAB_COLORS)), width: px, height: px, fontSize: Math.round(px * 0.5) }} aria-hidden>
+      <span className="p-mark p-letters" style={{ ...colorVar(p.color || autoColor(p.id, TAB_COLORS)), width: px, height: px, fontSize: px * 0.56 }} aria-hidden>
         {p.letters || badges.get(p.id) || badgeLetters([{ id: p.id, name: p.name }]).get(p.id)}
       </span>
     )

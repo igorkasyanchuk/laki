@@ -94,7 +94,7 @@ const StarterPicker = (p: Parameters<typeof StarterLazy>[0]) => (
 
 // the pages in the main area, over the panes
 export function Pages({ app }: { app: AppCtx }) {
-  const { editLayout, nextNeed, achAll, achHidden, achKept, achN, achRef, achSet, aiNames, allows, apps, archive, artMenu, artPage, artView, asFile, bgUrl,
+  const { editLayout, nextNeed, achAll, achHidden, achKept, achN, achRef, achSet, aiNames, allows, apps, archive, artMenu, artPage, artView, asFile, bgUrl, panelApi,
     busyWith, byId, call, calOn, cfgSheet, copy, deskOn, dialog, done, earn, extCfg, extInserts, extModal, extWs, fail, flowsOn, fontSize, full, gallery, going,
     held, hereCtx, hist, hotkey, quickKey, tellKey, inBrowser, inViewer, kb, layoutsOn, live, made, needsYou, newFor, newImages, newInit, newWs, notesOn,
     onboardDone, openFile, openIn, openMenu, openProject, order, own, pageZoom, picking, pinPlan, placeName, notices, answerNotice, pops, quickNew, rail, reply,
@@ -666,6 +666,7 @@ export function Pages({ app }: { app: AppCtx }) {
             menu: path => artMenu(ws, path),
             copy,
             page: path => (inViewer(path) ? artPage(ws, path) : undefined),
+            comment: text => panelApi(ws).toPrompt(text).then(() => setGallery(null), e => (fail(e), Promise.reject(e))), // #3: its notes into the agent's prompt
             unlink: url => api.call('linkRm', { ws: ws.id, url }),
             external: bridge?.openPath && (path => inBrowser(ws, path)), // HTML as the sandboxed page (L11), as the right click's
             drag: bridge?.dragOut && !ws.host ? path => bridge!.dragOut!(`${ws.storage}/${path}`, ws.storage!) : undefined,
@@ -687,6 +688,7 @@ export function Pages({ app }: { app: AppCtx }) {
           {...(artView.wt
             ? { wt: true, onExternal: bridge?.openExternal && (() => bridge!.openExternal!(artPage(w, artView.path, true)!)) } // View as page: the worktree's file; the browser for its devtools
             : { onExternal: bridge?.openPath && (() => inBrowser(w, artView.path)), onFile: asFile(w, artView.path), onReveal: bridge?.openPath && (() => revealArt(w, artView.path)) })}
+          onComment={text => panelApi(w).toPrompt(text).then(() => setArtView(null), e => (fail(e), Promise.reject(e)))} // #3: its notes into the agent's prompt
           onSource={() => (setArtView(null), openFile({ ws: w.id, path: artView.path, ...(!artView.wt && { storage: true }) }))}
           onClose={() => setArtView(null)}
         />

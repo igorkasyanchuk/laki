@@ -1,5 +1,6 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { type ArtBlocked, artHostOk, artSay } from '../../shared/artHosts'
+import { type ArtMark, artNotes, pickOf } from '../../shared/artPick'
 import { keyFor, keyMap, keyShow } from '../../shared/keys'
 import { aiOn as aiOnOf } from '../../shared/types'
 import { hasCap } from '../../shared/caps'
@@ -2054,7 +2055,7 @@ export function Welcome({ onOpen, onSsh, onClone, onNew, check, onRun, onSample 
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
 // menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
-export type ArtifactsApi = { list: () => Promise<Artifact[]>; stat?: (path: string) => Promise<{ size: number; at?: number }>; read: (path: string, media?: boolean) => Promise<{ size: number; text?: string; image?: string; media?: string; src?: string }>; open?: (path: string) => void; editor?: (path: string) => void; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown>; drag?: (path: string) => void } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
+export type ArtifactsApi = { comment?: (text: string) => Promise<unknown> /* #3: notes on an HTML one's parts, into the agent's prompt */; list: () => Promise<Artifact[]>; stat?: (path: string) => Promise<{ size: number; at?: number }>; read: (path: string, media?: boolean) => Promise<{ size: number; text?: string; image?: string; media?: string; src?: string }>; open?: (path: string) => void; editor?: (path: string) => void; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown>; drag?: (path: string) => void } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
 const host = (url: string) => (fileOf(url) ? fileOf(url).split('/').pop()! : url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]) // a file:/// link: its file's name
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string; media?: string } | { error: string }
@@ -2084,7 +2085,69 @@ function useChanged(stat: (() => Promise<{ size: number; at?: number }>) | undef
 // change to its CSS or script alone loads nothing again). A Markdown one: Outline, its headings
 // hosts, allow (S18): what its CSP blocked (the daemon's artifactHosts), a bar with Allow for this report, Always allow
 // and Keep blocked; an allow loads it again
-export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExternal, onFile, onReveal, onSource, onClose }: { path: string; page?: string; wt?: boolean; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; hosts?: () => Promise<{ blocked: ArtBlocked[] }>; allow?: (hosts: string[], always: boolean) => Promise<unknown>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
+// #3: Comment on an HTML artifact (the viewer's and the gallery's): the page again with the picker (?pick=1, the daemon's:
+// shared/artPick.ts); a click on a part of it is a numbered mark here with your note, all of them sent to the agent in
+// one message (artNotes). page: an HTML page's address, else none (no Comment)
+function useArtComment(path: string, page: string | undefined, onComment?: (text: string) => Promise<unknown>) {
+  const [commenting, setCommenting] = useState(false)
+  const [marks, setMarks] = useState<ArtMark[]>([])
+  const [draft, setDraft] = useState<(Omit<ArtMark, 'note'> & { note: string }) | null>(null)
+  const [sending, setSending] = useState(false)
+  const frame = useRef<HTMLIFrameElement>(null)
+  useEffect(() => {
+    if (!commenting) return
+    const f = (e: MessageEvent) => (p => p && e.source === frame.current?.contentWindow && setDraft(d => (d && !d.note.trim() && unmark(d.n), { ...p, note: '' })))(pickOf(e.data))
+    window.addEventListener('message', f)
+    return () => window.removeEventListener('message', f)
+  }, [commenting])
+  const unmark = (n: number) => frame.current?.contentWindow?.postMessage({ laki: 'artUnmark', n }, '*')
+  const addDraft = () => draft?.note.trim() && (setMarks(m => [...m, draft]), setDraft(null))
+  const send = () => {
+    if (!onComment || !marks.length || sending) return
+    setSending(true)
+    onComment(artNotes(path, marks)).then(() => (setMarks([]), setCommenting(false)), () => {}).finally(() => setSending(false))
+  }
+  const pageNow = page && commenting ? `${page}${page.includes('?') ? '&' : '?'}pick=1` : page
+  useEffect(() => (setCommenting(false), setMarks([]), setDraft(null)), [path])
+  const notes = commenting && (
+    <div className="art-notes">
+      {!marks.length && !draft && <span className="muted small">Click a part of the page, then say what to change there. Add as many as you like; they go to the agent in one message.</span>}
+      {marks.map(m => (
+        <div key={m.n} className="art-note">
+          <b className="art-n">{m.n}</b>
+          <code className="art-sel" data-tip={m.html}>{m.selector}</code>
+          <span className="grow">{m.note}</span>
+          <IconButton icon="x" title="Take it out" onClick={() => (unmark(m.n), setMarks(x => x.filter(y => y.n !== m.n)))} />
+        </div>
+      ))}
+      {draft && (
+        <div className="art-note art-draft">
+          <b className="art-n">{draft.n}</b>
+          <code className="art-sel" data-tip={draft.html}>{draft.selector}</code>
+          <input autoFocus value={draft.note} placeholder={`What to change in ${draft.text ? `"${draft.text.slice(0, 40)}"` : 'it'}…`} onChange={e => setDraft({ ...draft, note: e.target.value })} onKeyDown={e => (e.key === 'Enter' ? (e.preventDefault(), addDraft()) : e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), unmark(draft.n), setDraft(null)))} />
+          <button type="button" disabled={!draft.note.trim()} onClick={addDraft}>
+            Add
+          </button>
+        </div>
+      )}
+    </div>
+  )
+  const buttons = page && onComment && (commenting ? (
+      <>
+        <button className="primary" disabled={!marks.length || sending} onClick={send} data-tip="Each note with its part's selector and markup, into the workspace's agent's prompt">
+          {sending ? 'Sending…' : `Send to the agent${marks.length ? ` (${marks.length})` : ''}`}
+        </button>
+        <button onClick={() => (setCommenting(false), setMarks([]), setDraft(null))}>Stop commenting</button>
+      </>
+    ) : (
+      <button onClick={() => setCommenting(true)} data-tip="Click parts of the page and write a note on each: one message to the agent with where each one is">
+        Comment
+      </button>
+    ))
+  return { on: commenting, src: pageNow, frame, notes, buttons }
+}
+
+export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExternal, onFile, onReveal, onSource, onComment, onClose }: { onComment?: (text: string) => Promise<unknown>; path: string; page?: string; wt?: boolean; read: () => Promise<{ text?: string }>; stamp?: () => Promise<{ size: number; at?: number }>; hosts?: () => Promise<{ blocked: ArtBlocked[] }>; allow?: (hosts: string[], always: boolean) => Promise<unknown>; onExternal?: () => void; onFile?: () => void; onReveal?: () => void; onSource?: () => void; onClose: () => void }) {
   const [md, setMd] = useState<string | { error: string } | null>(null)
   const [n, setN] = useState(0) // the times it changed while open
   const html = HTML.test(path)
@@ -2105,6 +2168,7 @@ export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExte
   }
   useChanged(stamp, path, 1500, () => setN(x => x + 1))
   const [menu, openMenu] = useMenu()
+  const cm = useArtComment(path, html ? page : undefined, onComment)
   return (
     <Modal title={path} onClose={onClose} wide loose>
       {menu}
@@ -2130,7 +2194,7 @@ export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExte
       )}
       <div className="art-big">
         {html ? (
-          page ? <iframe key={n} className="art-frame" title={path} sandbox="allow-scripts" src={page} /> : <span className="muted small">Loading…</span>
+          cm.src ? <iframe key={`${n}:${cm.on}`} ref={cm.frame} className="art-frame" title={path} sandbox="allow-scripts" src={cm.src} /> : <span className="muted small">Loading…</span>
         ) : md === null ? (
           <span className="muted small">Loading…</span>
         ) : typeof md === 'string' ? (
@@ -2141,7 +2205,9 @@ export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExte
           <span className="warn small">{md.error}</span>
         )}
       </div>
+      {cm.notes}
       <div className="buttons">
+        {cm.buttons}
         <span className="muted small grow">{wt ? 'The file as it is in the worktree now: a commit’s or the PR’s may differ. Sandboxed: its scripts run; it can’t read Laki or your files' : html ? 'Sandboxed: its scripts run; it can’t read Laki or your files' : ''}</span>
         {wt && <button onClick={() => setN(x => x + 1)} data-tip="Loads the page again: after a change to its CSS or script">Reload</button>}
         {!html && typeof md === 'string' && <button data-tip="Go to heading…" onClick={e => openMenu(e, outlineItems(e.currentTarget.closest('.modal')))}>Outline</button>}
@@ -2206,6 +2272,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   const i = here && big !== null ? here.findIndex(f => f.path === big) : -1
   const at = here && i >= 0 ? here[i] : null
   const step = (d: number) => here?.length && i >= 0 && setBig(here[(i + d + here.length) % here.length].path)
+  const cm = useArtComment(at?.path ?? '', at && HTML.test(at.path) && !linkOf(at.path) ? a.page?.(at.path) : undefined, a.comment) // #3
   useEffect(() => void (at && !linkOf(at.path) && need(at)), [at])
   // audio or video shown big: its data URL, asked for then (the strip's previews never carry it); one at a time
   const [play, setPlay] = useState<{ key: string; src?: string; done?: boolean; err?: string } | null>(null)
@@ -2256,7 +2323,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     if (!c) return full || f.size <= 2 << 20 ? <span className="muted small">Loading…</span> : <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
     if ('error' in c) return <span className="warn small">{c.error}</span>
     if (c.image) return <img src={c.image} alt={f.path} />
-    if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe key={f.at} className="art-frame" title={f.path} sandbox="allow-scripts" src={a.page(f.path)} />
+    if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe key={`${f.at}:${cm.on}`} ref={cm.frame} className="art-frame" title={f.path} sandbox="allow-scripts" src={cm.src ?? a.page(f.path)} />
     if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} html /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
     if (full)
       return (
@@ -2357,6 +2424,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
           <div className="art-big" data-zoom onContextMenu={e => rightClick(e, at)}>
             {look(at, true)}
           </div>
+          {cm.notes}
           <div className="buttons">
             {(l =>
               l ? (
@@ -2367,6 +2435,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
                 </>
               ) : (
                 <>
+                  {cm.buttons}
                   <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
                   {/\.(md|markdown)$/i.test(at.path) && <button data-tip="Go to heading…" onClick={e => openMenu(e, outlineItems(e.currentTarget.closest('.modal')))}>Outline</button>}
                   {a.external && VIEWED.test(at.path) && <button onClick={() => a.external!(at.path)}>Open in the browser</button>}

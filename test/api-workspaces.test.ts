@@ -411,6 +411,10 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.equal(page.status, 200)
   assert.match(page.headers.get('content-security-policy')!, new RegExp(`^sandbox allow-scripts; default-src 'none'.*; connect-src 127\\.0\\.0\\.1:${port}/artifact/${widgetKey}/${w.id}/site/$`)) // its fetch('data.json'): its own folder only
   assert.equal(await page.text(), '<link rel="stylesheet" href="a.css"><h1>hi</h1>')
+  // #3: the viewer's Comment: the page with the picker added; a stylesheet never
+  const picking = await (await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/index.html?pick=1`)).text()
+  assert.ok(picking.startsWith('<link rel="stylesheet" href="a.css"><h1>hi</h1><script>') && picking.includes("laki: 'artPick'"))
+  assert.equal(await (await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css?pick=1`)).text(), 'h1 { color: red }')
   const css = await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`)
   assert.equal(css.headers.get('content-type'), 'text/css')
   assert.equal(css.headers.get('access-control-allow-origin'), null) // CORS only for its sandboxed page (Origin null)

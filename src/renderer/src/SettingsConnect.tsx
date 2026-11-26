@@ -86,9 +86,9 @@ export function WebhookSection({ w, onChange: put, test, mac, onMac }: { w: Webh
           {(mac.pushAtMac ?? 'hold') === 'hold' && (
             <div className="grid2">
               <label>
-                Still push an ask after
+                Push an unanswered ask after
                 <select value={mac.pushAfter ?? 90} onChange={e => onMac({ pushAfter: Number(e.target.value) })}>
-                  {[30, 60, 90, 180, 300].map(n => <option key={n} value={n}>{n < 120 ? `${n} s` : `${n / 60} min`}, if nobody answered it here</option>)}
+                  {[30, 60, 90, 180, 300].map(n => <option key={n} value={n}>{n < 120 ? `${n} s` : `${n / 60} min`}</option>)}
                 </select>
               </label>
               <label>

@@ -1818,3 +1818,14 @@ test('#5: project badges: two letters each, distinct across projects, a picked o
   for (const id of ['a', 'shop', 'laki', 'x1', 'zz']) assert.ok(!['gray', 'brown'].includes(autoColor(id, cs)), id)
   assert.equal(autoColor('shop', cs), autoColor('shop', cs))
 })
+
+test("#3: an artifact's notes: the picker's message checked, one message for the agent", async () => {
+  const { artNotes, pickOf } = await import('../src/shared/artPick.ts')
+  const p = pickOf({ laki: 'artPick', n: 1, selector: 'section#totals > h2', html: '<h2>Totals</h2>', text: 'Totals' })
+  assert.deepEqual(p, { n: 1, selector: 'section#totals > h2', html: '<h2>Totals</h2>', text: 'Totals' })
+  for (const bad of [null, 'x', { laki: 'other', n: 1 }, { laki: 'artPick', n: '1', selector: 'a', html: '', text: '' }, { laki: 'artPick', n: 2, selector: 3, html: '', text: '' }]) assert.equal(pickOf(bad), undefined)
+  assert.equal(
+    artNotes('report.html', [{ ...p!, note: 'bigger  ' }, { n: 2, selector: 'td', html: '<td>\n 4 </td>', text: '', note: 'red' }]),
+    'Notes on the artifact report.html (in $LAKI_STORAGE_FOLDER), each on one part of the page:\n1. `section#totals > h2` "Totals": bigger\n   <h2>Totals</h2>\n2. `td`: red\n   <td> 4 </td>',
+  )
+})

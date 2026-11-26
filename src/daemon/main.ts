@@ -1,6 +1,7 @@
 // The terminal host: owns PTYs, state and scans; outlives the app. Reached over 127.0.0.1 only:
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
+import { withPick } from '../shared/artPick.ts'
 import './starterEnv.ts' // first: the starter's git and npm variables gone before any module reads process.env
 import { earlyHost } from './ptyEarly.ts' // second: the pty host starting beside the daemon's other modules as they load
 import { execFileSync } from 'node:child_process'
@@ -458,7 +459,8 @@ function artifactAllow(p: { ws?: unknown; path?: unknown; wt?: unknown; hosts?: 
   artAllowed.set(key, [...new Set([...(artAllowed.get(key) ?? []), ...hosts.map(h => h.toLowerCase())])])
   return { allowed: artHostsFor(key) }
 }
-function artifactPage(path: string, origin: string | undefined, host: string | undefined, res: ServerResponse) {
+// pick: the viewer's Comment mode (#3): an HTML page with the picker added (shared/artPick.ts)
+function artifactPage(path: string, origin: string | undefined, host: string | undefined, res: ServerResponse, pick = false) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
   const m = /^\/(?:artifact|worktree)\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
   const wt = path.startsWith('/worktree/')
@@ -483,7 +485,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
     'x-content-type-options': 'nosniff',
     ...(origin === 'null' && !(wt ? /^(text\/html|application\/json)/ : /^text\/html/).test(ART_TYPES[extname(file).toLowerCase()] ?? '') && { 'access-control-allow-origin': 'null' }), // its page's module scripts and fonts: CORS loads, from its opaque origin (sandboxed: Origin null)
   })
-  res.end(body)
+  res.end(pick && /^text\/html/.test(ART_TYPES[extname(file).toLowerCase()] ?? '') ? withPick(body.toString('utf8')) : body)
 }
 
 // ---------- the API: same methods over HTTP and WebSocket
@@ -2045,7 +2047,7 @@ const server = createServer(async (req, res) => {
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
     const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
     if (u.pathname.startsWith('/mcp-app/')) return void mcpPage(u.pathname, u.searchParams).then(r => (res.writeHead(r.code, r.headers), res.end(r.body))) // an MCP App's page (mcpApps.ts): its own key, its own CSP
-    if (u.pathname.startsWith('/artifact/') || u.pathname.startsWith('/worktree/')) return artifactPage(u.pathname, req.headers.origin, req.headers.host, res) // an artifact in the app's viewer: the key in its path
+    if (u.pathname.startsWith('/artifact/') || u.pathname.startsWith('/worktree/')) return artifactPage(u.pathname, req.headers.origin, req.headers.host, res, u.searchParams.get('pick') === '1') // an artifact in the app's viewer: the key in its path
     if (u.pathname === '/img') return imgPage(u.searchParams, res) // an extension's picture for the app window: the view's key
     if (PWA.has(u.pathname)) return pwaPage(u.pathname, res) // M4: the page as an app, while remote access runs
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin
