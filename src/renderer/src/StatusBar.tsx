@@ -16,6 +16,20 @@ import { csWord, shortPath } from './text'
 import { hasCap } from '../../shared/caps'
 import { hhmm } from '../../shared/tray'
 import { settingsOf, wsName } from './appCtx'
+import { useEffect, useState } from 'react'
+
+// a word for two seconds in the status bar (Body's clipCopy: Copied N lines), from anywhere in the window
+export const sbSay = (text: string) => window.dispatchEvent(new CustomEvent('laki-sb-say', { detail: text }))
+function SbSay() {
+  const [say, setSay] = useState('')
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined
+    const on = (e: Event) => (clearTimeout(t), setSay(String((e as CustomEvent).detail)), (t = setTimeout(() => setSay(''), 2000)))
+    window.addEventListener('laki-sb-say', on)
+    return () => (clearTimeout(t), window.removeEventListener('laki-sb-say', on))
+  }, [])
+  return say ? <span className="sb-say" role="status">{say}</span> : null
+}
 
 export function statusBarOf(app: AppCtx) {
   const { reviewGo, achAll, achKept, achMore, achN, AI_TIP, aiDock, aiFab, aiFloat, attachable, behindMenu, branchFull, call, cfgSheet, connected, costsOn, ctxOn, dialog, dock, fail, flowsOn, fly, footButtons, gallery, git, infoOf, kt, labels, limits, noBar, openMenu, openPort, ownWidgets, pageBar, ports, portStop, portUp, prMenu, problem, project, rail, readerApi, setAiFloat, setAuto, setBranchFull, setDialog, settings, shortBranch, tab, toAi, toggleArtifacts, toSettings, tracked, tunnelApi, turnApi, upd, view, wideBar, widgetApi, ws } = app
@@ -28,6 +42,7 @@ export function statusBarOf(app: AppCtx) {
   return view && !(noBar && connected) && (ws?.browser === undefined || !connected || wideBar) && ( // a browser page: none, unless something's wrong (the wide bar: always)
         <div className={`status ${wideBar ? 'wide' : ''}`}>
           {wideBar && <span className="sb-foot">{footButtons(labels, true)}</span>}
+          <SbSay />
           {/* V11: two groups, each a capsule over the bar (empty: none drawn) */}
           <span className="sb-group capsule">
           {ws && ws.browser === undefined && !pageBar && ( // a Browsers page: no port, branch or folder of its own

@@ -59,7 +59,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   PR and the other moves to *related* (a PR you attached or picked stays). A session an agent starts from another one (`/laki:new`) only lists the PRs its
   prompt names as related, so the PR it opens is its PR (`--link <url>`: the PR it's about, as for a review).
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
-  closed. ⌘F finds with every match in yellow; copy on select; drop files on one to type their paths; font,
+  closed. ⌘F finds with every match in yellow; copy on select; a copy in vim, tmux or over ssh (OSC 52) reaches the
+  Mac's clipboard (a shell tab asks once; Settings › Terminal › *Programs may copy to the clipboard*: also agents, or
+  never); drop files on one to type their paths; font,
   size, line height, weight, cursor and zoom, with a live preview.
 - **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots and any other file; the agent
   gets the text and their paths. Prompt templates wrap it (`{{prompt}}`).

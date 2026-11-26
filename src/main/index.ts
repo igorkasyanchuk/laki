@@ -2,6 +2,7 @@
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
 import { app, autoUpdater, BrowserWindow, safeStorage, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, nativeTheme, net, Notification, protocol, screen, session, ShareMenu, shell, systemPreferences, Tray, webContents } from 'electron'
+import { OSC52_MAX } from '../shared/osc52.ts'
 import { execFile, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -1155,6 +1156,13 @@ const fileOk = new Set<string>() // pages you said yes to (until Laki quits)
 // an artifact to the clipboard (the app window's, right click › Copy): a picture as a picture, any other file as the file
 // itself (Finder, Slack and mail paste it); its text the renderer copies on its own
 const PICS = /\.(png|jpe?g|gif|webp|heic|tiff?|bmp)$/i
+// OSC 52 (the window's clipCopy, after Settings › Terminal's rule): a program's copy as text, the app window's only, as
+// much as the parse lets through (shared/osc52.ts); never a read
+ipcMain.handle('copy-text', async (e, text: unknown) => {
+  if (!win || e.sender !== win.webContents || typeof text !== 'string' || !text || text.length > OSC52_MAX) return false
+  await clipboard.writeText(text)
+  return true
+})
 ipcMain.handle('copy-file', async (e, path: unknown) => {
   if (!win || e.sender !== win.webContents || typeof path !== 'string' || !path.startsWith('/')) return 'missing'
   const real = await realpath(path).catch(() => '')

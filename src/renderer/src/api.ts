@@ -46,6 +46,7 @@ type Bridge = {
   bounce?(): void // U15: the Dock icon bounces once (informational), when Laki isn't in front
   quickLook?(path: string): void // U14: macOS's Quick Look of a file (main's quick-look; a regular file only, macOS only)
   onFront?(cb: (on: boolean) => void): void // Laki became the front app, or another app did (main's setFront)
+  copyText?(text: string): Promise<boolean> // OSC 52: a terminal program's copy to the clipboard (main's copy-text: the app window's, OSC52_MAX at most), the window focused or not
   copyFile?(path: string): Promise<'image' | 'file' | 'missing'> // an artifact to the clipboard: a picture as one, else the file (main's copy-file)
   openFile?(path: string, root: string): Promise<'opened' | 'missing' | 'viewer'> // an HTML artifact inside root as a file:// page in the default browser (main's open-file)
   dictate?(): void

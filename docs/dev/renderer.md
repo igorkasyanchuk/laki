@@ -500,7 +500,16 @@ are tested in `test/units-more.test.ts`.
   resizes it). Over a plain terminal, no chat open and not a page, it fades to 55% (`.far`) while the pointer is over
   120px away (back on approach or focus; Motion off, never). Pages keep `--fab-room` at their bottom
   (`.page-body`, `.settings-main`). test:ui's README run checks it meets no `data-dock` element on the Done check's still.
-- **`Term.tsx`**: one xterm per pane. Recent pictures (`TermPics`, `pictures`: settings.termPictures unless false): the
+- **`Term.tsx`**: one xterm per pane. OSC 52 (a program's copy: vim's, tmux's, one over ssh): `registerOscHandler(52)`
+  hands `shared/osc52.ts`' parse (`<targets>;<base64>`: c, s or none, at most `OSC52_MAX` 100 KB decoded, else
+  dropped silently; a read, `?`, never answered) to `onClip`, only in the app's own window (`bridge`: a phone's page
+  never writes the Mac's clipboard) and a view with keys (`readOnly` ones don't: one write a window); always swallowed.
+  Body's `clipCopy`: Settings › Terminal › *Programs may copy to the clipboard* (`termClip`: `ask`, unset: a shell tab
+  asks once, *Allow* or *Not now*, kept on the tab, `tabSet`'s `clip`, never an agent's (main.ts agentNo); an agent tab
+  never; `all`: shells and agents; `never`), then the bridge's `copyText` (main's `copy-text`: the app window's
+  sender only, a string of at most `OSC52_MAX`; the window focused or not, which `navigator.clipboard` needs) and
+  StatusBar's `sbSay` (*Copied N lines*, 2 s). test:ui's `osc52` flow prints one in a shell tab and reads main's
+  clipboard. Recent pictures (`TermPics`, `pictures`: settings.termPictures unless false): the
   last `PICS` (4) dropped or pasted pictures' paths as chips at the top right (`.term-pics`, hidden while find is open),
   a hover card with the picture (LinkPeek's `image`, the daemon's `imageRead`), its path, size and time, *Open* (the big
   view), *Copy path*, *Reveal in Finder* (main's `reveal` IPC: an absolute path that exists). A paste of a picture alone

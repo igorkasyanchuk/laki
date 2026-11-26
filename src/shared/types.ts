@@ -573,6 +573,7 @@ export type Tab = {
   goalRun?: TabGoal // A1b: the goal Laki runs for it (an agent with no /goal of its own)
   queueHeld?: boolean // U8: Stop all agents stopped its turn: its queue waits for Resume queue (queueResume)
   color?: string // a tab color's name (red, blue, …); 'none' turns the agent's default off
+  clip?: boolean // OSC 52 in a shell tab (Settings' termClip ask): your answer to its first copy, Allow or Not now, kept for its life (tabSet's; never an agent's)
   muted?: boolean // no notifications from it
   snoozed?: number // Needs you's ✕ and Snooze (tabSnooze): out of Needs you and every count until then (SNOOZE_NEXT: until something new), or sooner as it asks something new or starts a turn
   bell?: boolean // T16: its next ask or turn end told once, then off (core's ring, tabBell)
@@ -683,6 +684,7 @@ export type Settings = {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  termClip?: 'ask' | 'all' | 'never' // OSC 52, a program's copy to the clipboard: shells ask once each (unset), shells and agents, or never
   termPictures?: boolean // a terminal's last pictures pasted or dropped, as chips at its top (Term.tsx TermPics; unset: on)
   editKeys?: boolean // the terminal's ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   fileClick?: 'preview' | 'editor' // a file path ⌘-clicked in a terminal (src/app.ts:42): Laki's preview (unset) or your editor; ⌘⌥: the other
@@ -1604,7 +1606,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 230
+export const API = 231
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

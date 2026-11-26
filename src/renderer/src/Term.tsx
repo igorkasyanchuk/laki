@@ -18,6 +18,7 @@ import { wordTrim } from './text'
 import { termTheme, transparent } from './themes'
 import { closeTo, Icon, type IconName, openFrom } from './ui'
 import { cellRange, wrappedLine } from './termLines'
+import { osc52 } from '../../shared/osc52'
 
 export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
 // K1: two views of one terminal in a window (an extension's cell and its full view) share the window's socket: it
@@ -64,6 +65,7 @@ export function Term({
   readOnly = false,
   pictures = true,
   savePicture,
+  onClip,
 }: {
   tab: string
   active?: boolean
@@ -85,6 +87,7 @@ export function Term({
   readOnly?: boolean // K1: an extension's terminal in a cell: shown, no keys
   pictures?: boolean // its last pictures pasted or dropped, as chips at its top (Settings › Terminal: termPictures)
   savePicture?: (f: File) => Promise<string> // a pasted picture kept (imageSave): its path, typed in as a drop's
+  onClip?: (text: string) => void // OSC 52: a program's copy (vim's, tmux's, over ssh), parsed (shared/osc52.ts); none: dropped
 }) {
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
@@ -93,8 +96,8 @@ export function Term({
   const box = useRef<HTMLDivElement>(null)
   const file = useRef(onFile)
   file.current = onFile
-  const props = useRef({ onReply, onSelection, onCode, codeTo, image, text, cwd })
-  props.current = { onReply, onSelection, onCode, codeTo, image, text, cwd }
+  const props = useRef({ onReply, onSelection, onCode, codeTo, image, text, cwd, onClip })
+  props.current = { onReply, onSelection, onCode, codeTo, image, text, cwd, onClip }
   // a link's hover card (LinkPeek): shown 400 ms after the pointer rests on one, gone 250 ms after it leaves both. xterm
   // drops the hovered link as its rows redraw and finds it again at once (a leave, then a hover): a TUI that redraws
   // often (claude's and codex's spinners) would start the wait over each time, so a card on its way, or shown, for that
@@ -276,6 +279,9 @@ export function Term({
       p.registerCsiHandler({ prefix: '>', final: 'q' }, mute), // XTVERSION
       p.registerDcsHandler({ intermediates: '$', final: 'q' }, mute), // DECRQSS
       ...[4, 10, 11, 12].map(n => p.registerOscHandler(n, d => mute() && d.includes('?'))), // color queries
+      // OSC 52: a copy to the Mac's clipboard, only in the app's own window (the bridge: never a phone's page) and a view
+      // with keys (one write per window); a read ("?") never answered. Always swallowed
+      p.registerOscHandler(52, d => (!readOnly && bridge && (c => c && props.current.onClip?.(c.text))(osc52(d)), true)),
     ]
 
     let alive = true

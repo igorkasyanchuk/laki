@@ -1685,6 +1685,7 @@ function agentNo(method: string, p: Params) {
   else if (method === 'ship' && p.allowSecrets !== undefined && p.allowSecrets !== false) notAgent(p, 'ship past the secret check (the user says what is not a secret)')
   else if (method === 'aiAsk' && String(p.chat ?? '').startsWith('widget:')) notAgent(p, "ask in an extension's page chat (what Laki AI changes there stays on)")
   else if (method === 'tunnelStart' && p.host !== undefined) notAgent(p, 'make a permanent tunnel (a public address that stays, a DNS record of yours)')
+  else if (method === 'tabSet' && p.clip !== undefined) notAgent(p, 'let a tab copy to the clipboard (the user answers that)')
   else if (method === 'tabSet' && fromTab(p.from) !== p.id) notAgent(p, p.alias !== undefined ? "name another agent's tab (laki name names your own)" : "rename, color or mute a tab that isn't its own") // an alias: else it could take a name and its messages; S11: the rest too (a muted tab's asks go unseen)
   else if (FILE_EDITS.has(method) && core.agentCaller(p.from)) {
     // S2: its own workspace's files (it writes those itself anyway), never git's own: another's is the user's to change

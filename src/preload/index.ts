@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('laki', {
   ...(process.platform === 'darwin' && { touchId: (): Promise<boolean> => ipcRenderer.invoke('touch-id'), confirm: (what: string): Promise<string | null> => ipcRenderer.invoke('confirm', what) }), // Touch ID (shared/confirm.ts): can this Mac ask; ask for one action, its ticket
   ...(process.platform === 'darwin' && { quickLook: (path: string) => ipcRenderer.send('quick-look', path), share: (url: string) => ipcRenderer.send('share-menu', url), bounce: () => ipcRenderer.send('dock-bounce') }), // U14: Space on a file row; U15: Share…, the Dock's bounce
   copyFile: (path: string): Promise<'image' | 'file' | 'missing'> => ipcRenderer.invoke('copy-file', path), // an artifact to the clipboard
+  copyText: (text: string): Promise<boolean> => ipcRenderer.invoke('copy-text', text), // OSC 52: a program's copy (Body's clipCopy), focused or not
   openFile: (path: string, root: string): Promise<'opened' | 'missing' | 'viewer'> => ipcRenderer.invoke('open-file', path, root), // an HTML artifact as a file:// page in the browser
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone

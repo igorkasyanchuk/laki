@@ -9,7 +9,8 @@ import { Glyph as ExtGlyph, inWs, status as extStatus, WidgetBody, WidgetPanel }
 import { edited, type FileContent, FilePreview, fileNoteText, type FilesRoot, SidePanel } from './SidePanel'
 import type { ReviewNote } from '../../shared/reviewNotes'
 import { Glyph, rollup } from './Glyph'
-import { ask, Icon, IconButton } from './ui'
+import { ask, choose, Icon, IconButton } from './ui'
+import { sbSay } from './StatusBar'
 import { bulkAnswer } from './Needs'
 import { InfoTab } from './Info'
 import { PanelHandle, Panes } from './Panes'
@@ -35,6 +36,26 @@ import { lazy } from 'react'
 
 // E8: loaded as it first shows (the Review tab): not in the window's first load
 const FullReview = lazy(() => import('./FullReview').then(m => ({ default: m.FullReview })))
+
+// OSC 52 (Term's onClip): a program's copy to the Mac's clipboard, as Settings › Terminal › Programs may copy to the
+// clipboard says (termClip): a shell tab asks once (Allow, Not now: kept on the tab, tabSet's clip), an agent's only
+// with Shells and agents, none with Never; the status bar says it for two seconds
+const clipAsks = new Map<string, Promise<boolean>>()
+const clipSaid = new Map<string, boolean>() // answered here, before the view brings the tab's clip
+async function clipCopy(t: TabView | undefined, text: string, how: 'ask' | 'all' | 'never' = 'ask') {
+  if (!t || how === 'never' || (t.kind === 'agent' && how !== 'all')) return
+  const said = t.clip ?? clipSaid.get(t.id)
+  if (how === 'ask' && said === false) return
+  if (how === 'ask' && said === undefined) {
+    const asked = clipAsks.get(t.id) ?? choose('Let this tab copy to your clipboard?', `A program in ${t.name} (vim, tmux, ssh) asks to put text on your clipboard. Asked once for this tab`, [{ label: 'Allow', primary: true }, { label: 'Not now' }]).then(i => i === 0)
+    if (!clipAsks.has(t.id)) {
+      clipAsks.set(t.id, asked)
+      void asked.then(yes => (clipAsks.delete(t.id), clipSaid.set(t.id, yes), api.call('tabSet', { id: t.id, clip: yes }))).catch(() => {})
+    }
+    if (!(await asked)) return
+  }
+  if (await bridge?.copyText?.(text).catch(() => false)) (n => sbSay(`Copied ${n} line${n === 1 ? '' : 's'}`))(text.replace(/\r?\n$/, '').split('\n').length)
+}
 
 export function bodyOf(app: AppCtx) {
   const { artsIn, attachable, browsed, byId, call, checkHid, ciLog, closeFile, closePreview, closeTabs, copy, detachPr, dialog, done, fail, finds, floated, floatTab, full, git, group, groups, guests, hookHid, infoOf, inReader, kh, kt, label, labelApi, laterCancel, laterChange, laterNow, live, narrow, newTabActions, newWs, noBar, openIn, openProject, ownWidgets, pageSeen, paneDeps, panelApi,
@@ -108,6 +129,7 @@ export function bodyOf(app: AppCtx) {
                     image={path => paneNow.current.peekImage(id)(path)}
                     text={path => paneNow.current.peekText(id)(path)}
                     cwd={view?.workspaces.find(x => x.id === byId(id)?.workspace)?.path}
+                    onClip={text => void clipCopy(byId(id), text, settings.termClip)}
                     pictures={settings.termPictures !== false}
                     savePicture={f => keepFile(f, (data, ext) => api.call<string>('imageSave', { data, ext })).then(r => r.path)}
                   />

@@ -1,6 +1,6 @@
 // npm run test:ui and test:sheet (--laki-smoke=<dir>, main's uiSmoke): the real window walked page by page, then the
 // risky flows, each step waited for and screenshotted; index.ts starts it once the window has loaded
-import { app, BrowserWindow, nativeImage } from 'electron'
+import { app, BrowserWindow, clipboard, nativeImage } from 'electron'
 import { card, floater, floats, pinGo, pinned, setFront, talk, talkW } from './floater.ts'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -59,6 +59,8 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
   const fakeLog = () => (f => (existsSync(f) ? readFileSync(f, 'utf8') : ''))(join(process.env.HOME ?? '', 'fake.log'))
   const ws: Record<string, View['workspaces'][number]> = {}
   let before = 0 // the quick bar's step: workspaces before it sends
+  let clipWas = '' // the osc52 step's: the clipboard before it
+  let clipDone = false
   const cart = () => readFileSync(join(ws.cart.path, 'src/cart.js'), 'utf8')
   const checkout = () => join(ws.co.path, 'src/checkout.js')
   const steps: [string, (() => Promise<unknown>) | null, string | (() => Promise<boolean>)][] = [
@@ -348,6 +350,20 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
       await size(1000, 800)
     }, async () => (await has('.tab-list > .tab-more')) && (await has('.tab-list > .tab.sel'))],
     ['tab-overflow-off', () => size(1440, 900), '.tab-list'],
+    // OSC 52: a shell's copy (printf's, as vim's or tmux's would send it) asks once, then reaches the Mac's clipboard and
+    // the status bar says so; the clipboard as it was is put back
+    ['osc52', async () => {
+      clipWas = await clipboard.readText()
+      const cw = await named('checkout-flow')
+      const t = (await rpc<{ id: string }>('tabNew', { ws: cw.id, preset: 'shell' })).id
+      await waitFor(async () => (await link(`laki://ws/${cw.id}?tab=${t}`)(), await nap(300), hasText('.tab-list > .tab.sel', 'shell')), 'the shell tab shown') // once the view has it
+      w.focus()
+      w.webContents.focus()
+      await waitFor(async () => !!(await rpc<string>('screen', { target: t, lines: 5 })).trim(), 'its prompt')
+      await nap(500)
+      await rpc('input', { tab: t, data: "printf '\\033]52;c;%s\\007' aGkgdGhlcmU=\r" })
+      await answer('Allow')
+    }, async () => (clipDone ||= (await clipboard.readText()) === 'hi there' && (await hasText('.status .sb-say', 'Copied 1 line')) && (await clipboard.writeText(clipWas), true))], // checked twice: once put back, it stays done
     // the phone (390×844): its bottom bar (five columns, each a finger's size, one lit, a capsule floating over the
     // bottom, in from both sides), nothing wider
     // than the screen; Projects opens the drawer over the whole width (the main area inert) with Needs you's counts, Esc

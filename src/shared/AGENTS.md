@@ -29,6 +29,7 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/tray.ts` | Q8: the menu bar icon's state (`stateOf`: idle, working, waiting, blocked), its tooltip and title, its four template pictures (`trayBitmap`) |
 | `src/shared/loop.ts` | an agent failing the same command: `loopFeed` counts a turn's Bash calls (3 in a row or 5 in a turn, same first 200 characters of error), `loopCmd` normalizes the command |
+| `src/shared/osc52.ts` | OSC 52, a program's copy: `osc52` parses `<targets>;<base64>` into the text for the clipboard, or none (a read, too big, bad base64) |
 | `src/shared/nextStep.ts` | One next step: what a workspace needs from you now, from its tabs, check and PR |
 | `src/shared/todos.ts` | the agent's plan, live: a tab's to-do list from its tools' calls, `planCount`, `planNow` |
 | `src/shared/overlap.ts` | Collision radar: a -U0 diff's base lines per file, where two diffs meet |

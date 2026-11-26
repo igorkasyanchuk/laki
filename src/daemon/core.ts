@@ -3008,7 +3008,7 @@ function titleFrom(tab: Tab, prompt: unknown) {
   save()
 }
 
-export function tabSet(o: { id: string; name?: string; color?: string; muted?: boolean; alias?: string }) {
+export function tabSet(o: { id: string; name?: string; color?: string; muted?: boolean; alias?: string; clip?: unknown }) {
   const t = findTab(o.id)
   // its @name: one live tab each (an ended agent's goes to the new one); '' drops it
   const alias = typeof o.alias === 'string' ? o.alias.trim().replace(/^@/, '').toLowerCase() : undefined
@@ -3020,6 +3020,7 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
   if (o.name?.trim()) (t.name = o.name.trim().slice(0, 40)), (t.titled = true)
   if (o.color !== undefined) t.color = o.color || undefined
   if (o.muted !== undefined) t.muted = o.muted || undefined
+  if (o.clip !== undefined) t.clip = o.clip === true // OSC 52: your answer for this shell tab (Body's clipCopy)
   save()
   changed()
   return { ...t, draft: undefined } // an agent names its own tab: what you typed stays yours

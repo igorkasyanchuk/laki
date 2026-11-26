@@ -114,6 +114,7 @@ export type AppSettings = Paint & {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  termClip?: 'ask' | 'all' | 'never' // OSC 52: a program's copy to the clipboard (Body's clipCopy; unset: ask, shells only)
   termPictures?: boolean // a terminal's recent pictures as chips (unset: on)
   editKeys?: boolean // ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   fileClick?: 'preview' | 'editor' // a file path clicked in a terminal: Laki's preview (unset) or your editor
@@ -2909,6 +2910,7 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={s.copyOnSelect !== false} onChange={v => set({ copyOnSelect: v })}>
                     <Says title="Copy selected text" hint="What you select is on the clipboard, no ⌘C needed" />
                   </Switch>
+                  {row('Programs may copy to the clipboard', 'A copy in vim, tmux or over ssh (OSC 52) reaches the Mac’s clipboard. Never read from it', 'termClip', 'ask', ['ask', 'all', 'never'], v => (v === 'ask' ? 'Shells, ask first' : v === 'all' ? 'Shells and agents' : 'Never'))}
                   <Switch className="switch-row" on={s.termPictures !== false} onChange={v => set({ termPictures: v })}>
                     <Says title="Recent pictures on a terminal" hint="The last four pictures you pasted or dropped into a terminal, as chips at its top: resting on one shows it, its path, size and dimensions, with Open, Copy path and Reveal in Finder" />
                   </Switch>
