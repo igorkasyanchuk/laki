@@ -46,6 +46,7 @@ import * as e2e from './e2e.ts'
 import { pinDecide, type Pins } from '../shared/pins.ts'
 import { activity, activityList, clip80 } from './remoteLog.ts'
 import { agentDid, agentLogOf } from './agentLog.ts'
+import { agentCalls, toolCount, toolDaysSave } from './toolDays.ts'
 import { CONFIRM, confirmKnown, confirmOf, type ConfirmWhat, TICKET_MS } from '../shared/confirm.ts'
 import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
@@ -823,6 +824,7 @@ const api = {
   screenLock: p => remoteMod.screenLock(p), // D9: the app's powerMonitor: the Mac locked (true) or unlocked; remote access follows it (settings.remoteWhen)
   remoteLog: p => activityList(Math.min(1000, Math.max(1, Number(p?.n) || 200))), // D9: what was done remotely, newest first
   agentLog: p => agentLogOf(core.findWs(String(p?.ws ?? '')).id), // what its agents did through Laki, newest first (agentLog.ts)
+  agentCalls: () => agentCalls(), // what agents call: the last 7 days per method (calls, refused, errors, the last error), the tools none of whose methods they called (toolDays.ts); the user's
   wsSpend: p => metersMod.wsSpend(p), // where a workspace's tokens went (shared/spend.ts): the user's; an agent's for its own workspace (agentNo)
   diskUsage: p => resourcesMod.diskUsage({ again: p?.again === true }), // Settings › Resources › Disk, laki doctor --disk (kept 10 minutes)
   diskTidy: p => resourcesMod.diskTidy(p ?? {}), // its three ways to make room; dry: what would go
@@ -1011,7 +1013,7 @@ const remoteNo = (method: string, p: Params) =>
 const FROM = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'gitTidy',
   'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave', 'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm',
   'uninstall', 'skillOpen', 'secretKeep', 'secretForget', 'wsSpend', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
-  'clientAnswer', 'events', 'agentLog', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
+  'clientAnswer', 'events', 'agentLog', 'agentCalls', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
   'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'presence', 'remoteLog', 'diagnostics',
   'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm',
   'voiceText', 'projectClone', 'projectNew', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen',
@@ -1545,6 +1547,7 @@ const ANSWER: Record<string, true | ((p: Params) => string)> = {
   agentVersions: true,
   reviewMark: true, // R11: a review sent from the phone marks it too
   agentLog: true, // what its agents did, read from the phone too
+  agentCalls: true, // what agents call, read from the phone too
   wsSpend: true, // where a workspace's tokens went, read from the phone too
   secretKeep: true, // the phone's prompt box keeps a pasted secret in a file too
   diskUsage: true, // Disk, read from the phone too
@@ -1867,7 +1870,7 @@ const TEST_CLOCK = inRig() && process.env.LAKI_TEST_CLOCK !== '0' // 0: a test's
 // ANSWER table's reads (and the passkey's steps: remote.ts logs an unlock itself); what a full-level page does beyond
 // ANSWER is a change. A line names the workspace and tab and what was done: a message's or prompt's first 80
 // characters, never a secret's value; a terminal's keys once a minute per tab ('input')
-const READS = new Set('flowTrustDiff aiCredits wsSpend agentLog diskUsage voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList \
+const READS = new Set('flowTrustDiff aiCredits wsSpend agentLog agentCalls diskUsage voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList \
 diff baseBranches files fileRead dbRead sourceGuess artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet \
 planFile noteList noteGet noteFile todoListGet chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin failDismiss'.split(' '))
 for (const k of READS) if (!Object.hasOwn(ANSWER, k)) throw new Error(`READS' ${k} isn't one of ANSWER's (D7): D9 logs what it doesn't call a read`)
@@ -1948,6 +1951,15 @@ function agentLine(method: string, params: unknown, e?: unknown) {
   } catch {}
 }
 
+// toolDays.ts: a call by an agent (its tab's token, S12: known; else the from or caller whoCalls found), counted; its
+// hooks aside (Laki's, not the agent's choice). Sync and in a try: nothing awaited, never a call's failure
+function toolTally(method: string, params: unknown, known: Tab | undefined, how: 'ok' | 'refused' | 'error', e?: unknown) {
+  try {
+    if (method === 'hook') return
+    const p = (params && typeof params === 'object' ? params : {}) as { from?: unknown; caller?: unknown }
+    if (core.agentTab(known && { tab: known.id }) || core.agentCaller(p.from) || core.agentCaller(p.caller)) toolCount(method, how, e)
+  } catch {}
+}
 // known: the agent's tab a call's token is of (S12, /rpc only); app: the call came with the app's token (S1)
 // a blocked event loop (a hung daemon: main pings it, the window says so): a tick more than 2 s late is one line in the
 // log, with how late and the API methods running or begun in the last two looks (the one that blocked is among them: a
@@ -2007,6 +2019,7 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   if (client && sock) params = await clientCalls(sock, method, params, client)
   else if (sock) params = await whoCalls(sock, method, params, known, app)
   let r
+  let ran = false // its method began: a throw after is its error, before it a gate's refusal (toolDays.ts)
   try {
     if (sock) agentNo(method, params ?? {})
     if (method === 'ticketMint' && !(app && sock && (inRig() || (process.platform === 'darwin' && (await core.appPeer(sock.remotePort ?? 0)))))) throw new Error("only Laki's app makes a Touch ID ticket, as it asks for Touch ID")
@@ -2017,16 +2030,19 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
     try {
       if (process.env.LAKI_TEST_BUSY === method) for (const end = Date.now() + 3000; Date.now() < end; ); // a test's blocked event loop (restart.test.ts)
       const cid = (method === 'send' || method === 'answer') && typeof params?.cid === 'string' && params.cid ? params.cid.slice(0, 64) : undefined
+      ran = true
       r = cid ? await once(c, cid, async () => h(params ?? {}, c)) : await h(params ?? {}, c)
     } finally {
       running.splice(running.lastIndexOf(method), 1)
     }
   } catch (e) {
     agentLine(method, params, e)
+    toolTally(method, params, known, ran ? 'error' : 'refused', e)
     if (params?.byClient) clientLine(method, params, e)
     throw e
   }
   agentLine(method, params)
+  toolTally(method, params, known, 'ok')
   if (params?.byClient) clientLine(method, params)
   if (remote && !READS.has(method)) (line => line && activity({ device: deviceName(c?.device), method, line }))(remoteLine(method, params ?? {})) // D9
   // S3: the settings these answer with, whole only to you (your window, your own CLI call): an agent's, remote access's
@@ -2569,6 +2585,7 @@ function shutdown(keep: unknown = false) {
   } catch (e) {
     log('keeping shells', e) // the stop goes on
   }
+  toolDaysSave() // what agents called, kept as it stops (toolDays.ts)
   try {
     screensMod.screensSave(true) // #S1: each shell tab's screen, for the next start
   } catch (e) {

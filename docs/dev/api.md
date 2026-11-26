@@ -40,6 +40,18 @@ the newest 500 in memory and in `<data>/agent-log/<ws>.jsonl` (0600; rewritten t
 removed with the workspace (`dropWs`). `agentLog` (`ws`: newest first; AGENT_NO, a phone's too: REMOTE_OK and ANSWER)
 reads it: the Info tab's *What its agents did*, `laki agent log`.
 
+What agents call (`toolDays.ts`): `call()`'s `toolTally`, for a caller classed as an agent only (its tab's token, S12's
+`known`, else the `from` or `caller` whoCalls found: `agentTab`; `hook` aside), counts `{ calls, refused, errors }` per
+method and day: refused when the call threw before its method ran (`ran`: agentNo's, ticketNo's, hookWho's), an error
+when its method threw; the method's last error, its first line through `redact`, 120 characters (never the params).
+Sync, in memory, in a try (no await on the call's path; it never fails a call); `<data>/tool-days.json` (`TOOL_KEEP` 30
+days) written at most once a minute (`LAKI_TOOL_SAVE_MS`: tests') and at `shutdown` (`toolDaysSave`); in backups
+(`BACKUP_KEEP`). `agentCalls` (AGENT_NO; REMOTE_OK and ANSWER, as `agentLog`): the last 7 days summed per method, the
+most failing share ((refused + errors) / calls) first, then the most called, each with its `last` error; `unused`: the
+tools of `shared/tools.ts` none of whose methods were called (`toolMethods`: each tool's run handed an rpc that notes
+the names and never answers; ponytail: what it calls before its first await). Settings › Agents & profiles › *What
+agents call* (SettingsAgents.tsx `AgentCalls`). Tested in `test/tool-days.test.ts`.
+
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
   worktrees' *When everything is done*): core.ts `whenDone` at each view, beside `keepAwake`: armed by something going
   (an agent running or waiting, a live workflow run, a scheduled task or a workspace's late start due within the hour),

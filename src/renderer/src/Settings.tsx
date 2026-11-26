@@ -36,7 +36,7 @@ import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from '.
 import type { AllowRule } from '../../shared/ask'
 import type { McpServer } from '../../shared/mcp'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, KeptSecrets, type McpFound, McpServers, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
-import { type AccountsApi, AccountsBlock, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
+import { type AccountsApi, AccountsBlock, AgentCalls, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, TelegramSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
@@ -3296,6 +3296,9 @@ export function SettingsPage(p: {
               <Switch className="switch-row" on={s.secretHint !== false} onChange={on => set({ secretHint: on })}>
                 <Says title="Warn about a pasted secret" hint="A token, key or password in a prompt box: a line under it offers to pass it as a secret, a file only the agent reads; checked in this window, nothing sent to look" />
               </Switch>
+              <Group title="What agents call" hint="What agents asked of Laki in the last 7 days, through the laki command and its MCP server: each call, the ones Laki refused, the ones that failed. The most failing first; a name with an error shows its last one">
+                <AgentCalls />
+              </Group>
               {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
                 <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} act={hookSays(agent)} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
                   {(agent === 'claude' || agent === 'codex') && p.typeIn && (

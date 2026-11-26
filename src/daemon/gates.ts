@@ -38,7 +38,7 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
   kcWrapper: "wrap the Keychain's values (Laki's window does)", kcWrapped: "answer a Keychain value's wrap (Laki's window does)",
   termAnswer: 'allow a terminal to act as the user (they do, in Laki\'s window)', termList: "list the terminals the user allowed",
   termRevoke: "revoke a terminal the user allowed (they do, in Settings › Security)", screenLock: 'say the Mac locked (remote access follows it)', presence: "say whether the user is at the Mac (phone pushes follow it)",
-  remoteLog: "read what was done over remote access", agentLog: "read what agents did through Laki (the user's to look back at)",
+  remoteLog: "read what was done over remote access", agentLog: "read what agents did through Laki (the user's to look back at)", agentCalls: "read what agents call through Laki (the user's)",
   ticketMint: "make a Touch ID ticket (Laki's window does, as you touch it)", diskUsage: "read what takes room on the user's disk (Settings › Resources)",
   diskTidy: "delete kept turns, storage folders or archives (the user does, in Settings › Resources)",
   shipDraft: "read the Ship sheet's draft (it quotes the tab's chat)", sampleNew: 'make the sample project', sampleRm: 'remove the sample project',
@@ -129,7 +129,7 @@ export const REMOTE_NO = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'sugges
 // REMOTE_OK: the page may call it; main.ts' remoteNo still refuses some by what they say (widgetSet's on, a settingsSet of
 // REMOTE_KEYS, a share with no end, a project's scripts and auto-answer rules)
 export const REMOTE_OK = new Set(['suggestAnswer', 'tabSnooze', 'artifactHosts', 'artifactAllow', 'flowTrustDiff', 'askExplain', 'reviewSteps', 'aiCredits', 'promptQuestions', 'promptImprove', 'goalClear',
-  'flowExport', 'flowImport', 'flowWaitEnd', 'signIn', 'mcpSignIn', 'keptList', 'agentVersions', 'secretKeep', 'wsSpend', 'tabBell', 'remoteKeep', 'agentLog', 'diskUsage',
+  'flowExport', 'flowImport', 'flowWaitEnd', 'signIn', 'mcpSignIn', 'keptList', 'agentVersions', 'secretKeep', 'wsSpend', 'tabBell', 'remoteKeep', 'agentCalls', 'agentLog', 'diskUsage',
   'mergeQueueStart', 'mergeQueueStop', 'archivedKeep', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet',
   ...'ping state projectAdd sampleNew sampleRm projectRm projectArchive updateIdle agentModels projectSet memoryAdd memoryRm projectFile projectTrust branches csMachines wsNew quickNew wsRm wsPeek overlapCheck wsStat wsArchive doctor hooksSeen wsFan answer unread seen show showDone browse timer browseDone wsRestore wsFork tabNew layoutSet layoutMove tabFocus uiDo todoAdd todoRm memoryCompact \
 memoryCompactLog cliState reminderAdd reminderSet reminderRm tabClose tabReopen tabDraft failDismiss gateRestart tabMode hookList tabSet settingsSet storageInfo openIn apps termShells wsSet reorder imageSave bgSet bgGet fileSave prFix wsUpdate prLog logs scriptLogs progress tabHandover turnDiff turnUndo turnList turnRewind turnFork sideAsk sideState sideNew alertShow noticeShow alertAnswer \

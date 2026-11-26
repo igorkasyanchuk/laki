@@ -2208,6 +2208,11 @@ prompt instead; *Send as it is* sends it unchanged. ⏎ with the line showing wa
 window, nothing is sent to look, and a kept draft keeps it masked. Settings › Agents & profiles › *Warn about a pasted
 secret* turns it off.
 
+Settings › Agents & profiles › *What agents call* lists what agents asked of Laki in the last 7 days through the
+`laki` command and its MCP server: each method's calls, the ones Laki refused and the ones that failed, the most failing
+first; a method's name opens its last error (secrets masked; what was asked is never kept), and a line names the tools
+nobody called.
+
 Paste a long text (a log, a stack trace: over 40 lines or 4,000 characters) into a prompt box that takes files and it
 becomes a chip, *pasted-text.txt · 312 lines*, instead of filling the box: the agent gets the file's path, the box stays
 readable, and a click on the chip's name shows it to read or edit (emptied, it goes). In a Reader's box the file's path

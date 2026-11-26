@@ -1016,3 +1016,59 @@ export function AgentVersions({ openTab }: { openTab?: (tab: string) => void }) 
 }
 // how old, in words: an hour old, 3 days old
 const agoWords = (ms: number) => (h => (h < 1 ? 'under an hour old' : h < 48 ? `${h} hour${h === 1 ? '' : 's'} old` : `${Math.floor(h / 24)} days old`))(Math.floor(ms / 3600e3))
+
+// What agents call (toolDays.ts' agentCalls): the last days' calls through the CLI and laki mcp per API method, the most
+// failing share first; a method's button opens its last error (redacted); the tools none of whose methods were called
+type Calls = { days: number; rows: { method: string; calls: number; refused: number; errors: number; last?: { at: number; text: string } }[]; unused: string[] }
+export function AgentCalls() {
+  const [r, setR] = useState<Calls | null>(null)
+  const [open, setOpen] = useState('')
+  useEffect(() => void api.call<Calls>('agentCalls').then(setR, () => setR({ days: 7, rows: [], unused: [] })), [])
+  if (!r) return <div className="muted small">Reading…</div>
+  return (
+    <>
+      {r.rows.length ? (
+        <table className="nt-table">
+          <thead>
+            <tr>
+              <th scope="col" style={{ textAlign: 'left' }}>Method</th>
+              <th scope="col">Calls</th>
+              <th scope="col">Refused</th>
+              <th scope="col">Errors</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.rows.flatMap(x => [
+              <tr key={x.method}>
+                <td style={{ textAlign: 'left' }}>
+                  {x.last ? (
+                    <button type="button" className="link mono" aria-expanded={open === x.method} data-tip="Its last error" onClick={() => setOpen(open === x.method ? '' : x.method)}>
+                      {x.method}
+                    </button>
+                  ) : (
+                    <span className="mono">{x.method}</span>
+                  )}
+                </td>
+                <td>{x.calls}</td>
+                <td>{x.refused || ''}</td>
+                <td>{x.errors || ''}</td>
+              </tr>,
+              ...(open === x.method && x.last
+                ? [
+                    <tr key={`${x.method}:last`}>
+                      <td colSpan={4} className="muted small" style={{ textAlign: 'left' }}>
+                        {new Date(x.last.at).toLocaleString()}: {x.last.text}
+                      </td>
+                    </tr>,
+                  ]
+                : []),
+            ])}
+          </tbody>
+        </table>
+      ) : (
+        <div className="muted small">No calls from agents in the last {r.days} days.</div>
+      )}
+      {r.unused.length > 0 && <div className="muted small">No calls in {r.days} days: {r.unused.join(', ')}</div>}
+    </>
+  )
+}
