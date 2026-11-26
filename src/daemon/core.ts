@@ -4825,10 +4825,10 @@ function continueLater(tab: Tab, r: Runtime) {
     }
   }, CONTINUE_MS).unref()
 }
-export function failDismiss(p: { tab?: unknown }) {
+export function failDismiss(p: { tab?: unknown; from?: unknown }) {
   const r = rtOf(findTab(String(p.tab ?? '')).id)
   r.failed = undefined
-  if (r.loop) (r.loop = undefined), (r.loopLet = true) // Let it work: no mark again this turn
+  if (r.loop && !agentTab(p.from)) (r.loop = undefined), (r.loopLet = true) // Let it work (yours: an agent can't hide its own): no mark again this turn
   changed()
 }
 // an agent failing the same command (shared/loop.ts, claude's Bash: its PostToolUseFailure; no other agent's hooks say a
@@ -4848,7 +4848,7 @@ function loopCount(tab: Tab, r: Runtime, pl: { hook_event_name?: unknown; tool_i
   const text = `${ws?.name || tab.workspace} · ${tab.name} ran ${hit.cmd.slice(0, 120)} ${hit.n} times with the same error`
   wsLog({ id: tab.workspace }, `${tab.name} loops: ${hit.cmd.slice(0, 200)} failed ${hit.n} times with the same error`)
   broadcast({ ev: 'loop', tab: tab.id, ws: tab.workspace, text })
-  if (state.settings?.notifyOn?.loop !== false) phoneLong(tab, text, 'loop')
+  if (state.settings?.notifyOn?.loop !== false) phoneLong(tab, redact(text), 'loop') // it leaves the Mac: secrets' shapes masked
   changed()
 }
 // a turn's state, from a hook or from the screen (sweepRunning). at: when the hook started (hook.ts); one older than the

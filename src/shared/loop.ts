@@ -9,7 +9,7 @@ export const LOOP_TURN = 5
 export const loopNew = (): LoopSeen => ({ streak: 0, seen: {} })
 
 // whitespace collapsed, a leading `cd … &&` dropped, the numbers in temp paths masked (mktemp's, a test's own folder)
-const TEMP = /(?:\/private)?\/(?:tmp|var\/folders)\/\S*/g
+const TEMP = /(?<=^|[\s'"=:])(?:\/private)?\/(?:tmp|var\/folders)\/\S*/g // a path's start: not a tmp folder deeper in one
 const masked = (s: string) => s.replace(TEMP, p => p.replace(/\d+/g, '#'))
 export const loopCmd = (cmd: string) => masked(cmd.replace(/\s+/g, ' ').trim().replace(/^cd\s+(?:'[^']*'|"[^"]*"|\S+)\s*&&\s*/, ''))
 const errOf = (e = '') => masked(e.replace(/\s+/g, ' ').trim()).slice(0, 200)

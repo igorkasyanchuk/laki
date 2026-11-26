@@ -22,7 +22,7 @@ import { viewShare } from './viewShare'
 import { personalOutput, spokenNote } from '../../shared/speak'
 import { outputLabel, sayInit } from './say'
 import { toolLine, toolOn } from './AppParts'
-const QUIET = new Set(['turn', 'long', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
+const QUIET = new Set(['turn', 'long', 'loop', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
 
 type St<T> = Dispatch<SetStateAction<T>>
 export type DaemonCtx = {

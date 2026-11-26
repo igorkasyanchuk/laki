@@ -59,8 +59,9 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
   const fakeLog = () => (f => (existsSync(f) ? readFileSync(f, 'utf8') : ''))(join(process.env.HOME ?? '', 'fake.log'))
   const ws: Record<string, View['workspaces'][number]> = {}
   let before = 0 // the quick bar's step: workspaces before it sends
-  let clipWas = '' // the osc52 step's: the clipboard before it
+  let clipWas: string | undefined // the osc52 step's: the clipboard before it, put back after, pass or fail
   let clipDone = false
+  let designWas: View['settings']['design'] = 'classic' // schedule-title's: the design before it
   const cart = () => readFileSync(join(ws.cart.path, 'src/cart.js'), 'utf8')
   const checkout = () => join(ws.co.path, 'src/checkout.js')
   const steps: [string, (() => Promise<unknown>) | null, string | (() => Promise<boolean>)][] = [
@@ -100,14 +101,19 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
     ['board-sidebar', null, () => js<boolean>(`(([s, m]) => getComputedStyle(s).visibility === 'hidden' && s.getBoundingClientRect().width > 0 && Math.abs(s.getBoundingClientRect().height - m.getBoundingClientRect().height) < 2 && m.getBoundingClientRect().left < s.getBoundingClientRect().right)([document.querySelector('.sidebar'), document.querySelector('.main')])`)],
     ['schedule', link('laki://schedules'), '.sched-empty, .sched-row, .ghosts'],
     // a page's title large, then small in its glass head once scrolled past 40px (ui.tsx usePageTitle): room to scroll
-    // under it (the demo's few tasks fit), then 200px down: the frame's data-scrolled and the small title shown
-    // (Classic, the demo's, has no glass head: Soft for it, the large title shown at the top and the small one hidden first)
-    ['schedule-scrolled', async () => {
+    // under it (the demo's few tasks fit), then 200px down: the frame's data-scrolled and the small title shown, in any
+    // design (test:sheet's page of that name, each look's)
+    ['schedule-scrolled', () => js("(b => b && (b.style.paddingBottom = '100vh', b.scrollTop = 200))(document.querySelector('.settings-page > .page-body'))"), () => js<boolean>("(p => !!p?.hasAttribute('data-scrolled') && getComputedStyle(p.querySelector('.settings-head > .page-title-s')).opacity === '1')(document.querySelector('.settings-page'))")],
+    // the motion itself where the head is glass (Soft): at the top the large title and no small one, then the swap; the
+    // design that was set put back after
+    ['schedule-title', async () => {
+      designWas = (await rpc<View>('state')).settings.design ?? 'classic'
+      await js("document.querySelector('.settings-page > .page-body')?.scrollTo(0, 0)")
       await rpc('settingsSet', { design: 'soft' })
-      await waitFor(() => js<boolean>("(t => !!t && getComputedStyle(t).display === 'block' && getComputedStyle(document.querySelector('.settings-head > .page-title-s')).opacity === '0')(document.querySelector('.page-title-l'))"), 'its large title, the small one hidden')
-      await js("(b => b && (b.style.paddingBottom = '100vh', b.scrollTop = 200))(document.querySelector('.settings-page > .page-body'))")
+      await waitFor(() => js<boolean>("(t => !!t && getComputedStyle(t).display === 'block' && getComputedStyle(t).opacity === '1' && getComputedStyle(document.querySelector('.settings-head > .page-title-s')).opacity === '0')(document.querySelector('.page-title-l'))"), 'its large title, the small one hidden')
+      await js("document.querySelector('.settings-page > .page-body')?.scrollTo(0, 200)")
     }, () => js<boolean>("(p => !!p?.hasAttribute('data-scrolled') && getComputedStyle(p.querySelector('.settings-head > .page-title-s')).opacity === '1' && getComputedStyle(p.querySelector('.page-title-l')).opacity === '0')(document.querySelector('.settings-page'))")],
-    ['schedule-scrolled-off', () => rpc('settingsSet', { design: 'classic' }), async () => !(await has('.app[data-design]'))],
+    ['schedule-title-off', () => rpc('settingsSet', { design: designWas }), async () => (await rpc<View>('state')).settings.design === designWas],
     ['ai', link('laki://ai'), '.ai-page'],
     ['workflows', click('[data-rail="workflows"]'), '.wf-page, .sched-empty'],
     // place more: an extension's item in the foot's ⋯ menu, with Video, Meme and Timer (ui-smoke.ts' Docs)
@@ -372,7 +378,8 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
       await nap(500)
       await rpc('input', { tab: t, data: "printf '\\033]52;c;%s\\007' aGkgdGhlcmU=\r" })
       await answer('Allow')
-    }, async () => (clipDone ||= (await clipboard.readText()) === 'hi there' && (await hasText('.status .sb-say', 'Copied 1 line')) && (await clipboard.writeText(clipWas), true))], // checked twice: once put back, it stays done
+    }, async () => (clipDone ||= (await clipboard.readText()) === 'hi there' && (await hasText('.status .sb-say', 'Copied 1 line')))],
+    ['osc52-off', async () => clipWas !== undefined && (await clipboard.writeText(clipWas)), async () => clipWas === undefined || (await clipboard.readText()) === clipWas],
     // the phone (390×844): its bottom bar (five columns, each a finger's size, one lit, a capsule floating over the
     // bottom, in from both sides), nothing wider
     // than the screen; Projects opens the drawer over the whole width (the main area inert) with Needs you's counts, Esc

@@ -53,6 +53,8 @@ test('loop: the command normalized', () => {
   assert.equal(loopCmd(`cd '/Users/me/my app' && npm test`), 'npm test')
   assert.equal(loopCmd('cat /tmp/out-4821.log /var/folders/ab/T/x12/y'), 'cat /tmp/out-#.log /var/folders/ab/T/x#/y')
   assert.equal(loopCmd('sleep 30'), 'sleep 30', 'numbers outside temp paths stay')
+  assert.equal(loopCmd('cat /Users/me/app/tmp/run1.log'), 'cat /Users/me/app/tmp/run1.log', 'a tmp folder deeper in a path is no temp path')
+  assert.equal(loopCmd('X=/tmp/a1 make'), 'X=/tmp/a# make')
   const s = loopNew()
   loopFeed(s, fail('cd /a && npm  test', 'in /tmp/t-1/x'))
   loopFeed(s, fail('npm test', 'in /tmp/t-22/x'))

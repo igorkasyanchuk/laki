@@ -527,9 +527,9 @@ export function spinsUntil(tabs: TabView[], now = Date.now()) {
 }
 
 // Needs you (Needs.tsx), ⌘J and the bubbles: a done tab is stale once it's been done (needAt) staleAfter minutes
-// (settings.staleAfter; unset STALE_AFTER; 0 never); a waiting one never is
+// (settings.staleAfter; unset STALE_AFTER; 0 never); a waiting one never is, nor one looping (it's at work)
 export const STALE_AFTER = 30
-export const isStale = (t: TabView, after = STALE_AFTER, now = Date.now()) => t.status !== 'waiting' && after > 0 && !!t.needAt && now - t.needAt >= after * 60e3
+export const isStale = (t: TabView, after = STALE_AFTER, now = Date.now()) => t.status !== 'waiting' && !t.loop && after > 0 && !!t.needAt && now - t.needAt >= after * 60e3
 // waiting first, the oldest first (one with no time yet last); then done, the newest first: fresh ones, then stale ones
 export function needsSorted(tabs: TabView[], after = STALE_AFTER, now = Date.now()) {
   const oldest = (a: TabView, b: TabView) => (a.needAt ?? Infinity) - (b.needAt ?? Infinity)
