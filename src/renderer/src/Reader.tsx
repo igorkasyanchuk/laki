@@ -287,15 +287,16 @@ export function Reader({ tab, api, active, look = {} }: { tab: TabView; api: Rea
   // at most, the last change's read at the end of that wait (its final answer names the files it just made)
   const [known, setKnown] = useState<{ files: Set<string>; root?: string }>()
   const knownAt = useRef(0)
+  const mounted = useRef(true)
+  useEffect(() => ((mounted.current = true), () => void (mounted.current = false)), [])
   useEffect(() => {
     if (!api.files) return
-    let on = true
-    const read = () => ((knownAt.current = Date.now()), void api.files!(tab).then(r => on && setKnown({ files: new Set(r.files), root: r.root }), () => {}))
+    // a read in flight is kept as said grows (its messages load just after the first read), dropped only once it's gone
+    const read = () => ((knownAt.current = Date.now()), void api.files!(tab).then(r => mounted.current && setKnown({ files: new Set(r.files), root: r.root }), () => {}))
     const wait = 15000 - (Date.now() - knownAt.current)
     const t = wait > 0 ? setTimeout(read, wait) : (read(), undefined)
-    return () => ((on = false), clearTimeout(t))
+    return () => clearTimeout(t)
   }, [tab.id, said?.length])
-  useEffect(() => void (knownAt.current = 0), [tab.id])
   const fileRefs = useMemo(() => {
     if (!known || !api.openAt) return undefined
     const has = (p: string) => (q => (known.files.has(q) ? q : undefined))(known.root && p.startsWith(`${known.root}/`) ? p.slice(known.root.length + 1) : p.replace(/^\.\//, ''))

@@ -1796,6 +1796,7 @@ test("a chat's html block: Preview only for a whole page, sealed by a CSP in its
   assert.equal(sealed('<!doctype html><html><head>').match(/Content-Security-Policy/g)?.length, 1, 'one CSP only')
   assert.match(sealed('<html><a href="https://x.io">x</a>'), /^<html><meta [^>]+><base target="_blank">/, 'a link opens a popup the sandbox blocks: none followed')
   assert.doesNotMatch(sealed('<!doctype html><meta http-equiv="Refresh" content="0;url=https://x.io">'), /http-equiv="Refresh"/i, 'no meta refresh off to a site')
+  assert.doesNotMatch(sealed('<html><a href="https://x.io" target="_self">x</a><form target=f>'), /<(a|form) [^>]*\starget=/i, "a link's own target: the base's, so it isn't followed in the frame either")
 })
 
 test('#8: a path in an answer: in backticks or bare in prose, its line, never a URL or a sentence', async () => {
@@ -1818,6 +1819,7 @@ test('#5: project badges: two letters each, distinct across projects, a picked o
   const b = badgeLetters([{ id: 'a', name: 'orca' }, { id: 'b', name: 'orca-web' }, { id: 'c', name: 'ocean' }, { id: 'd', name: 'next.js' }, { id: 'e', name: 'mine', letters: 'OR' }, { id: 'f', name: '🛒' }])
   assert.deepEqual(Object.fromEntries(b), { e: 'OR', a: 'OC', b: 'OA', c: 'OE', d: 'NE', f: 'PA' })
   assert.equal(new Set(b.values()).size, b.size)
+  assert.equal(badgeLetters([{ id: 'u', name: 'мапа' }]).get('u'), 'МА', 'a name in another script: its own letters')
   const cs = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray']
   for (const id of ['a', 'shop', 'laki', 'x1', 'zz']) assert.ok(!['gray', 'brown'].includes(autoColor(id, cs)), id)
   assert.equal(autoColor('shop', cs), autoColor('shop', cs))
@@ -1832,4 +1834,5 @@ test("#3: an artifact's notes: the picker's message checked, one message for the
     artNotes('report.html', [{ ...p!, note: 'bigger  ' }, { n: 2, selector: 'td', html: '<td>\n 4 </td>', text: '', note: 'red' }]),
     'Notes on the artifact report.html (in $LAKI_STORAGE_FOLDER), each on one part of the page:\n1. `section#totals > h2` "Totals": bigger\n   <h2>Totals</h2>\n2. `td`: red\n   <td> 4 </td>',
   )
+  assert.match(artNotes('site/index.html', [{ ...p!, note: 'x' }], true), /^Notes on the page site\/index\.html \(in this workspace\),/, "a worktree's page: not in the storage folder")
 })

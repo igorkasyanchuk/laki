@@ -2088,7 +2088,7 @@ function useChanged(stat: (() => Promise<{ size: number; at?: number }>) | undef
 // #3: Comment on an HTML artifact (the viewer's and the gallery's): the page again with the picker (?pick=1, the daemon's:
 // shared/artPick.ts); a click on a part of it is a numbered mark here with your note, all of them sent to the agent in
 // one message (artNotes). page: an HTML page's address, else none (no Comment)
-function useArtComment(path: string, page: string | undefined, onComment?: (text: string) => Promise<unknown>) {
+function useArtComment(path: string, page: string | undefined, onComment?: (text: string) => Promise<unknown>, wt = false) {
   const [commenting, setCommenting] = useState(false)
   const [marks, setMarks] = useState<ArtMark[]>([])
   const [draft, setDraft] = useState<(Omit<ArtMark, 'note'> & { note: string }) | null>(null)
@@ -2112,7 +2112,7 @@ function useArtComment(path: string, page: string | undefined, onComment?: (text
     const all = draft?.note.trim() ? [...marks, draft] : marks // a note typed and not added yet goes too
     if (!onComment || !all.length || sending) return
     setSending(true)
-    onComment(artNotes(path, all)).then(() => (setMarks([]), setDraft(null), setCommenting(false)), () => {}).finally(() => setSending(false))
+    onComment(artNotes(path, all, wt)).then(() => (setMarks([]), setDraft(null), setCommenting(false)), () => {}).finally(() => setSending(false))
   }
   const pageNow = page && commenting ? `${page}${page.includes('?') ? '&' : '?'}pick=1` : page
   useEffect(() => (setCommenting(false), setMarks([]), setDraft(null)), [path])
@@ -2175,7 +2175,7 @@ export function ArtifactView({ path, page, read, stamp, wt, hosts, allow, onExte
   }
   useChanged(stamp, path, 1500, () => setN(x => x + 1))
   const [menu, openMenu] = useMenu()
-  const cm = useArtComment(path, html ? page : undefined, onComment)
+  const cm = useArtComment(path, html ? page : undefined, onComment, wt)
   return (
     <Modal title={path} onClose={onClose} wide loose>
       {menu}

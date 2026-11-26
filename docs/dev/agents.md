@@ -6,7 +6,7 @@ Settings › *Agents & profiles* (the code's word stays *preset*): each preset c
 the tab's own, from the new-workspace page, wins), for claude and codex `perm` and `fast` (likewise; below; a worker an
 agent starts with no `perm` takes its lead's mode now, core.ts `leadMode` (#6): the footer's, else its own, where the
 worker's agent has it, never one that never asks or that leaves a sandbox its profile keeps; `permFrom` names the lead,
-kept in `pending` for a later start; TabBar's tip says it), and
+kept in `pending` for a later start; TabBar's tip says it started in that mode, a ⇧⇥ since being the footer's), and
 `account`. `daemon/accounts.ts`: an
 `Account` (`settings.accounts`, only through `accountAdd`/`accountSet`/`accountRm`: `settingsSet` drops `accounts`, so an
 import never brings folders) is a folder `<data>/accounts/<agent>-<id>` given as `CLAUDE_CONFIG_DIR` / `CODEX_HOME`

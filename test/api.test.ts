@@ -530,6 +530,8 @@ test("#5: a project's badge: its repo's logo as a picture (or none), letters of 
   assert.equal((await view()).picture, false)
   assert.equal((await view()).letters, 'SH')
   await assert.rejects(rig.rpc('projectSet', { id: p.id, letters: 'abc' }), /one or two letters or digits/)
+  await rig.rpc('projectSet', { id: p.id, letters: 'жк' })
+  assert.equal((await view()).letters, 'ЖК', 'letters of any script')
   await rig.rpc('projectSet', { id: p.id, picture: true, letters: '' })
   assert.match((await view()).picture, /^data:image/)
   assert.equal((await view()).letters, undefined)

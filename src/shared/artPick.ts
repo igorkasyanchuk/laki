@@ -36,7 +36,7 @@ export const ART_PICK = `<script>(() => {
     m.textContent = String(++n)
     m.style.left = r.left + scrollX + 'px'
     m.style.top = Math.max(0, r.top + scrollY - 9) + 'px'
-    document.body.appendChild(m)
+    document.documentElement.appendChild(m)
     parent.postMessage({ laki: 'artPick', n, selector: sel(el), html: el.outerHTML.replace(/ class=""/g, '').slice(0, 2000), text: (el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 200) }, '*')
     el.classList.add('__laki-over')
   }, true)
@@ -47,15 +47,17 @@ export const ART_PICK = `<script>(() => {
   })
 })()</script>`
 
-// the page with the picker: at its end (after </html> is fine: the parser takes it into the body)
-export const withPick = (html: string) => html + ART_PICK
+// main.ts adds it at the page's end (after </html> is fine: the parser takes it into the body), to its bytes as they are
+// (a page in another charset than UTF-8 too: the picker is ASCII). Its marks go under <html>, outside the body: placed
+// in page coordinates (a positioned body would move them) and never in a picked part's words or markup
 
 export type ArtMark = { n: number; selector: string; html: string; text: string; note: string }
-// what goes to the agent: the file, then each note by its number, the element's selector and words, its markup cut short
-export function artNotes(path: string, marks: ArtMark[]) {
+// what goes to the agent: the file, then each note by its number, the element's selector and words, its markup cut short;
+// wt: a file of the worktree (View as page), not an artifact
+export function artNotes(path: string, marks: ArtMark[], wt = false) {
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s)
   return [
-    `Notes on the artifact ${path} (in $LAKI_STORAGE_FOLDER), each on one part of the page:`,
+    `Notes on ${wt ? `the page ${path} (in this workspace)` : `the artifact ${path} (in $LAKI_STORAGE_FOLDER)`}, each on one part of the page:`,
     ...marks.map(m => `${m.n}. \`${m.selector}\`${m.text ? ` "${cut(m.text, 80)}"` : ''}: ${m.note.trim()}\n   ${cut(m.html.replace(/\s+/g, ' '), 300)}`),
   ].join('\n')
 }

@@ -1,7 +1,7 @@
 // The terminal host: owns PTYs, state and scans; outlives the app. Reached over 127.0.0.1 only:
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
-import { withPick } from '../shared/artPick.ts'
+import { ART_PICK } from '../shared/artPick.ts'
 import './starterEnv.ts' // first: the starter's git and npm variables gone before any module reads process.env
 import { earlyHost } from './ptyEarly.ts' // second: the pty host starting beside the daemon's other modules as they load
 import { execFileSync } from 'node:child_process'
@@ -485,7 +485,7 @@ function artifactPage(path: string, origin: string | undefined, host: string | u
     'x-content-type-options': 'nosniff',
     ...(origin === 'null' && !(wt ? /^(text\/html|application\/json)/ : /^text\/html/).test(ART_TYPES[extname(file).toLowerCase()] ?? '') && { 'access-control-allow-origin': 'null' }), // its page's module scripts and fonts: CORS loads, from its opaque origin (sandboxed: Origin null)
   })
-  res.end(pick && /^text\/html/.test(ART_TYPES[extname(file).toLowerCase()] ?? '') ? withPick(body.toString('utf8')) : body)
+  res.end(pick && /^text\/html/.test(ART_TYPES[extname(file).toLowerCase()] ?? '') ? Buffer.concat([body, Buffer.from(ART_PICK)]) : body)
 }
 
 // ---------- the API: same methods over HTTP and WebSocket

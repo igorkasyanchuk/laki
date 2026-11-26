@@ -1203,7 +1203,7 @@ export const wholePage = (s: string) => /^\s*(<!doctype html|<html[\s>])/i.test(
 // the frame's sandbox runs no script; a link opens a new window (the base's target), a popup the sandbox blocks: none
 // followed. The parser puts a <meta> after a doctype or <html> in a head
 export const sealed = (s: string) =>
-  s.replace(/http-equiv\s*=\s*(["']?)refresh\1/gi, 'data-refresh').replace(/<!doctype html[^>]*>|<html[^>]*>|<head[^>]*>/i, m => `${m}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"><base target="_blank">`)
+  s.replace(/http-equiv\s*=\s*(["']?)refresh\1/gi, 'data-refresh').replace(/(<(?:a|area|form)\b[^>]*?\s)target\s*=/gi, '$1data-target=').replace(/<!doctype html[^>]*>|<html[^>]*>|<head[^>]*>/i, m => `${m}<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:"><base target="_blank">`)
 
 // #8: a file's path as an agent writes it: src/app.ts, ./a/b.md, src/app.ts:42 (:42:7), src/app.ts#L42, an absolute
 // one (/Users/me/app/src/a.ts: the Reader maps it into the workspace); a bare name only with an extension (app.ts).
@@ -1225,7 +1225,7 @@ export function badgeLetters(ps: { id: string; name: string; letters?: string }[
   for (const p of ps) if (p.letters) out.set(p.id, p.letters), taken.add(p.letters)
   for (const p of ps) {
     if (out.has(p.id)) continue
-    const w = p.name.toUpperCase().match(/[A-Z0-9]/g) ?? ['P']
+    const w = p.name.toUpperCase().match(/[\p{L}\p{N}]/gu) ?? ['P']
     const tries = [w.slice(0, 2).join(''), ...w.slice(2).map(c => w[0] + c), ...[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'].map(c => w[0] + c)]
     const l = tries.find(x => x.length === 2 && !taken.has(x)) ?? w[0]
     out.set(p.id, l)

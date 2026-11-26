@@ -123,7 +123,8 @@ function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: Fil
   useEffect(() => {
     const f = () => setIgn(load('laki.filesIgnored', false))
     window.addEventListener('laki-ignored', f)
-    return () => window.removeEventListener('laki-ignored', f)
+    window.addEventListener('storage', f) // another window's (the floated side panel's, or the app's)
+    return () => (window.removeEventListener('laki-ignored', f), window.removeEventListener('storage', f))
   }, [])
   const showIgn = !art && ign
   const [d, err, reload] = useLoad(art?.files ?? (() => api.files(showIgn ? { ignored: true } : undefined)), `${ws}:${art ? 'art' : 'ws'}:${showIgn}`, 8000)

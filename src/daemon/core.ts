@@ -1649,7 +1649,7 @@ export function projectSet(ref: string, o: { muted?: boolean; name?: string; con
   if (o.color !== undefined && !['', 'none', ...TAB_COLORS].includes(o.color)) throw new Error(`${o.color} isn't a color: one of ${TAB_COLORS.join(', ')}`)
   if (o.icon !== undefined && o.icon !== '' && !isIconName(o.icon) && !emojiOf(o.icon)) throw new Error("a project's icon is an icon's name or an emoji")
   const letters = o.letters === undefined ? undefined : String(o.letters).trim().toUpperCase()
-  if (letters && !/^[A-Z0-9]{1,2}$/.test(letters)) throw new Error("a project's badge is one or two letters or digits")
+  if (letters && !/^[\p{L}\p{N}]{1,2}$/u.test(letters)) throw new Error("a project's badge is one or two letters or digits")
   if (o.color !== undefined) p.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.icon !== undefined) p.icon = isIconName(o.icon) ? o.icon : emojiOf(o.icon)
   // #5: its badge: two letters or digits of yours ('' its own again), its repo's picture or not
@@ -1969,6 +1969,8 @@ export async function projectNew(name: unknown, into?: unknown): Promise<Project
     for (const x of made ? [dest] : [join(dest, '.git'), join(dest, 'README.md')]) rmSync(x, { recursive: true, force: true }) // half made: none, an empty folder of yours as it was
     throw new Error(`new project failed: ${firstLine(e)}`)
   }
+  const had = state.projects.find(p => !p.host && !p.kind && p.git === false && p.path === realpathSync(dest)) // that empty folder added before: a plain folder until now
+  if (had) had.git = true
   return projectAdd(dest)
 }
 
