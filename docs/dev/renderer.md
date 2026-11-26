@@ -312,8 +312,9 @@ are tested in `test/units-more.test.ts`.
     checks a red mark of their own before it, `.ws-pr.ci`, as conflicts get theirs: a red GitHub mark is a closed PR),
     unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`), or their own `icon` in
     their `color` (ui.tsx `ProjectMark`, `.p-mark`: an emoji with a line in it; none (#5): the view's `picture`, the
-    daemon's `pictureOf`, else `.p-letters`, `setBadges`' `badgeLetters` on `autoColor`; a click on the sidebar's badge:
-    `projectActions(p, true)`, `badgeItems`; also the new-workspace page's project
+    daemon's `pictureOf` (a new Rails app's red-circle stand-in skipped: `PLACEHOLDERS`), else `.p-letters`, `setBadges`'
+    `badgeLetters` on `autoColor`; a click on the sidebar's badge: `projectActions(p, true)`, `badgeItems`: what it shows,
+    that one checked, a pick making it shown, then the color of its letters or icon (*Color: auto*: the auto one picked); also the new-workspace page's project
     menu (a menu item's `mark`), the palette's workspaces and tabs (`PaletteItem` `mark`), Settings' nav, a rail pin's
     corner); App's `tint`: a workspace's color, else its project's (the peek card, rail pins, the bubbles).
   - A project's workspaces are in `.project-ws` (indented on a guide line; a line between projects). Rows are inset and

@@ -533,4 +533,14 @@ test("#5: a project's badge: its repo's logo as a picture (or none), letters of 
   await rig.rpc('projectSet', { id: p.id, picture: true, letters: '' })
   assert.match((await view()).picture, /^data:image/)
   assert.equal((await view()).letters, undefined)
+
+  // a new Rails app's public/icon.svg (a plain red circle in every one) is a stand-in: its favicon instead, else none
+  const rails = join(rig.home, 'rails-app')
+  mkdirSync(join(rails, 'public'), { recursive: true })
+  writeFileSync(join(rails, 'public/icon.svg'), '<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">\n  <circle cx="256" cy="256" r="256" fill="red"/>\n</svg>\n')
+  writeFileSync(join(rails, 'public/favicon-32x32.png'), 'png')
+  execFileSync('git', ['init', '-q'], { cwd: rails })
+  const r = await rig.rpc('projectAdd', { path: rails })
+  const pic = (await rig.rpc('state')).projects.find((x: { id: string }) => x.id === r.id).picture
+  assert.equal(pic, `data:image/png;base64,${Buffer.from('png').toString('base64')}`)
 })

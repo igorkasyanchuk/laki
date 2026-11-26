@@ -1088,7 +1088,9 @@ function wsView(w: Workspace) {
 // and (B6) the memory and notes in its checkout
 // #5: a project's picture for its badge: the repo's own logo or favicon (an SVG or PNG of 12 KB at most, the first of
 // PICTURES there), as a data URL. ponytail: read once per project and daemon start (a logo added later shows after a restart)
-const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg', 'favicon.png', 'public/favicon.svg', 'public/favicon.png', 'public/logo.svg', 'public/logo.png', 'public/icon.svg', 'app/icon.svg', 'app/icon.png', 'src/app/icon.svg', 'src/app/icon.png', 'static/favicon.svg', 'static/favicon.png', 'assets/logo.svg', 'assets/logo.png', 'docs/logo.svg', 'docs/logo.png', '.github/logo.svg', '.github/logo.png', 'build/icon.png', 'resources/icon.png']
+const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg', 'favicon.png', 'public/favicon.svg', 'public/favicon.png', 'public/favicon-32x32.png', 'public/logo.svg', 'public/logo.png', 'public/apple-touch-icon.png', 'public/icon.svg', 'public/icon.png', 'app/icon.svg', 'app/icon.png', 'src/app/icon.svg', 'src/app/icon.png', 'static/favicon.svg', 'static/favicon.png', 'assets/logo.svg', 'assets/logo.png', 'docs/logo.svg', 'docs/logo.png', '.github/logo.svg', '.github/logo.png', 'build/icon.png', 'resources/icon.png']
+// a new Rails app's public/icon.svg and icon.png: a plain red circle in every one, never the repo's own (its favicon is)
+const PLACEHOLDERS = new Set(['ba7398f28422ebe3abbaf1f677afae671c5a65e7', '52f3bfec2798e4cb7ef3e4814ad6e5adb1e71269'])
 const pictures = new Map<string, string>()
 export function pictureOf(p: Project) {
   if (p.host || p.kind || p.git === false) return ''
@@ -1099,7 +1101,9 @@ export function pictureOf(p: Project) {
       try {
         const st = statSync(join(p.path, f), { throwIfNoEntry: false })
         if (!st?.isFile() || st.size > 12 << 10 || !st.size) continue
-        got = `data:image/${f.endsWith('.svg') ? 'svg+xml' : 'png'};base64,${readFileSync(join(p.path, f)).toString('base64')}`
+        const b = readFileSync(join(p.path, f))
+        if (PLACEHOLDERS.has(createHash('sha1').update(b).digest('hex'))) continue // a framework's stand-in, not the repo's
+        got = `data:image/${f.endsWith('.svg') ? 'svg+xml' : 'png'};base64,${b.toString('base64')}`
         break
       } catch {}
     pictures.set(p.path, got)

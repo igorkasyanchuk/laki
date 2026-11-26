@@ -717,6 +717,8 @@ export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(
 // distinct across your projects (App sets them from each view: setBadges)
 let badges = new Map<string, string>()
 export const setBadges = (ps: { id: string; name: string; letters?: string }[]) => void (badges = badgeLetters(ps))
+// the two letters its badge shows: yours, else its own
+export const lettersOf = (p: { id: string; name: string; letters?: string }) => p.letters || badges.get(p.id) || badgeLetters([{ id: p.id, name: p.name }]).get(p.id)!
 export function ProjectMark({ p, size = 12, or }: { p?: { id?: string; name?: string; icon?: string; color?: string; letters?: string; picture?: string | false; kind?: string }; size?: number; or?: IconName }) {
   const i = p?.icon
   const e = emojiOf(i)
@@ -727,7 +729,7 @@ export function ProjectMark({ p, size = 12, or }: { p?: { id?: string; name?: st
     if (typeof p.picture === 'string' && p.picture) return <img className="p-mark p-pic" src={p.picture} alt="" width={px} height={px} aria-hidden />
     return (
       <span className="p-mark p-letters" style={{ ...colorVar(p.color || autoColor(p.id, TAB_COLORS)), width: px, height: px, fontSize: px * 0.56 }} aria-hidden>
-        {p.letters || badges.get(p.id) || badgeLetters([{ id: p.id, name: p.name }]).get(p.id)}
+        {lettersOf({ id: p.id, name: p.name, letters: p.letters })}
       </span>
     )
   }

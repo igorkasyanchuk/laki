@@ -2,8 +2,8 @@
 // from what appCtx.ts says it reads.
 import { type AppBase, colorOf, WEB, wsName } from './appCtx'
 import { type TabView, type WorkspaceView, againOnEnter, capSpent, capText, FOLD_AFTER, HOME_ACCOUNT, type Project } from '../../shared/types'
-import { ask, type MenuItem, ON, iconItems, TAB_COLORS, askText, type IconName } from './ui'
-import { isPage, pendingWords, shortPath } from './text'
+import { ask, type MenuItem, ON, iconItems, TAB_COLORS, askText, type IconName, lettersOf } from './ui'
+import { autoColor, isPage, pendingWords, shortPath } from './text'
 import { isIconName } from '../../shared/icons'
 import { tabsOf, move } from '../../shared/layout'
 import { modeItems, readable } from './Reader'
@@ -185,13 +185,25 @@ export function menusOf(app: AppBase) {
     if (name === null || name.trim() === p.name) return
     call('projectSet', { id: p.id, name: name.trim() }).then(() => done(name.trim() ? `Renamed to ${name.trim()}` : "Named after its folder again"), () => {})
   }
-  // #5: its badge's own menu (a click on it in the sidebar): its color, letters, an icon or emoji, its repo's picture
-  const badgeItems = (p: Project): MenuItem[] => [
-    { colors: TAB_COLORS, value: p.color, pick: c => call('projectSet', { id: p.id, color: c }) },
-    { label: 'Letters…', icon: 'pencil', hint: p.letters, tip: 'One or two letters or digits on its color', run: () => void askText(`${p.name}'s badge`, { text: 'One or two letters or digits. Empty: its own again.', value: p.letters ?? '', placeholder: 'OR', ok: 'Set' }).then(x => x !== null && call('projectSet', { id: p.id, letters: x })) },
-    ...iconItems(p.icon, icon => call('projectSet', { id: p.id, icon: icon ?? '' })),
-    ...(typeof p.picture === 'string' ? [{ label: 'No picture: its letters', icon: 'x', tip: "Its repo's logo or favicon out of its badge", run: () => call('projectSet', { id: p.id, picture: false }) } as MenuItem] : p.picture === false ? [{ label: "Its repo's picture", icon: 'image', tip: 'Its logo or favicon as its badge again', run: () => call('projectSet', { id: p.id, picture: true }) } as MenuItem] : []),
-  ]
+  // #5: its badge's own menu (a click on it in the sidebar): what it shows, the one shown checked (an icon or emoji,
+  // else its repo's picture, else its letters: ui.tsx ProjectMark's order), each pick making that one shown; then the
+  // color of its letters or icon (letters with none picked: the auto one, shown picked). A picture keeps its own colors
+  const badgeItems = (p: Project): MenuItem[] => {
+    const set = (o: { icon?: string; picture?: boolean; letters?: string; color?: string }) => call('projectSet', { id: p.id, ...o })
+    const pic = typeof p.picture === 'string' && !!p.picture
+    const shows = p.icon ? (isIconName(p.icon) ? 'icon' : 'emoji') : pic ? 'picture' : 'letters'
+    const own = lettersOf(p)
+    type Item = Extract<MenuItem, { label: string }>
+    const [icon, emoji] = iconItems(p.icon, i => set({ icon: i ?? '' })) as Item[] // its No icon left out: a pick here is the other
+    return [
+      { head: 'Its badge shows' },
+      ...(p.picture !== undefined ? [{ label: "Its repo's picture", icon: 'image', hint: shows === 'picture' ? ON : undefined, tip: 'Its logo or favicon, as found in the repo', run: () => set({ icon: '', picture: true }) } as MenuItem] : []),
+      { label: `Letters: ${own}…`, icon: 'pencil', hint: shows === 'letters' ? ON : undefined, tip: 'One or two letters or digits on its color', run: () => void askText(`${p.name}'s badge`, { text: `One or two letters or digits. Empty: its own${p.letters ? '' : ` (${own})`}.`, value: p.letters ?? '', placeholder: own, ok: 'Set' }).then(x => x !== null && set({ letters: x, icon: '', ...(pic && { picture: false }) })) },
+      { ...icon, hint: shows === 'icon' ? ON : undefined },
+      { ...emoji, hint: shows === 'emoji' ? ON : undefined },
+      ...(shows === 'picture' ? [] : [{ head: shows === 'letters' && !p.color ? 'Color: auto' : 'Color' } as MenuItem, { colors: TAB_COLORS, value: p.color || (shows === 'letters' ? autoColor(p.id, TAB_COLORS) : undefined), pick: (c: string) => set({ color: c }) } as MenuItem]),
+    ]
+  }
   const projectActions = (p: Project, badge?: boolean): MenuItem[] => {
     if (badge) return badgeItems(p)
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
