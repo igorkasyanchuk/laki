@@ -5,6 +5,8 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 
 ## Next
 
+- Frosted's menus, dialogs and toasts let the window's glass through more, by Glass › Strength (solid under Reduce transparency).
+- On Linux, Settings › Updates says when a newer Laki is out and that you replace the AppImage with it.
 - A huge SQLite table opens at once, its count shown as *10,000+ rows*, and a shell tab's screen brought back after a restart starts at a whole line, with no stray characters at its top.
 - Laki starts without waiting on the Keychain one value at a time, and an `X-Laki-Key` webhook may send `X-Laki-Timestamp` and `X-Laki-Id` so a copy of a request runs nothing.
 - The daemon's log is cut back past 10 MB every half hour while it runs, not every hour.

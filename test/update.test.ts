@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parseLink } from '../src/renderer/src/links.ts'
-import { BACK_FREE, backOf, backRefused, feedName, feedOf, heldUntil, keepWhy, newer, notesOf, RELEASES, releaseOf, STATE_V, verdict } from '../src/shared/update.ts'
+import { BACK_FREE, backOf, backRefused, feedName, feedOf, heldUntil, keepWhy, newer, notesOf, outLine, RELEASES, releaseOf, STATE_V, verdict } from '../src/shared/update.ts'
 
 test('newer: numbers by part, a pre-release before its release, a leading v', () => {
   assert.equal(newer('0.25.0', '0.24.0'), true)
@@ -125,4 +125,10 @@ test('#G1 Go back: a copy kept only by the packaged Mac app with 1 GB free; refu
   assert.deepEqual(backOf({ version: '0.63.0', stateV: STATE_V }), { version: '0.63.0' })
   assert.deepEqual(backOf({ version: '0.63.0', stateV: STATE_V - 1 }), { version: '0.63.0', newerData: true })
   assert.deepEqual(backOf({ version: '0.63.0' }), { version: '0.63.0', newerData: true })
+})
+
+test("outLine: a newer release's line in Settings › Updates; on Linux, replace the AppImage (no self-update there)", () => {
+  assert.equal(outLine('0.67.0', 'darwin'), 'Laki 0.67.0 is out')
+  assert.equal(outLine('0.67.0', ''), 'Laki 0.67.0 is out')
+  assert.equal(outLine('0.67.0', 'linux'), 'Laki 0.67.0 is out: download it and replace this AppImage')
 })

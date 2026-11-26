@@ -12,7 +12,7 @@ import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRe
 import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
-import { RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
+import { outLine, RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
@@ -732,7 +732,7 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
     : u.status === 'downloading' ? `Downloading ${l?.version}…`
     : u.status === 'ready' ? `${l?.version} is downloaded: restart to finish. Your agents keep running.`
     : u.status === 'error' ? u.error
-    : l ? `Laki ${l.version} is out`
+    : l ? outLine(l.version, /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent) ? 'linux' : '')
     : u.passed ? `Laki ${u.passed} is out: you skipped it, so the next one is offered`
     : u.held ? `Laki ${u.held.version} is out: offered on ${new Date(u.held.until).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, by your update delay`
     : u.checked ? `Up to date · checked ${ago(u.checked)}`

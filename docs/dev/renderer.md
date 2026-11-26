@@ -881,7 +881,8 @@ are tested in `test/units-more.test.ts`.
   anything else regular; Reduce transparency: regular) is where `--surface-a` starts (`surfaceAlpha`'s and `glassInk`'s
   `from`) and `html[data-glass-level]`'s `--glass-blur` (Clear 30px, Regular 24, Tinted 20; `--surface-blur` and
   `--cap-blur` from it); glass's capsules and Frosted's menus and tips follow `--surface-a` (+18%, +22%, +24%: Regular's
-  90, 94, 96) rather than an alpha of their own. An agent may set it (gates.ts `AGENT_SETTINGS_OK`); Reset the
+  90, 94, 96) rather than an alpha of their own; Frosted's menus, dialogs and toasts in a glass window share it more
+  (+8%: Regular 80, Clear 64, Tinted 96; no blur of their own; Reduce transparency or no glass: the +22%). An agent may set it (gates.ts `AGENT_SETTINGS_OK`); Reset the
   interface drops it. and `glassGrain` (on unless false) `html.grain`: styles.css' `::after` of `--glass-grain` (a 120px SVG noise tile; not `--grain`, which the Noir, Workshop and E-Ink looks set as their own texture)
   at `--grain-a` (0.04, `html.light` 0.03), `overlay` (`soft-light` on a light theme), under the text of the floating
   surfaces (`.menu`, `.modal`, `.finder`, `.toast`: isolated, `z-index: -1`) and the splash, over the sidebar's and the

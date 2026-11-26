@@ -223,4 +223,10 @@ test("Glass › Strength: clear, regular and tinted start at 56, 72 and 88%; any
   for (const rule of ['html:is(.opaque, .glass-full) { --surface-bg: var(--panel); --surface-blur: none; }', 'html:is(.opaque, .glass-full) .edge-blur::before, html:is(.opaque, .glass-full) .edge-blur::after { display: none; }']) assert.ok(css.includes(rule), rule)
   assert.doesNotMatch(css, /html:is\(\.opaque, \.glass\)|html\.lens:not\(\.opaque, \.glass,/, 'no blur off for every glass')
   assert.match(css, /\.term-wrap \.capsule \{ --cap-blur: none;/, 'never a blur over a terminal')
+  // Frosted's floats in glass: by --surface-a (whose text the test above reads), more than it, never a fixed alpha;
+  // solid under Reduce transparency (the media query), and no backdrop-filter of their own
+  const frosted = readFileSync(new URL('../src/renderer/src/looks/frosted.css', import.meta.url), 'utf8')
+  assert.match(frosted, /@media \(prefers-reduced-transparency: no-preference\) \{\n {2}\[data-look='frosted'\]\.glass :is\(\.menu, \.modal, \.tunnel-pop, \.toast\) \{ background: color-mix\(in srgb, var\(--panel\) min\(100%, calc\(var\(--surface-a\) \+ \d+%\)\), transparent\); \}/)
+  assert.doesNotMatch(frosted, /:is\(\.menu, \.modal, \.tunnel-pop, \.toast\) \{[^}]*backdrop-filter/, 'no blur of their own')
+  assert.match(frosted, /\.glass:not\(\.vibrant\) \.app\[data-dz\] :is\(\.rail, \.sidebar, \.side-strip\) \{ backdrop-filter: blur\(var\(--sp-6\)\) saturate\(1\.6\); \}/, "the rail's blur stays")
 })

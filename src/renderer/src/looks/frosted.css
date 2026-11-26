@@ -145,7 +145,13 @@
 [data-look='frosted'] select:not([multiple], [size]):hover { background-color: var(--f-fill-up); }
 [data-look='frosted'] kbd { border-radius: var(--rs, 5px); border-color: var(--f-edge); background: var(--f-fill); }
 /* what floats: near solid, big soft corners, a menu's choice in the accent as on a Mac */
-[data-look='frosted'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--f-edge); background: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 22%)), transparent); /* near solid, by Glass › Strength (Regular: 94%) */ box-shadow: inset 0 1px 0 var(--f-hi), 0 0 0 0.5px rgb(0 0 0 / 0.25), 0 24px 70px var(--f-drop); }
+[data-look='frosted'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--f-edge); background: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 22%)), transparent); /* near solid (Regular: 94%): no glass, or Reduce transparency */ box-shadow: inset 0 1px 0 var(--f-hi), 0 0 0 0.5px rgb(0 0 0 / 0.25), 0 24px 70px var(--f-drop); }
+/* the window's glass: the floats share it by Glass › Strength (--surface-a + 8%: Regular 80%, Clear 64%, Tinted 96%;
+   --surface-a's text reads over the worst desktop, test/contrast.test.ts), no blur of their own (the window's is native).
+   Reduce transparency, or no glass: near solid, as above */
+@media (prefers-reduced-transparency: no-preference) {
+  [data-look='frosted'].glass :is(.menu, .modal, .tunnel-pop, .toast) { background: color-mix(in srgb, var(--panel) min(100%, calc(var(--surface-a) + 8%)), transparent); }
+}
 [data-look='frosted'] .menu { border-radius: var(--rs, 13px); }
 [data-look='frosted'] :is(.modal, .tunnel-pop) { border-radius: var(--rs, 16px); }
 [data-look='frosted'] .toast { border-radius: var(--rs, 13px); }

@@ -5,7 +5,7 @@
 // tab comes back with no terminal behind it (restoreNow), that screen goes into the new one first, dimmed, then a line
 // with when it was, then its shell. A tab closed for good, or gone, takes its file with it (the next save's prune)
 // The tail is cut at a line's start (screenTail: past the first \n after the cut, so no half escape sequence or character
-// is left at its top), and its replay starts with a reset (\x1b[0m: colors set before the cut are gone)
+// is left at its top; one long line: past a cut character and escape), and its replay starts with a reset (\x1b[0m: colors set before the cut are gone)
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeAtomic } from '../shared/conn.ts'
@@ -40,14 +40,18 @@ export function screensSave(all = false) {
   } catch {}
 }
 // SCREEN_MAX bytes at most: a longer one's tail from the first line that starts after the cut (none: from its first
-// whole character)
+// whole character, past what's left of an escape sequence the cut went through)
 export function screenTail(text: string, max = SCREEN_MAX) {
   const buf = Buffer.from(text)
   if (buf.length <= max) return text
   const tail = buf.subarray(buf.length - max)
   const nl = tail.indexOf(10)
   let at = nl + 1
-  if (nl < 0) while (at < tail.length && (tail[at] & 0xc0) === 0x80) at++ // no line break: past a cut character's rest
+  if (nl < 0) {
+    while (at < tail.length && (tail[at] & 0xc0) === 0x80) at++ // no line break: past a cut character's rest
+    const cut = /^(?:\[?[0-9;:?]+[A-Za-z@~]|\[m)/.exec(tail.subarray(at, at + 40).toString('latin1')) // and a cut escape's rest (`[38;5;1m`, `;1m`, `[m`), not text's `[INFO]`
+    if (cut) at += cut[0].length
+  }
   return tail.subarray(at).toString()
 }
 export const screenForget = (id: string) => (rmSync(fileOf(id), { force: true }), savedAt.delete(id))

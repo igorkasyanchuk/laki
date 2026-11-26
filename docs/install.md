@@ -59,6 +59,7 @@ npm link                          # optional: the laki CLI
 `npm run pack:linux` builds `dist/linux/Laki-<version>-<arch>.AppImage` in Docker and tests it there (`ARCH=x64` for
 Intel/AMD). [The guide](guide.md#linux-and-windows-through-wsl) says how to run it; on a server with no screen,
 [headless](headless.md).
+It doesn't update itself: Settings › General › Updates says when a newer one is out, and you replace the AppImage.
 
 ## If something's off
 

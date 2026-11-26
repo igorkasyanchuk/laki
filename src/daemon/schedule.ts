@@ -396,6 +396,7 @@ function orphans(s: Schedule, how: 'deleted' | 'archived', ok?: unknown) {
 }
 // a run ended (its state, or a failed start with no retry waiting): the tasks waiting on its task, once per run
 function afterEnded(r: ScheduleRun) {
+  if (safeOn()) return // safe mode: none starts on its own (safe.ts)
   const st: RunState | undefined = r.state ?? (!r.ok && r.retry === undefined && !r.skipped && !r.what.startsWith('skipped:') ? 'failed' : undefined)
   if (!st || st === 'running' || st === 'waiting') return
   for (const d of waiters(r.schedule).filter(x => x.on && !x.archived && x.afterRun !== r.id && (x.after!.when === 'any' || st === 'done'))) {
@@ -651,6 +652,7 @@ let eventBusy = false
 // a signed webhook (inbound.ts, after its signature, replay and rate checks): each task on it (and on its event, when it
 // names one) runs as an event's would, its gap and runs a day kept; a hook of a project's only that project's tasks
 export function scheduleHook(name: string, event: string, body: unknown, project?: string, now = Date.now()) {
+  if (safeOn()) return void log(`webhook ${name}: safe mode, no scheduled task starts`) // safe.ts
   const text = (typeof body === 'string' ? body : JSON.stringify(body, null, 1)).slice(0, HOOK_BODY)
   for (const s of state.schedules ?? []) {
     const t = s.trigger

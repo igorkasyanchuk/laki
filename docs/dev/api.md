@@ -60,12 +60,14 @@ agents call* (SettingsAgents.tsx `AgentCalls`). Tested in `test/tool-days.test.t
   last 3 all neither alive nor clean: `safe { since, suspects }`, kept in the file until the user leaves it (a restart
   doesn't end it), in the view as `safe`. While safe, these return at once: `widgetRun`, `widgetTick`, `factsTick`,
   `widgetEvent`'s handlers and workflow starts (the event is still logged), `scheduleTick`, `eventTick`, `pendingTick`,
+  `scheduleHook` (a webhook's tasks), `afterEnded` (a task after another's run),
   `flowTick` and `flowResume` (`resumeLater`: flowTick resumes once it's off), `scanPorts` (after `syncBranches` and
   the artifacts), `prTick`, `scanPRs`, `gitTidyTick`. Extensions' gates still run (they hold Ship and Merge). A test's
   daemon (`inRig`) is exempt unless `LAKI_SAFE_TEST=1`. `safeOff { without?, now? }` (AGENT_NO, REMOTE_NO, ANSWER_NO):
   `without` turned off first (`widgetSet` on false, `scheduleSet` on false, or `flowPause`), then safe cleared and
   `scheduleTick`, `pendingTick`, `widgetTick` run now. MainArea.tsx's banner: *Turn on without* and the name, per
-  suspect, *Turn everything on*. Tested in `test/safe.test.ts`.
+  suspect, *Turn everything on* (Laki's window only: over remote access it says to turn it on from the Mac). Tested in
+  `test/safe.test.ts`.
 
 - when everything is done (`settings.whenDone`: sleep, lock, shutdown; unset or off: nothing; Settings › Git &
   worktrees' *When everything is done*): core.ts `whenDone` at each view, beside `keepAwake`: armed by something going

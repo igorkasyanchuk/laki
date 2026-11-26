@@ -121,11 +121,12 @@ export function keyRead(name: string, path: string): string {
   const k = kept.get(name)
   if (k !== undefined && !((retry.get(name) ?? Infinity) < Date.now())) return k
   retry.delete(name)
+  const pre = warm.has(name) ? { got: warmed(name) } : undefined // kcWarm's answer: taken whichever way this goes
   let v = fileOf(path)
   if (!keychainOn()) where.set(name, 'file')
   else if (v) kcSet(name, v) ? (rmSync(path, { force: true }), where.set(name, 'Keychain')) : where.set(name, "file (the Keychain didn't take it)")
   else {
-    const got = warm.has(name) ? warmed(name) : kcGet(name)
+    const got = pre ? pre.got : kcGet(name)
     if (got === undefined) where.set(name, "file (the Keychain didn't answer)"), retry.set(name, Date.now() + RETRY())
     else if (got.startsWith(WRAP)) {
       // wrapped: '' until the app unwraps it (now, if its window is open)

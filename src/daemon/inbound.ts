@@ -97,7 +97,7 @@ export function signed(kind: InHook['kind'], secret: string, raw: Buffer, h: Inc
 // S11: a signed request sent again (one captured on its way) runs nothing: GitHub's X-GitHub-Delivery and Linear's
 // signature are remembered REPLAY_MS, and Linear's webhookTimestamp must be within it; on disk too, so a restart forgets
 // none (<data>/hook-deliveries.json, 0600, as main.ts' e2e-salts.json). An X-Laki-Key hook's sender may say both too:
-// X-Laki-Timestamp (Unix ms, or seconds) within REPLAY_MS, X-Laki-Id once. ponytail: optional, and not signed (the key
+// X-Laki-Timestamp (Unix ms, or seconds) within REPLAY_MS, X-Laki-Id once within it. ponytail: optional, and not signed (the key
 // itself goes in clear): a sender that sends neither has no copy told apart
 const REPLAY_MS = 600_000
 const DELIVERIES = join(dir, 'hook-deliveries.json')

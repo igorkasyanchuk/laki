@@ -475,5 +475,13 @@ test("#S1: a saved screen's tail starts at a line: no half escape sequence or ch
   const cut = screenTail(text, Buffer.byteLength(text) - 6) // inside the first line's escape sequence
   assert.equal(cut, '\x1b[1mtwo\r\nthree\r\n')
   assert.equal(screenTail('x'.repeat(50), 10), 'x'.repeat(10), 'no line break: the bytes')
+  const long = `${'x'.repeat(20)}\x1b[38;5;196mred`
+  assert.equal(screenTail(long, 11), 'red', 'one long line, a color sequence cut in half: its rest dropped')
+  assert.equal(screenTail(long, 12), 'red', 'cut inside its parameters')
+  assert.equal(screenTail(long, 13), 'red', 'cut right after ESC')
+  assert.equal(screenTail(`${'x'.repeat(20)}[INFO] up`, 9), '[INFO] up', "text's brackets stay")
+  assert.equal(screenTail(`${'x'.repeat(20)}\x1b[mok`, 4), 'ok', 'a cut reset')
+  assert.equal(screenTail(`${'x'.repeat(20)}12 apples`, 9), '12 apples', 'digits that are text stay')
+  for (const n of [5, 9, 11, 12, 15]) assert.ok(Buffer.byteLength(screenTail(long, n)) <= n && !/^[[0-9;:]+m|^\x1b(?!\[[0-9;]*m)/.test(screenTail(long, n)), `no raw fragment at ${n}`)
   assert.equal(screenTail(`ab\n${'ж'.repeat(3)}`, 5), 'жж', 'no line break, a cut through a character: from the first whole one')
 })

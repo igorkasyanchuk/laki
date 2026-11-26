@@ -53,6 +53,9 @@ export function verdict(latest: Release | null | undefined, version: string, o: 
   return (o.skip === latest.version ? undefined : heldUntil(latest.at, delay, now)) ?? 'offer'
 }
 
+// Settings › Updates' line for a newer release. Linux has no self-update (main/update.ts): you replace the AppImage
+export const outLine = (version: string, platform: string) => (platform === 'linux' ? `Laki ${version} is out: download it and replace this AppImage` : `Laki ${version} is out`)
+
 // Settings › Updates' Update delay: a release is offered once it's that many days old (unset: at once)
 export const UPDATE_DELAYS = [0, 1, 3, 7, 14, 30]
 

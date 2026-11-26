@@ -15,6 +15,9 @@ short version.
   (a button at the sidebar's head) lists every workspace across projects by when it last worked: Running, Today,
   Yesterday, Last 7 days, Last 30 days, Older. *Show › Workers* off keeps an orchestrator's workers out of the sidebar,
   counted on their lead's row.
+- **Looping**: a Claude Code agent failing the same command with the same error (3 times in a row, or 5 in a turn)
+  shows *looping ×n* on its row, in Needs you and on the Board, with *Nudge*, *Stop* and *Let it work*, and a phone push
+  (Settings › Notifications › *An agent loops*).
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings. Each has a badge in the sidebar, ⌘K, the rail and pickers: its repo's logo or favicon, else two letters of its own on its color (a click changes the letters, icon, picture or color; Settings › Layout › *Project badges* turns them off). *New project…* (Welcome, ⌘K) makes a folder with git and a first commit and adds it.
 - **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from
@@ -35,7 +38,7 @@ on an event, the last one or a sample (`laki flow run --event`), questions answe
 time and AI money per run (`budget: 60 min, $5`).
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits (`laki limits` for agents too), a tab restarted on another account
-  with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. A `/goal` (Claude Code, Codex): a band with its state and *Pause*, *Resume*, *Clear*, the tab running until the goal stops and one *Goal reached* then. An MCP server that needs a sign-in: a band with *Sign in* too (Codex's `codex mcp login`, Claude Code's `/mcp`). Signed out mid-turn: a band with *Sign in* (the agent's own login, for that tab's account), and the message goes once you're in, wherever you signed in. Cursor as a ready-made profile (`cursor-agent acp`): its models and effort in the new-workspace menus, its chats resumed after a restart. *Versions*: each agent CLI's version and the newest, *Update* (or several at once) in a terminal tab you can watch, a dot on Settings when one is out. On a Mac, a wrapper sandbox (`sandbox-exec`) for an agent with none of its own on: it writes only in its worktree and can't read your keys. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
+  with its chat, and *Auto fallback*: accounts in an order, a tab at its plan limit going on on the next one by itself. A `/goal` (Claude Code, Codex): a band with its state and *Pause*, *Resume*, *Clear*, the tab running until the goal stops and one *Goal reached* then. An MCP server that needs a sign-in: a band with *Sign in* too (Codex's `codex mcp login`, Claude Code's `/mcp`). Signed out mid-turn: a band with *Sign in* (the agent's own login, for that tab's account), and the message goes once you're in, wherever you signed in. Cursor as a ready-made profile (`cursor-agent acp`): its models and effort in the new-workspace menus, its chats resumed after a restart. *Versions*: each agent CLI's version and the newest, *Update* (or several at once) in a terminal tab you can watch, a dot on Settings when one is out. *What agents call*: their calls to Laki over the last 7 days, per method, the failing ones first, with the tools none called. On a Mac, a wrapper sandbox (`sandbox-exec`) for an agent with none of its own on: it writes only in its worktree and can't read your keys. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Antigravity** (Google's `agy`, Gemini CLI's successor) as the gemini agent: its model, effort and permission modes (`--mode`), its status from what it tells the terminal (OSC 7501), its chat resumed by the id it prints as it exits.
 - **Notes and memory in the repo**: a project's switch keeps its notes and memory in `.laki/notes.md` and `.laki/memory.md`, shared through git; a worktree's agent reads its own branch's.
 - **Uninstall Laki**: Settings › General › Developer or `laki uninstall` removes the `laki` command, the agent skills and the daemon in one go (the worktrees and your data only when ticked), each a row; then the app to the Trash.
@@ -106,6 +109,8 @@ time and AI money per run (`budget: 60 min, $5`).
   (the workspace's or its storage folder's) the page it's written to be; a file's path
   (`src/app.ts:42`) opens on ⌘-click in the preview at its line, or your editor. *Keep the Mac awake while agents work* (Settings › Git & worktrees), or let it sleep, lock or shut down once everything is done (a minute's countdown first, once). *Check overlaps…* (a worktree's ⋯ › Workspace) finds where two worktrees change the same lines (or a base that changed them since), while both agents can still adjust; Collision radar does it on its own. Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
+  A copy inside vim, tmux or an ssh session (OSC 52) reaches your Mac's clipboard: a tab asks once (Settings › Terminal ›
+  *Programs may copy to the clipboard*: ask, all, never; agents only with all).
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
 - **Cloud workspaces**: a GitHub project's workspace in a GitHub Codespace of its own (*In a codespace* on the
@@ -151,11 +156,16 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
   look; the video, extensions, the preview or the floating bubbles stop with a click. A notice before the disk fills up
   (a worktree's disk under 5 GB free, or what you set), *Make room…* opening what each workspace takes, biggest first.
+- **Safe mode**: after the daemon stops three times in a row in its first minute, Laki starts nothing on its own
+  (extensions, scheduled tasks, workflows, the PR and port scans) until you pick on its banner: *Turn on without* what
+  ran before the crash, or *Turn everything on*. Terminals and agents work meanwhile.
 - **Hidden browser pages**: an optional memory budget unloads the oldest Browsers page you aren't on; it never touches one playing,
   downloading, being inspected, or with typing or form edits.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
 - **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
+- **Swipe on rows**: two fingers across a workspace's row or a Needs you card: left snoozes it an hour (further left
+  archives, with Undo), right marks it seen (Settings › Layout › *Swipe on rows*, on on a Mac).
 - **Looks**: icons from Tabler (the default), Lucide or Laki's own, at your line width and size; six Dock icons to pick from; 104 themes, 82 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines, rows, spacing and text sizes (compact to cards), Density (Compact, Regular, Roomy), the pointing hand over buttons (or macOS's arrow) and scroll bars
   that show as you scroll, stars (or stardust, dots, a net, a grid, fireflies) behind an empty page and New workspace that stir as the pointer passes, and your own CSS for the rest; the tab bar's buttons in groups you pick and order

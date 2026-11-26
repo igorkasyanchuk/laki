@@ -275,6 +275,8 @@ and `gh` in WSL and sign in there, and keep projects in its own folders (`~/…`
 boundary). On a desktop Ubuntu 24.04+, if it stops on the SUID sandbox helper (AppArmor), start it with `--no-sandbox`.
 The AppImage's starter is static: no libfuse2 or zlib1g-dev to install (a plain Ubuntu 24.04 arm64 runs it), and with
 no FUSE at all `--appimage-extract-and-run` runs it.
+Laki doesn't update itself on Linux: when a newer one is out, Settings › Updates says so, and *Download* opens its
+release page; replace the AppImage with the new one (your data stays).
 
 On a server with no screen, `./Laki-*.AppImage --headless --tailscale` runs Laki for a browser instead of a window:
 [headless.md](headless.md).
@@ -1870,7 +1872,7 @@ Two come from outside Laki. **`issue.labeled`**: someone labels an issue of one 
 issue events once a minute while a workflow or an extension listens; a restart doesn't fire old ones):
 `event.project`, `event.number`, `.title`, `.url`, `.label`, `.by`, `.body`. **`webhook`**: a POST to one of Settings ›
 Tunnels › *Webhooks* (a name and a secret each: GitHub's signature, Linear's, or an `X-Laki-Key` header for anything
-else, with `X-Laki-Timestamp` and `X-Laki-Id` if the sender can: a copy, or one over 10 minutes old, runs nothing): `event.name`, `event.event` (GitHub's `X-GitHub-Event`), `event.body` (the request's JSON). They run on a small
+else, with `X-Laki-Timestamp` and `X-Laki-Id` if the sender can: one over 10 minutes old, or a copy within 10 minutes, runs nothing): `event.name`, `event.event` (GitHub's `X-GitHub-Event`), `event.body` (the request's JSON). They run on a small
 server of their own, never Laki's; *Expose to the internet* puts it, and only it, on a Cloudflare quick tunnel (its
 address changes when it starts again) or Tailscale Funnel. Their text is someone else's: put it in a prompt as quoted
 context, and a run they start can't run commands, webhooks, extensions or an agent in bypass permissions. The

@@ -10,6 +10,8 @@ out of Help and Settings.
 | **Review** | the one full-page Review tab over the panes | the review |
 | **PR comments** | the side panel's tab of a PR's threads | Review (for this) |
 | **Second opinion** | the Done check's reviewer agent | review agent |
+| **Looping** | an agent failing the same command with the same error (*looping ×n*) | stuck, retry loop |
+| **Safe mode** | the daemon's start after three young crashes: nothing starts on its own | recovery mode, safe start |
 | **Backlog** | the Board's first column: prompts waiting for a workspace | To do |
 | **To-dos** | the personal checklist page | todo list |
 | **Plan** | the agent's own to-do list, live | todos |

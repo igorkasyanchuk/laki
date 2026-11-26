@@ -141,7 +141,7 @@ const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 // the Keychain's values read together, not one sync spawn each as the state loads; the state only parsed here (readJson
 // would set an unreadable one aside before core.load's own handling of it)
-await kcWarm([...envNames((() => { try { return JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')) } catch {} })()), 'openrouter', 'endpoint', 'widget-secrets', 'telegram'])
+if (keychainOn()) await kcWarm([...envNames((() => { try { return JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')) } catch {} })()), 'openrouter', 'endpoint', 'widget-secrets', 'telegram'])
 core.load()
 policyTick() // a managed policy: before any tab starts again (spawnTab checks it), then every 5 minutes
 core.writeHooks()
@@ -835,10 +835,14 @@ const api = {
   safeOff: (p: { without?: { kind?: unknown; id?: unknown; source?: unknown; project?: unknown }; now?: number }) => {
     const w = p?.without
     if (w && typeof w.id === 'string') {
-      if (w.kind === 'extension') widgetSet({ id: w.id, on: false })
-      else if (w.kind === 'task') scheduleMod.scheduleSet({ id: w.id, on: false })
-      else if (w.kind === 'workflow') flowPause({ id: w.id, source: w.source as never, project: typeof w.project === 'string' ? w.project : undefined, on: false }, 'turned off in safe mode')
-      else throw new Error(`no suspect ${String(w.kind)}`)
+      if (!['extension', 'task', 'workflow'].includes(String(w.kind))) throw new Error(`no suspect ${String(w.kind)}`)
+      try {
+        if (w.kind === 'extension') widgetSet({ id: w.id, on: false })
+        else if (w.kind === 'task') scheduleMod.scheduleSet({ id: w.id, on: false })
+        else flowPause({ id: w.id, source: w.source as never, project: typeof w.project === 'string' ? w.project : undefined, on: false }, 'turned off in safe mode')
+      } catch (e) {
+        if (!/^no (widget|scheduled task|workflow) /.test((e as Error).message)) throw e // gone since: nothing to turn off
+      }
     }
     if (!safeLeave()) return { on: false }
     core.changed()

@@ -2,7 +2,8 @@
 // release, at launch and every 4 hours while Settings says so, or when asked. Nothing downloads until you click: on a
 // Developer ID signed Mac through Electron's autoUpdater (Squirrel.Mac, the release's update-mac-<arch>.json), then
 // Restart to update; anywhere else Download is the release's page. The daemon outlives it: its yellow bar, as before.
-// ponytail: no Linux self-update (an AppImage updater is a new dependency), no beta channel
+// ponytail: no Linux self-update (an AppImage updater is a new dependency: Settings says to replace the AppImage,
+// shared/update.ts outLine), no beta channel
 import { app, autoUpdater, net } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'

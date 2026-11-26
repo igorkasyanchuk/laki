@@ -695,7 +695,7 @@ and neither does a host. A shell tab's screen (#S1, `screens.ts`): `screensSave`
 shell whose `lastOutput` moved since its last save, and with `all` in `shutdown`, writes `Session.saved()` (the serialize
 addon's text, colors and scrollback, no modes; none while the alternate screen is up) to `<data>/screens/<tab>.txt`,
 0600 (the folder 0700, in `DATA_SECRETS`), its last `SCREEN_MAX` (200 KB) bytes, from the first line after the cut
-(`screenTail`; no line break: its first whole character), its replay starting with a reset (`\x1b[0m`); a Private workspace's or project's
+(`screenTail`; no line break: its first whole character, past a cut escape sequence), its replay starting with a reset (`\x1b[0m`); a Private workspace's or project's
 isn't written (one made Private since: removed), `closeTab` removes a tab's (`screenForget`), and each save prunes the
 files of tabs gone. `restoreNow` of a shell with no terminal behind it (not ptyAdopt's) writes `screenBack` into its
 mirror first (`Session.prelude`, muted: its old queries unanswered): the text dimmed (each SGR followed by `\x1b[2m`),

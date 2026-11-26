@@ -1377,9 +1377,9 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^(action|event):[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
   const once = o.once === true && !onOf(w)
   if (safeOn()) return { ok: false, error: "safe mode: extensions don't fetch until you turn everything on" }
-  safeSeen({ kind: 'extension', id: w.id, name: w.m.name || w.id })
   if (!onOf(w) && (guarded(w) || (!once && !(force && w.s.by !== 'ai')))) return { ok: false, error: guarded(w) ? `${OFF(w)}: it ${whence(w)}, look at what it runs (laki widget what ${w.id})` : OFF(w) } // a repo's: never once, unlooked
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script: give it a source (static, file or url)` }
+  safeSeen({ kind: 'extension', id: w.id, name: w.m.name || w.id }) // what ran: a crash's suspect (safe.ts)
   const src = sourceOf(w)
   if (once && streaming(w)) return { ok: false, error: 'a stream runs only while it is on' }
   if (streaming(w)) {
