@@ -428,7 +428,11 @@ test('ocRead: a session and its subagents’ messages, OpenCode’s own cost; on
   ocSaid(db, 'm3', 'ses_other', 'z-ai/glm-5.1', [9999, 0, 0, 0, 0], 9)
   ocSaid(db, 'm4', 'ses_subsub', 'z-ai/glm-5.1', [100, 10, 0, 0, 0], 0.001)
   ocSaid(db, 'm5', 'ses_main', 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002, false) // still answering
-  const by = (r: any) => Object.values(r.days).flatMap((d: any) => Object.entries(d)).map(([m, v]: any) => [m, v.tokens, Math.round(v.cost * 1e6) / 1e6]).sort()
+  const by = (r: any) => {
+    const m: Record<string, { tokens: number; cost: number }> = {} // a model's days summed: m6, two hours back, is yesterday's before 2 am
+    for (const d of Object.values(r.days) as any[]) for (const [k, v] of Object.entries(d) as any) m[k] = { tokens: (m[k]?.tokens ?? 0) + v.tokens, cost: (m[k]?.cost ?? 0) + v.cost }
+    return Object.entries(m).map(([k, v]) => [k, v.tokens, Math.round(v.cost * 1e6) / 1e6]).sort()
+  }
   let n = ocRows.n
   const r1 = ocRead(f, 'ses_main')!
   assert.deepEqual([by(r1), r1.last, r1.again, ocRows.n - n], [[['beam-free', 520, 0], ['z-ai/glm-5.1', 1260 + 110, 0.011]], 5, false, 5], 'its rows to the one still answering (the user’s and the other session’s not counted)')
