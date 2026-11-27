@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.68.0 · Nov 28, 2026
 
 - A worker that can't go on (its plan limit, a failed turn, its process gone, silent for 10 minutes) tells the agent that started it, once, with what to do next; `laki wait` says *stuck*.
 - Search the text of a workspace's files: ⇧⌘P (or Tab in ⌘P), with match case, whole words and regex; Enter opens the file at the line.
