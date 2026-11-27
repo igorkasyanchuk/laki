@@ -2,7 +2,7 @@
 // your own status line with the same input; the context meter and the plan limits take its numbers while fresh.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
@@ -110,4 +110,41 @@ test("statusline: the project's own wins over yours, Laki's never wraps itself, 
   assert.deepEqual(has(), [false, false])
   await rig.rpc('settingsSet', { statusBridge: true })
   assert.deepEqual(has(), [true, true])
+})
+
+test("statusline: an account's plan limits window by window across its tabs: the later reset, then the higher percent", async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200', FAKE_CODEX_LIMITS: 'unknown' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const a = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const b = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  for (const x of [a, b]) await until(() => said(rig, x.id)[0], 'its status line')
+  const reset = Math.floor(Date.now() / 1000) + 3600 // seconds, as claude says it
+  const week = reset + 5 * 86400
+  // a: idle, its file rewritten just now with the numbers it had; b: busier, its file older
+  const put = (tab: string, five: [number, number], seven: [number, number], ago: number) => {
+    const f = join(rig.data, 'statusline', `${tab}.json`)
+    writeFileSync(f, JSON.stringify({ session_id: 'x', rate_limits: { five_hour: { used_percentage: five[0], resets_at: five[1] }, seven_day: { used_percentage: seven[0], resets_at: seven[1] } } }))
+    utimesSync(f, new Date(Date.now() - ago), new Date(Date.now() - ago))
+  }
+  put(a.id, [12, reset], [30, week - 7 * 86400], 1000) // its week's window is the one before
+  put(b.id, [40, reset], [5, week], 60_000)
+  const u = (await rig.rpc('usage'))[0]
+  assert.deepEqual(u.windows.map((w: any) => [w.label, w.used, w.resets]), [['5-hour', 40, reset * 1000], ['Weekly', 5, week * 1000]])
+  assert.ok(Math.abs(u.at - (Date.now() - 60_000)) < 5000, 'as of the oldest reading chosen')
+
+  // codex: each tab's last token_count rate_limits, chosen the same way (its app-server says none: FAKE_CODEX_LIMITS)
+  const day = join(rig.home, '.codex/sessions/2026/11/20')
+  mkdirSync(day, { recursive: true })
+  const rl = (id: string, used: number, resetsAt: number, ago: number) =>
+    writeFileSync(join(day, `rollout-2026-11-20T10-00-00-${id}.jsonl`), `${JSON.stringify({ timestamp: new Date(Date.now() - ago).toISOString(), type: 'event_msg', payload: { type: 'token_count', info: null, rate_limits: { primary: { used_percent: used, window_minutes: 300, resets_at: resetsAt } } } })}\n`)
+  const cx = []
+  for (const [id, used, ago] of [['cx-a', 9, 1000], ['cx-b', 33, 120_000]] as const) {
+    rl(id, used, reset, ago)
+    const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
+    await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: id } })
+    cx.push(tab)
+  }
+  const c = await until(async () => (x => x?.windows?.[0]?.used === 33 && x)((await rig.rpc('usage')).find((r: any) => r.agent === 'codex')), 'codex’s, the higher one')
+  assert.deepEqual(c.windows.map((w: any) => [w.label, w.used, w.resets]), [['5-hour', 33, reset * 1000]])
 })

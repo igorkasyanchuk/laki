@@ -1,12 +1,13 @@
 // The meters (meters.ts' meterTick, share.ts' meterOf): each claude and codex tab's context, from its transcript read on as
-// it grows, and what its chat used, tokens and ≈ cost by shared/types.ts' PRICES; today's kept in usage-today.json.
+// it grows, and what its chat used, tokens and ≈ cost by shared/types.ts' costOf (prices.json, PRICE_OWN); today's kept in
+// usage-today.json, each day's in usage-days.json as token parts, priced as they're read.
 import assert from 'node:assert/strict'
 import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { dayOf, meterNew, meterOf } from '../src/daemon/share.ts'
-import { costOf } from '../src/shared/types.ts'
+import { dayOf, type Meter, meterCost, meterNew, meterOf } from '../src/daemon/share.ts'
+import { costOf, PRICE_OWN, partsOf, partsTokens, pricesDate, priceOf } from '../src/shared/types.ts'
 import { fresh, until } from './helpers.ts'
 
 const line = (o: object) => `${JSON.stringify(o)}\n`
@@ -16,21 +17,58 @@ const at = (h: number) => new Date(now - h * 3600e3).toISOString()
 const said = (id: string, model: string, u: object, h = 0, more = {}) => line({ type: 'assistant', timestamp: at(h), message: { id, model, role: 'assistant', content: [{ type: 'text', text: 'x' }], usage: u }, ...more })
 const tokenCount = (total: object, last: object, h = 0) => line({ type: 'event_msg', timestamp: at(h), payload: { type: 'token_count', info: { total_token_usage: total, last_token_usage: last, model_context_window: 272000 } } })
 
-test('meter: prices by model family; an unknown model has none', () => {
-  assert.equal(costOf('claude-opus-4-1-20250805', { input: 1e6, output: 0 }), 15)
-  assert.equal(costOf('claude-opus-4-6', { input: 0, output: 1e6 }), 25)
-  assert.equal(costOf('claude-opus-5-5', { input: 1e6, output: 1e6, write: 1e6, read: 1e6 }), 4 + 20 + 5 + 0.2)
-  assert.equal(costOf('claude-sonnet-4-5-20250929', { input: 1e6, output: 0, read: 1e6 }), 3.3)
-  assert.equal(costOf('claude-sonnet-5-5', { input: 1e6, output: 0 }), 2)
-  assert.equal(costOf('claude-haiku-4-5-20251001', { input: 0, output: 1e6 }), 5)
-  assert.equal(costOf('gpt-5-codex', { input: 1e6, output: 1e6, read: 1e6 }), 1.25 + 10 + 0.125)
-  assert.equal(costOf('gpt-5.1-codex-mini', { input: 1e6, output: 0 }), 0.25)
-  assert.equal(costOf('some-new-model', { input: 1e6, output: 1e6 }), undefined)
-  assert.equal(costOf(undefined, { input: 1, output: 1 }), undefined)
+const near = (a: number | undefined, b: number, what = '') => assert.ok(a !== undefined && Math.abs(a - b) < 1e-9, `${what} ${a} ≠ ${b}`)
+const todayOf = (m: Meter, t = now) => Object.values(m.days?.[dayOf(t)] ?? {}).reduce((n, p) => n + partsTokens(p), 0)
+
+test('prices: exact model ids (prices.json, then PRICE_OWN); a model with no row has none, never a family guess', () => {
+  const all = { in: 1e6, out: 1e6, rd: 1e6, w5: 1e6, w1: 1e6 }
+  near(costOf('claude-fable-5-2', all), 8 + 40 + 0.2 + 10 + 16, 'fable 5.2')
+  near(costOf('claude-mythos-5-2', all), 8 + 40 + 0.2 + 10 + 16, 'mythos 5.2')
+  near(costOf('claude-opus-5-5', all), 4 + 20 + 0.2 + 5 + 8, 'opus 5.5')
+  near(costOf('claude-sonnet-5-5', { rd: 1e6 }), 0.1, "sonnet 5.5's cache reads")
+  near(costOf('claude-fable-5-1', { in: 1e6, out: 1e6, rd: 1e6 }), 10 + 50 + 0.25)
+  near(costOf('claude-opus-4-6', { out: 1e6 }), 25)
+  near(costOf('claude-haiku-4-5-20251001', { out: 1e6 }), 5)
+  near(costOf('claude-opus-4-1-20250805', { in: 1e6 }), 15, "a retired id, Laki's own row")
+  near(costOf('claude-sonnet-4-5-20250929', { in: 1e6, rd: 1e6 }), 3.3)
+  for (const [m, i, o, r] of [['gpt-5.3-codex', 1.75, 14, 0.175], ['gpt-5.4', 2.5, 15, 0.25], ['gpt-5.4-mini', 0.75, 4.5, 0.075], ['gpt-5.4-nano', 0.2, 1.25, 0.02], ['gpt-5.5', 5, 30, 0.5], ['gpt-5.6-sol', 4, 20, 0.4], ['gpt-5.6-terra', 2, 12, 0.2]] as const) {
+    near(costOf(m, { in: 1e6 }), i, m)
+    near(costOf(m, { out: 1e6 }), o, m)
+    near(costOf(m, { rd: 1e6 }), r, m)
+  }
+  near(costOf('gpt-5-codex', { in: 1e6, out: 1e6, rd: 1e6 }), 1.25 + 10 + 0.125)
+  near(costOf('gpt-5.4', { w1: 1e6 }), 5, 'a 1-hour write a row says nothing of: 2x input')
+  for (const m of ['claude-opus-5-5-20990101', 'claude-sonnet-9', 'gpt-5.4-codex-turbo', 'some-new-model', '__proto__', 'constructor']) assert.equal(costOf(m, { in: 1e6 }), undefined, m)
+  assert.equal(costOf(undefined, { in: 1 }), undefined)
+  assert.match(pricesDate(), /^\d{4}-\d\d-\d\d$/)
+})
+
+test('prices: a long prompt at its own rates, by each request’s whole input; fast mode at 2x where the model has it', () => {
+  assert.deepEqual(partsOf('claude-haiku-5-5', { in: 100_000, out: 1000 }), { in: 100_000, out: 1000 }, 'at the line: not past it')
+  const big = partsOf('claude-haiku-5-5', { in: 50_000, rd: 60_000, out: 1000 }) // 110K with its cache
+  assert.deepEqual(big, { inL: 50_000, rdL: 60_000, outL: 1000 })
+  near(costOf('claude-haiku-5-5', big), (0.5 * 50_000 + 0.05 * 60_000 + 2.5 * 1000) / 1e6, 'haiku 5.5 past 100K')
+  for (const [m, i, o] of [['gpt-5.4', 5, 22.5], ['gpt-5.5', 10, 45], ['gpt-5.6-sol', 8, 30], ['gpt-5.6-terra', 4, 18]] as const) near(costOf(m, partsOf(m, { in: 300_000, out: 1e6 })), i * 0.3 + o, `${m} past 272K`)
+  near(costOf('gpt-5.4', partsOf('gpt-5.4', { in: 272_000, out: 1e6 })), 2.5 * 0.272 + 15, 'gpt-5.4 at 272K')
+  near(costOf('claude-sonnet-4-5', partsOf('claude-sonnet-4-5', { in: 150_000, w5: 60_000, out: 1e6 })), 6 * 0.15 + 7.5 * 0.06 + 22.5, 'sonnet 4.5 past 200K')
+  near(costOf('claude-sonnet-4-20250514', partsOf('claude-sonnet-4-20250514', { in: 250_000 })), 6 * 0.25, 'sonnet 4 past 200K')
+  near(costOf('claude-sonnet-4-5', partsOf('claude-sonnet-4-5', { in: 200_000 })), 3 * 0.2, 'sonnet 4.5 at 200K')
+  near(costOf('claude-opus-5-5', partsOf('claude-opus-5-5', { in: 1e6, out: 1e6 }, true)), 2 * (4 + 20), 'opus 5.5 fast')
+  near(costOf('claude-fable-5-2', partsOf('claude-fable-5-2', { out: 1e6, w1: 1e6 }, true)), 2 * (40 + 16), 'fable 5.2 fast')
+  assert.deepEqual(partsOf('claude-sonnet-5-5', { in: 5 }, true), { in: 5 }, 'no fast mode: as usual')
+})
+
+test("meter: claude's cache writes split by how long they're kept; fast mode by usage.speed", () => {
+  const w = (c?: object, speed?: string) => meterCost(meterOf('claude', said('h', 'claude-opus-5-5', { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 1e6, ...(c && { cache_creation: c }), ...(speed && { speed }) }), meterNew(), now).by).cost
+  near(w({ ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 1e6 }), 8, 'only 1-hour writes: 2x input')
+  near(w({ ephemeral_5m_input_tokens: 4e5, ephemeral_1h_input_tokens: 6e5 }), 0.4 * 5 + 0.6 * 8, 'both')
+  near(w(), 5, 'no split said: all 5 minutes')
+  near(w({ ephemeral_1h_input_tokens: 1e6 }, 'fast'), 16, 'fast')
+  near(w(undefined, 'standard'), 5)
 })
 
 test("meter: claude's context is the last answer's prompt; tokens summed once per answer, today's apart", () => {
-  const m = meterNew(now)
+  const m = meterNew()
   const u = (input: number, write: number, read: number, output: number) => ({ input_tokens: input, cache_creation_input_tokens: write, cache_read_input_tokens: read, output_tokens: output })
   meterOf(
     'claude',
@@ -47,25 +85,25 @@ test("meter: claude's context is the last answer's prompt; tokens summed once pe
   meterOf('claude', said('m3', 'claude-sonnet-4-5', u(20, 500, 140000, 400)), m, now) // read on: the next part
   assert.equal(m.used, 20 + 500 + 140000)
   assert.equal(m.tokens, 2000 + (10 + 2000 + 300) + 50100 + (20 + 500 + 140000 + 400))
-  assert.deepEqual(m.today.tokens, m.tokens - 2000)
-  const cost = (3 * 1000 + 15 * 1000 + 3 * 10 + 3.75 * 2000 + 15 * 300 + 1 * 50000 + 5 * 100 + 3 * 20 + 3.75 * 500 + 0.3 * 140000 + 15 * 400) / 1e6
-  assert.ok(Math.abs(m.cost - cost) < 1e-9, `${m.cost} ≠ ${cost}`)
-  assert.ok(m.priced)
+  assert.equal(todayOf(m), m.tokens - 2000)
+  const c = meterCost(m.by)
+  near(c.cost, (3 * 1000 + 15 * 1000 + 3 * 10 + 3.75 * 2000 + 15 * 300 + 1 * 50000 + 5 * 100 + 3 * 20 + 3.75 * 500 + 0.3 * 140000 + 15 * 400) / 1e6)
+  assert.ok(c.priced)
   assert.equal(m.max, undefined, "claude's transcript doesn't say its window")
   // a subagent's lines between two blocks of one answer: that answer still counted once (H8.2 #5)
-  const sub = meterOf('claude', said('a', 'claude-sonnet-4-5', u(10, 0, 0, 5)) + said('s2', 'claude-haiku-4-5', u(7, 0, 0, 3), 0, { isSidechain: true }) + said('a', 'claude-sonnet-4-5', u(10, 0, 0, 300)), meterNew(now), now)
+  const sub = meterOf('claude', said('a', 'claude-sonnet-4-5', u(10, 0, 0, 5)) + said('s2', 'claude-haiku-4-5', u(7, 0, 0, 3), 0, { isSidechain: true }) + said('a', 'claude-sonnet-4-5', u(10, 0, 0, 300)), meterNew(), now)
   assert.equal(sub.tokens, 10 + 300 + (7 + 3))
-  assert.ok(Math.abs(sub.cost - (3 * 10 + 15 * 300 + 1 * 7 + 5 * 3) / 1e6) < 1e-12, String(sub.cost))
+  near(meterCost(sub.by).cost, (3 * 10 + 15 * 300 + 1 * 7 + 5 * 3) / 1e6)
   // an unknown model: tokens, no price
-  const n = meterOf('claude', said('x', 'claude-next-1', u(1, 0, 0, 1)), meterNew(now), now)
-  assert.deepEqual([n.tokens, n.cost, n.priced], [2, 0, undefined])
+  const n = meterCost(meterOf('claude', said('x', 'claude-next-1', u(1, 0, 0, 1)), meterNew(), now).by)
+  assert.deepEqual([n.cost, n.priced, n.none], [0, false, { 'claude-next-1': 2 }])
   // a new day: today's starts over, the chat's goes on
   meterOf('claude', said('m4', 'claude-sonnet-4-5', u(1, 0, 0, 1), -24), m, now + 24 * 3600e3)
-  assert.deepEqual([m.today.tokens, m.day], [2, dayOf(now + 24 * 3600e3)])
+  assert.equal(todayOf(m, now + 24 * 3600e3), 2)
 })
 
 test("meter: codex's context is its last token_count against its window; tokens what its totals grew by", () => {
-  const m = meterNew(now)
+  const m = meterNew()
   const t = (input: number, cached: number, output: number) => ({ input_tokens: input, cached_input_tokens: cached, output_tokens: output, reasoning_output_tokens: 0, total_tokens: input + output })
   meterOf(
     'codex',
@@ -78,13 +116,12 @@ test("meter: codex's context is its last token_count against its window; tokens 
     now,
   )
   meterOf('codex', tokenCount(t(30000, 9000, 900), t(20000, 9000, 400)), m, now)
-  assert.deepEqual([m.used, m.max, m.tokens, m.today.tokens], [20400, 272000, 30900, 30900])
-  const cost = (1.25 * (30000 - 9000) + 0.125 * 9000 + 10 * 900) / 1e6
-  assert.ok(Math.abs(m.cost - cost) < 1e-9, `${m.cost} ≠ ${cost}`)
+  assert.deepEqual([m.used, m.max, m.tokens, todayOf(m)], [20400, 272000, 30900, 30900])
+  near(meterCost(m.by).cost, (1.25 * (30000 - 9000) + 0.125 * 9000 + 10 * 900) / 1e6)
 })
 
 test("meter: R4: codex's plan limits from its token_count's rate_limits, the newest kept", () => {
-  const m = meterNew(now)
+  const m = meterNew()
   const rl = (used: number, h: number) => line({ type: 'event_msg', timestamp: at(h), payload: { type: 'token_count', info: null, rate_limits: { primary: { used_percent: used, window_minutes: 300, resets_in_seconds: 600 }, secondary: { used_percent: 4, window_minutes: 10080, resets_at: 1794326400 } } } })
   meterOf('codex', rl(30, 1) + rl(12, 2), m, now)
   assert.deepEqual(m.limits, { at: now - 3600e3, windows: [{ label: '5-hour', used: 30, resets: now - 3600e3 + 600e3 }, { label: 'Weekly', used: 4, resets: 1794326400e3 }] })
@@ -154,10 +191,125 @@ test("meter: a tab's view has its context and usage, read on as the transcript g
   assert.ok(d.rows.every((r: any) => r.cost > 0))
   assert.ok(d.rows.every((r: any) => r.ws === ws.id), JSON.stringify(d.rows)) // Where it went: each row's workspace
   assert.deepEqual(d.ai, []) // no Laki AI calls
-  assert.ok(JSON.parse(readFileSync(join(rig.data, 'usage-days.json'), 'utf8')).chats['chat-1'].days)
+  await until(async () => JSON.parse(readFileSync(join(rig.data, 'usage-days.json'), 'utf8')).chats['chat-1']?.days, 'usage-days.json written')
   // removed: Today still names it, as it was
   await rig.rpc('wsRm', { id: ws.id, force: true })
   assert.deepEqual((await rig.rpc('state')).today.ws.map((x: any) => [x.ws, x.name]), [[ws.id, ws.id]])
+})
+
+test('prices: every model the test fixtures’ transcripts name has a price', () => {
+  const walk = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? walk(join(d, e.name)) : e.name.endsWith('.jsonl') ? [join(d, e.name)] : []))
+  const models = new Set<string>()
+  for (const f of walk(join(import.meta.dirname, 'fixtures')))
+    for (const l of readFileSync(f, 'utf8').split('\n')) {
+      let j: any
+      try {
+        j = JSON.parse(l)
+      } catch {
+        continue
+      }
+      const m = j?.message?.model ?? (j?.type === 'turn_context' ? j.payload?.model : undefined)
+      if (typeof m === 'string' && m !== '<synthetic>') models.add(m)
+    }
+  assert.ok(models.size >= 5, [...models].join())
+  assert.deepEqual([...models].filter(m => !priceOf(m)), [], 'a model with no price: add it to PRICE_OWN or run npm run prices')
+})
+
+test('usage days: kept as token parts and priced as read (a new price re-prices a kept day); old rows keep their cost; no price says so', async t => {
+  const { daysRows, rowMerge } = await import('../src/daemon/share.ts')
+  const day = '2026-11-20'
+  const chats = {
+    c1: { ws: 'w', agent: 'claude', days: { [day]: { 'claude-opus-5-5': { p: { in: 1e6, w1: 1e6 } }, 'claude-next-9': { p: { in: 1000, rd: 3000 } } } } },
+    c2: { ws: 'w', agent: 'claude', days: { [day]: { 'claude-opus-5-5': { tokens: 500, cost: 1.5 } } } }, // kept before parts
+    g: { ws: 'w', agent: 'grok', days: { [day]: { 'grok-4.7-build': { tokens: 10, cost: 0.5, own: true as const } } } },
+    a: { ws: 'w', agent: 'gemini', days: { [day]: { 'gemini-4-neon': { tokens: 7, own: true as const } } } },
+  }
+  const row = (model: string) => daysRows(chats).find(r => r.model === model)!
+  assert.deepEqual(row('claude-opus-5-5'), { day, agent: 'claude', model: 'claude-opus-5-5', ws: 'w', tokens: 2e6 + 500, cost: 4 + 8 + 1.5, priced: true, old: true, input: 2e6 })
+  assert.deepEqual(row('claude-next-9'), { day, agent: 'claude', model: 'claude-next-9', ws: 'w', tokens: 4000, cost: 0, priced: false, read: 3000, input: 4000 })
+  assert.deepEqual([row('grok-4.7-build').cost, row('grok-4.7-build').priced, row('gemini-4-neon').priced], [0.5, true, false])
+  const was = PRICE_OWN['claude-opus-5-5']
+  t.after(() => (PRICE_OWN['claude-opus-5-5'] = was))
+  PRICE_OWN['claude-opus-5-5'] = { in: 40 }
+  assert.equal(row('claude-opus-5-5').cost, 40 + 8 + 1.5, 'the same kept day at the new price; the old row at its own')
+  assert.deepEqual(rowMerge({ p: { in: 5, out: 9 } }, { p: { in: 7, out: 2 } }), { p: { in: 7, out: 9 } }, 'the more of each part')
+  assert.equal(rowMerge({ p: { in: 7 } }, { p: { in: 7 } }), undefined)
+  assert.deepEqual(rowMerge({ tokens: 10, cost: 1 }, { p: { in: 10 } }), { p: { in: 10 } }, 'an old row: its parts once they reach it')
+  assert.equal(rowMerge({ tokens: 10, cost: 1 }, { p: { in: 9 } }), undefined)
+  assert.deepEqual(rowMerge({ tokens: 10, own: true }, { tokens: 12, cost: 0.2, own: true }), { tokens: 12, cost: 0.2, own: true })
+})
+
+const FX = join(import.meta.dirname, 'fixtures/transcripts')
+const SESSION = '3b0e8a52-5f6c-4d8a-9c1e-2a7b6d4f9e01'
+const PARENT = '7f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f'
+// a fixture into the rig's home, its lines' times now (today's)
+const place = (from: string, to: string, more = '') => (mkdirSync(dirname(to), { recursive: true }), writeFileSync(to, readFileSync(from, 'utf8').replace(/"timestamp":"[^"]+"/g, `"timestamp":"${new Date().toISOString()}"`) + more))
+
+test("meter: a claude chat's subagents and a codex chat's spawned threads count to its spend, today's and the Usage page's, never its context", async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  place(join(FX, 'claude', `${SESSION}.jsonl`), join(dir, `${SESSION}.jsonl`))
+  place(join(FX, 'claude', SESSION, 'subagents/agent-a1.jsonl'), join(dir, SESSION, 'subagents/agent-a1.jsonl'))
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: SESSION } })
+  // main: 20310 + 21520; its subagent: 30205 + 30105 (claude-haiku-5-5); the context the main chat's last prompt
+  const v = await until(async () => (x => x?.usage?.tokens === 102140 && x)(await rig.tab(ws.id)), 'the chat and its subagent')
+  assert.deepEqual(v.context, { used: 21020, max: 200000 })
+  assert.equal(v.usage.cost, Math.round(((10 * 4 + 20000 * 8 + 300 * 20) + (20 * 4 + 1000 * 5 + 20000 * 0.2 + 500 * 20) + (5 * 0.1 + 30000 * 0.125 + 200 * 0.5) + (5 * 0.1 + 30000 * 0.01 + 100 * 0.5)) / 1e6 * 1e4) / 1e4)
+  // one more subagent, later, its model with no price: tokens, said so
+  writeFileSync(join(dir, SESSION, 'subagents/agent-b2.jsonl'), line({ isSidechain: true, type: 'assistant', timestamp: new Date().toISOString(), requestId: 'req_b2', message: { id: 'msg_b2', model: 'claude-next-9', usage: { input_tokens: 10, output_tokens: 5 } } }))
+  const w = await until(async () => (x => x?.usage?.tokens === 102155 && x)(await rig.tab(ws.id)), 'the later subagent')
+  assert.deepEqual([w.usage.cost, w.usage.unpriced, w.context.used], [v.usage.cost, ['claude-next-9'], 21020])
+
+  // codex: the parent, the thread it spawned (its copy of the parent's turn counted once) and that one's own; another chat's not
+  const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
+  for (const f of readdirSync(join(FX, 'codex/2026/11/20'))) place(join(FX, 'codex/2026/11/20', f), join(rig.home, '.codex/sessions/2026/11/20', f))
+  await rig.rpc('hook', { tab: cx.id, state: 'start', payload: { session_id: PARENT } })
+  const c = await until(async () => (x => x?.usage?.tokens === 13650 && x)((await rig.rpc('state')).tabs.find((x: any) => x.id === cx.id)), 'codex and its threads', 15000)
+  assert.deepEqual(c.context, { used: 10500, max: 272000 })
+  assert.equal(c.usage.cost, Math.round((6000 * 2.5 + 4000 * 0.25 + 500 * 15 + 2000 * 0.75 + 100 * 4.5 + 1000 * 0.2 + 50 * 1.25) / 1e6 * 1e4) / 1e4)
+
+  // today's and the Usage page's, each once; the unpriced said; the cap's tip too
+  const today = await until(async () => (x => x?.tokens === 102155 + 13650 && x)((await rig.rpc('state')).today), 'today’s')
+  assert.deepEqual(today.unpriced, [{ model: 'claude-next-9', tokens: 15 }])
+  const rows = (await rig.rpc('usageDays')).rows
+  assert.deepEqual(rows.map((r: any) => [r.model, r.tokens, r.priced]).sort(), [['claude-haiku-5-5', 60310, true], ['claude-next-9', 15, false], ['claude-opus-5-5', 41830, true], ['gpt-5.4', 10500, true], ['gpt-5.4-mini', 2100, true], ['gpt-5.4-nano', 1050, true]])
+  await rig.rpc('wsSet', { id: ws.id, cap: 5 })
+  const spend = await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === ws.id)?.spend, 'its cap')
+  assert.deepEqual([Math.abs(spend.usd - (v.usage.cost + c.usage.cost)) < 0.011, spend.unpriced], [true, ['claude-next-9']])
+  // Where it went: the subagent's and the threads' requests too, the copy once
+  const sp = await rig.rpc('wsSpend', { ws: ws.id })
+  assert.equal(sp.input.total, (10 + 20000) + (20 + 1000 + 20000) + (5 + 30000) * 2 + 10 + 10000 + 2000 + 1000)
+})
+
+test('meter: a forked chat’s copied answers count once, to the chat that reported them first; a restart keeps who owns them', async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const ta = await until(async () => (x => x?.resumeId && x)(await rig.tab(a.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  place(join(FX, 'claude', `${SESSION}.jsonl`), join(dir, 'fork-a.jsonl'))
+  await rig.rpc('hook', { tab: ta.id, state: 'start', payload: { session_id: 'fork-a' } })
+  await until(async () => (await rig.tab(a.id))?.usage?.tokens === 41830, 'the first chat')
+  // the fork: the first one's lines, then an answer of its own
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tb = await until(async () => (x => x?.resumeId && x)(await rig.tab(b.id)), 'its chat')
+  const own = line({ type: 'assistant', timestamp: new Date().toISOString(), requestId: 'req_fork_1', message: { id: 'msg_fork_1', model: 'claude-opus-5-5', usage: { input_tokens: 100, output_tokens: 50 } } })
+  place(join(FX, 'claude', `${SESSION}.jsonl`), join(dir, 'fork-b.jsonl'), own)
+  await rig.rpc('hook', { tab: tb.id, state: 'start', payload: { session_id: 'fork-b' } })
+  const vb = await until(async () => (x => x?.usage && x)(await rig.tab(b.id)), 'the fork')
+  assert.deepEqual([vb.usage.tokens, vb.context.used], [150, 100], 'its own answer only; its context its last prompt')
+  const total = async () => (await rig.rpc('usageDays')).rows.reduce((n: number, r: any) => n + r.tokens, 0)
+  await until(async () => (await total()) === 41830 + 150, 'the Usage page')
+  await until(async () => (await rig.rpc('state')).today?.tokens === 41830 + 150, 'today’s')
+  await rig.stop()
+  await rig.start()
+  await until(async () => (await rig.tab(b.id))?.usage?.tokens === 150, 'the fork again')
+  await until(async () => (await rig.tab(a.id))?.usage?.tokens === 41830, 'the first again')
+  assert.equal(await total(), 41830 + 150)
+  assert.equal((await rig.rpc('state')).today.tokens, 41830 + 150)
 })
 
 // a protobuf message: [field, varint or bytes]…
@@ -247,20 +399,91 @@ test('agyRead: only the new steps; a smaller DB starts over; no temp folder left
   assert.deepEqual(readdirSync(process.env.TMPDIR), [])
 })
 
+// an OpenCode database as 1.19.5 keeps it (the columns read): sessions with their parents, messages with their data
+const ocMake = async (f: string) => {
+  const { DatabaseSync } = await import('node:sqlite')
+  const db = new DatabaseSync(f)
+  db.exec("PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS session (id text PRIMARY KEY, project_id text NOT NULL DEFAULT 'p', parent_id text, directory text NOT NULL DEFAULT '/tmp'); CREATE TABLE IF NOT EXISTS message (id text PRIMARY KEY, session_id text NOT NULL, time_created integer NOT NULL, time_updated integer NOT NULL, data text NOT NULL)")
+  return db
+}
+const ocSaid = (db: any, id: string, session: string, model: string, t: [number, number, number, number, number], cost: number, done = true, ago = 0) => {
+  const at = Date.now() - ago
+  const data = JSON.stringify({ role: 'assistant', modelID: model, providerID: 'openrouter', cost, tokens: { total: t.reduce((a, b) => a + b), input: t[0], output: t[1], reasoning: t[2], cache: { read: t[3], write: t[4] } }, time: { created: at, ...(done && { completed: at + 1 }) }, mode: 'build', parentID: 'msg_user' })
+  db.prepare('INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET time_updated = excluded.time_updated, data = excluded.data').run(id, session, at, at, data) // updated in place, as OpenCode does: its rowid kept
+}
+const ocSessions = (db: any, main: string) => {
+  for (const [id, parent] of [[main, null], ['ses_sub', main], ['ses_subsub', 'ses_sub'], ['ses_other', null]]) db.prepare('INSERT OR IGNORE INTO session (id, parent_id) VALUES (?, ?)').run(id, parent)
+  db.prepare("INSERT OR IGNORE INTO message (id, session_id, time_created, time_updated, data) VALUES ('msg_user', ?, 0, 0, ?)").run(main, JSON.stringify({ role: 'user', time: { created: Date.now() } }))
+}
+
+test('ocRead: a session and its subagents’ messages, OpenCode’s own cost; one still answering read again; only the new rows', async t => {
+  const { ocRead, ocRows } = await import('../src/daemon/agentUsage.ts')
+  const dir = mkdtempSync(join(tmpdir(), 'laki-oc-test-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const f = join(dir, 'opencode.db')
+  const db = await ocMake(f)
+  ocSessions(db, 'ses_main')
+  ocSaid(db, 'm1', 'ses_main', 'z-ai/glm-5.1', [1000, 50, 10, 200, 0], 0.01)
+  ocSaid(db, 'm2', 'ses_sub', 'beam-free', [500, 20, 0, 0, 0], 0)
+  ocSaid(db, 'm3', 'ses_other', 'z-ai/glm-5.1', [9999, 0, 0, 0, 0], 9)
+  ocSaid(db, 'm4', 'ses_subsub', 'z-ai/glm-5.1', [100, 10, 0, 0, 0], 0.001)
+  ocSaid(db, 'm5', 'ses_main', 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002, false) // still answering
+  const by = (r: any) => Object.values(r.days).flatMap((d: any) => Object.entries(d)).map(([m, v]: any) => [m, v.tokens, Math.round(v.cost * 1e6) / 1e6]).sort()
+  let n = ocRows.n
+  const r1 = ocRead(f, 'ses_main')!
+  assert.deepEqual([by(r1), r1.last, r1.again, ocRows.n - n], [[['beam-free', 520, 0], ['z-ai/glm-5.1', 1260 + 110, 0.011]], 5, false, 5], 'its rows to the one still answering (the user’s and the other session’s not counted)')
+  ocSaid(db, 'm5', 'ses_main', 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002) // done: the same row, its usage final
+  n = ocRows.n
+  const r2 = ocRead(f, 'ses_main', r1.last)!
+  assert.deepEqual([by(r2), r2.last, ocRows.n - n], [[['z-ai/glm-5.1', 777, 0.002]], 6, 1], 'only that row')
+  assert.equal(ocRead(f, 'ses_main', 99)!.again, true, 'another database: read whole')
+  // begun two hours ago and never ended (its opencode killed): counted as it is, the rows after it too
+  ocSaid(db, 'm6', 'ses_main', 'z-ai/glm-5.1', [40, 4, 0, 0, 0], 0, false, 2 * 3_600_000)
+  ocSaid(db, 'm7', 'ses_main', 'z-ai/glm-5.1', [6, 0, 0, 0, 0], 0)
+  const r3 = ocRead(f, 'ses_main', r2.last)!
+  assert.deepEqual([by(r3), r3.last], [[['z-ai/glm-5.1', 50, 0]], 8])
+  db.close()
+  assert.equal(ocRead(join(dir, 'none.db'), 'ses_main'), undefined)
+})
+
+test("meter: OpenCode's sessions from its own database, for the Usage page and Today, at OpenCode's own price", async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200', LAKI_AGY_EVERY_MS: '200' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'opencode' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its session')
+  mkdirSync(join(rig.home, '.local/share/opencode'), { recursive: true })
+  const db = await ocMake(join(rig.home, '.local/share/opencode/opencode.db'))
+  t.after(() => db.close())
+  ocSessions(db, tab.resumeId)
+  ocSaid(db, 'm1', tab.resumeId, 'z-ai/glm-5.1', [1000, 50, 10, 200, 0], 0.01)
+  ocSaid(db, 'm2', 'ses_sub', 'beam-free', [500, 20, 0, 0, 0], 0)
+  ocSaid(db, 'm3', 'ses_other', 'z-ai/glm-5.1', [9999, 0, 0, 0, 0], 9)
+  ocSaid(db, 'm4', tab.resumeId, 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002, false)
+  const rows = async () => (await rig.rpc('usageDays')).rows.filter((r: any) => r.agent === 'opencode').map((r: any) => [r.model, r.tokens, r.cost, r.priced, r.ws]).sort()
+  await until(async () => (await rows()).length === 2, 'its days')
+  assert.deepEqual(await rows(), [['beam-free', 520, 0, true, ws.id], ['z-ai/glm-5.1', 1260, 0.01, true, ws.id]])
+  ocSaid(db, 'm4', tab.resumeId, 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002)
+  await until(async () => (await rows())[1]?.[1] === 1260 + 777, 'the answer once it ended')
+  assert.deepEqual((await rows())[1], ['z-ai/glm-5.1', 2037, 0.012, true, ws.id])
+  const today = await until(async () => (x => x?.tokens === 2557 && x)((await rig.rpc('state')).today), 'today’s')
+  assert.deepEqual([today.cost, today.unpriced], [0.01, undefined])
+  assert.ok(rig.fakeLog().some((l: any) => l.bin === 'opencode' && l.args[0] === 'debug'), 'its data folder asked of opencode')
+})
+
 test('meter: each day by model, for the Usage page; a day past and a model of its own each', () => {
-  const m = meterNew(now)
+  const m = meterNew()
   const u = (output: number) => ({ input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output })
   meterOf('claude', said('a', 'claude-opus-4-6', u(100), 48) + said('b', 'claude-sonnet-4-5', u(10)) + said('b', 'claude-sonnet-4-5', u(30)) + said('c', 'claude-opus-4-6', u(5)), m, now)
-  assert.deepEqual(Object.fromEntries(Object.entries(m.days!).map(([d, x]) => [d, Object.fromEntries(Object.entries(x).map(([k, v]) => [k, v.tokens]))])), {
+  assert.deepEqual(Object.fromEntries(Object.entries(m.days!).map(([d, x]) => [d, Object.fromEntries(Object.entries(x).map(([k, v]) => [k, partsTokens(v)]))])), {
     [dayOf(now - 48 * 3600e3)]: { 'claude-opus-4-6': 100 },
     [dayOf(now)]: { 'claude-sonnet-4-5': 30, 'claude-opus-4-6': 5 }, // b's last block only
   })
-  const c = meterOf('codex', line({ type: 'turn_context', timestamp: at(0), payload: { model: 'gpt-5-codex' } }) + tokenCount({ total_tokens: 900 }, { total_tokens: 900 }), meterNew(now), now)
-  assert.deepEqual(c.days, { [dayOf(now)]: { 'gpt-5-codex': { tokens: 900, cost: c.cost } } })
+  const c = meterOf('codex', line({ type: 'turn_context', timestamp: at(0), payload: { model: 'gpt-5-codex' } }) + tokenCount({ input_tokens: 800, cached_input_tokens: 0, output_tokens: 100, total_tokens: 900 }, { total_tokens: 900 }), meterNew(), now)
+  assert.deepEqual(c.days, { [dayOf(now)]: { 'gpt-5-codex': { in: 800, out: 100 } } })
 })
 
 test("meter: claude waiting out an API error (its api_error line) until it answers", () => {
-  const m = meterNew(now)
+  const m = meterNew()
   const err = (n: number, ms: number) => line({ type: 'system', subtype: 'api_error', level: 'error', timestamp: at(0), error: { message: 'Overloaded', formatted: 'Rate limited' }, retryInMs: ms, retryAttempt: n, maxRetries: 10 })
   meterOf('claude', err(1, 5000), m, now)
   assert.deepEqual(m.retry, { n: 1, max: 10, at: Date.parse(at(0)), until: Date.parse(at(0)) + 5000, why: 'Rate limited' })

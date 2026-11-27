@@ -430,6 +430,8 @@ export function PanelWindow() {
     prFile: path => api.call<FileContent>('prFile', { ws, path }),
     agents: agentTabs.map(t => ({ id: t.id, name: t.name })),
     threads: () => api.call<Thread[]>('prThreads', { ws }),
+    threadReply: (thread, body) => api.call('prThreadReply', { ws, thread, body }),
+    threadResolve: (thread, resolved, body) => api.call('prThreadResolve', { ws, thread, resolved, body }),
     apply: async (path, edits, then) => {
       const was = (await api.call<FileContent>('fileRead', { ws, path })).text
       if (was === undefined) return toast(`${path} isn't text`)

@@ -25,6 +25,11 @@ draft to the public releases repo: [manual-release.md](manual-release.md).
    The build tools' high and critical ones only warn. The registry not answering warns and passes, unless
    `LAKI_AUDIT_STRICT=1` (release.sh sets it); `LAKI_SKIP_AUDIT=1` skips it loudly. package.json's minimatch override
    (electron-builder's own copies) stays until electron-builder takes minimatch 11 itself.
+   Then `npm run prices` (`scripts/prices.ts`): LiteLLM's model price table, fetched, into `src/shared/prices.json`
+   (the claude-*, gpt-5*, grok-* and gemini-* rows Laki prices transcripts by, dated); read its diff (a price that moved,
+   a model gone) and commit it. A model LiteLLM lacks or gets wrong goes in `src/shared/types.ts` `PRICE_OWN`, which wins;
+   `test/meter.test.ts` fails while a model the test fixtures name has no price. The app never fetches prices; `npm run
+   dmg` prints a warning when the file is over 30 days old.
 4. Build:
    ```bash
    npm run pack       # this Mac's architecture: dist/mac-arm64/Laki.app (Intel: dist/mac)

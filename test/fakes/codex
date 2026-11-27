@@ -6,13 +6,25 @@ const args = process.argv.slice(2)
 const tf = /LAKI_TAB_TOKEN_FILE="([^"]+)"/.exec(args.find(a => a.startsWith('mcp_servers.laki.env=')) ?? '')?.[1]
 const tokenFile = tf ? (() => { try { return { path: tf, mode: fs.statSync(tf).mode & 0o777, token: fs.readFileSync(tf, 'utf8') } } catch { return null } })() : undefined
 fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ tokenFile, bin: 'codex', tab: process.env.LAKI_TAB, args, env: { CODEX_HOME: process.env.CODEX_HOME, ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('LAKI_MCP_'))) } }) + '\n')
-// app-server (agentModels): model/list after initialize, one hidden; FAKE_MODELS: none (empty), or it fails (fail)
+// app-server (agentModels): model/list after initialize, one hidden; FAKE_MODELS: none (empty), or it fails (fail).
+// account/rateLimits/read (usage.ts): a 5-hour and a week, and a model's own limit; FAKE_CODEX_LIMITS=unknown: an
+// older codex's error for a method it lacks, slow: no answer, fail: an error of its own
 if (args[0] === 'app-server') {
   if (process.env.FAKE_MODELS === 'fail') return process.exit(1)
   let buf = ''
   return process.stdin.on('data', d => {
     buf += d
     if (buf.includes('"model/list"') && process.env.FAKE_MODELS === 'empty') return void ((buf = ''), process.stdout.write(JSON.stringify({ id: 2, result: { data: [] } }) + '\n'))
+    if (buf.includes('"account/rateLimits/read"')) {
+      buf = ''
+      const at = Math.floor(Date.now() / 1000)
+      const lim = process.env.FAKE_CODEX_LIMITS
+      if (lim === 'slow') return
+      if (lim === 'unknown') return void process.stdout.write(JSON.stringify({ id: 2, error: { code: -32600, message: 'Invalid request: unknown variant `account/rateLimits/read`' } }) + '\n')
+      if (lim === 'fail') return void process.stdout.write(JSON.stringify({ id: 2, error: { code: -32603, message: 'not signed in' } }) + '\n')
+      const main = { limitId: 'codex', primary: { usedPercent: 21, windowDurationMins: 300, resetsAt: at + 3600 }, secondary: { usedPercent: 8, windowDurationMins: 10080, resetsAt: at + 5 * 86400 }, planType: 'plus' }
+      return void process.stdout.write(JSON.stringify({ id: 2, result: { rateLimits: main, rateLimitsByLimitId: { codex: main, gpt_x: { limitId: 'gpt_x', limitName: 'GPT-X', primary: { usedPercent: 50, windowDurationMins: 10080, resetsAt: at + 86400 }, secondary: null } } } }) + '\n')
+    }
     if (buf.includes('"model/list"')) process.stdout.write(JSON.stringify({ id: 2, result: { data: [{ model: 'gpt-x', displayName: 'GPT-X', isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: 'medium' }, { reasoningEffort: 'ultra' }] }, { model: 'hidden-1', hidden: true }] } }) + '\n')
   })
 }

@@ -8,7 +8,7 @@ import type { WorkflowItem } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseAfter, parseWhen, partsOf, type Rule, stamp, wsTitle } from '../../shared/when'
 import { runIcon, runLine } from './runs'
-import { ask, askText, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu, act } from './ui'
+import { ask, askText, cardOpen, escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu, act } from './ui'
 import './schedules.css'
 import './pagetitle.css'
 
@@ -498,8 +498,264 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
       {(kids => kids.length > 0 && <div className="sched-deps">{kids.map(k => <div key={k.id}>{row(k, [...seen, s.id])}</div>)}</div>)(schedules.filter(x => x.after?.task === s.id && !seen.includes(x.id)))}
     </>
   )
+  // the task's form: a panel at the page's right (Page's side), the list beside it; Esc or × closes it (a change: asked first)
+  const editing = form?.id ? schedules.find(x => x.id === form.id) : undefined
+  const side = form && (
+    // Enter in a field never saves it (a time typed, a name): ⌘⏎ or the button does
+    <form key={form.id ?? 'new'} className="form sched-form sched-side" aria-label={form.id ? 'Edit task' : 'New task'} onSubmit={e => e.preventDefault()} onKeyDown={e => (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), save()), e.key === 'Escape' && !e.defaultPrevented && !e.nativeEvent.isComposing && !cardOpen() && (e.preventDefault(), void open(null)))}>
+      <div className="sched-side-head">
+        <span className="sched-icon" data-kind={form.workflow ? 'flow' : form.widget ? 'panel' : 'fork'}>
+          <Icon name={form.id ? 'pencil' : 'plus'} />
+        </span>
+        <span className="sched-side-title">
+          <b>{form.id ? 'Edit task' : 'New task'}</b>
+          <span className="muted small">{editing ? titleOf(editing) : project?.name}</span>
+        </span>
+        <IconButton icon="x" title={changed ? 'Close (asks first: it has changes)' : 'Close (Esc)'} onClick={() => void open(null)} />
+      </div>
+      <div className="sched-side-body">
+        {err && <div className="field-err">{err}</div>}
+        <section className="sched-field" data-field="what">
+          <h4>What</h4>
+          <div className="nw-card nw-composer">
+            {form.widget && !form.action ? (
+              <div className="muted small sched-ext-says">Fetches {extOf(form.widget)?.name ?? form.widget} at its times, on top of its own schedule. Off, it waits until you turn it on.</div>
+            ) : (
+              <textarea rows={3} data-field="prompt" value={form.prompt} aria-label={form.workflow ? 'Its task' : form.widget ? 'Its argument' : 'Prompt'} placeholder={form.workflow ? `What ${flowName(form.workflow)} works on: its {{task}}` : form.widget ? `Optional: what ${form.action} gets as $WIDGET_ARG` : 'What the agent should do: update the dependencies, run the tests, open a PR if they pass'} onChange={e => set({ prompt: e.target.value })} autoFocus />
+            )}
+            <div className="prompt-tools">
+              <span className="prompt-tools-end">
+                <button type="button" className="nw-pick" data-field="preset" aria-haspopup="menu" data-tip="The agent that gets it, a workflow that runs it, or an extension to fetch" onClick={agentMenu}>
+                  <Icon name={form.workflow ? 'flow' : form.widget ? 'panel' : 'agent'} />
+                  <span>{form.workflow ? flowName(form.workflow) : form.widget ? extName(form.widget, form.action) : form.preset}</span>
+                  <Icon name="chevron" size={11} />
+                </button>
+              </span>
+            </div>
+          </div>
+        </section>
+        <section className="sched-field">
+          <h4>{evented ? 'On' : form.after ? 'After' : 'When'}</h4>
+          {evented ? (
+            <>
+              <div className="nw-chips sched-event">
+                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="What starts it: GitHub's, read every few minutes" onClick={eventMenu}>
+                  <Icon name="activity" />
+                  <span className="nw-chip-text">{triggerWords(form.trigger!)}</span>
+                  <Icon name="chevron" size={11} />
+                </button>
+                {form.trigger!.event === 'webhook' ? (
+                  <>
+                    <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Which of Settings › Webhooks" onClick={hookMenu}>
+                      <Icon name="zap" />
+                      <span className="nw-chip-text">{form.trigger!.hook ?? 'a webhook'}</span>
+                      <Icon name="chevron" size={11} />
+                    </button>
+                    <label className="nw-chip" data-tip="Only this event of it, as it sends it (issues, push; Linear's Issue). Empty, every event">
+                      <Icon name="activity" />
+                      <input className="nw-chip-input" value={form.trigger!.hookEvent ?? ''} aria-label="Its event" placeholder="any event" spellCheck={false} onChange={e => setTrigger({ hookEvent: e.target.value || undefined })} />
+                    </label>
+                  </>
+                ) : form.trigger!.event === 'comment' ? (
+                  <>
+                    <label className="nw-chip" data-tip="The word after /laki that picks this task: fix for /laki fix (empty: every /laki comment)">
+                      <Icon name="message" />
+                      <input className="nw-chip-input" value={form.trigger!.word ?? ''} aria-label="Its word" placeholder="any word" spellCheck={false} onChange={e => setTrigger({ word: e.target.value || undefined })} />
+                    </label>
+                    <label className="nw-chip" data-tip="Who may start it besides you (your gh login): GitHub logins, a comma between">
+                      <Icon name="user" />
+                      <input className="nw-chip-input" value={(form.trigger!.logins ?? []).join(',')} aria-label="Logins" placeholder="only you" spellCheck={false} onChange={e => setTrigger({ logins: e.target.value ? e.target.value.split(',') : undefined })} />
+                    </label>
+                    <button type="button" className="nw-chip" aria-pressed={!!form.trigger!.reply} data-tip="As its turn ends, its agent's last answer goes back as a comment, by your gh" onClick={() => setTrigger({ reply: form.trigger!.reply ? undefined : true })}>
+                      <Icon name={form.trigger!.reply ? 'check' : 'message'} />
+                      <span className="nw-chip-text">{form.trigger!.reply ? 'replies with its answer' : 'no reply'}</span>
+                    </button>
+                  </>
+                ) : form.trigger!.event === 'issue.opened' ? (
+                  <label className="nw-chip" data-tip="Only issues with this label (empty: any)">
+                    <Icon name="tag" />
+                    <input className="nw-chip-input" value={form.trigger!.label ?? ''} aria-label="Label" placeholder="any label" spellCheck={false} onChange={e => setTrigger({ label: e.target.value })} />
+                  </label>
+                ) : (
+                  <label className="nw-chip" data-tip={form.trigger!.event.startsWith('pr.') ? 'Only PRs into this branch (empty: any)' : 'The branch (empty: its main)'}>
+                    <Icon name="pr" />
+                    <input className="nw-chip-input" value={form.trigger!.branch ?? ''} aria-label="Branch" placeholder={form.trigger!.event.startsWith('pr.') ? 'into any branch' : 'its main branch'} spellCheck={false} onChange={e => setTrigger({ branch: e.target.value })} />
+                  </label>
+                )}
+                {form.trigger!.event !== 'push' && form.trigger!.event !== 'ci.failed' && form.trigger!.event !== 'webhook' && form.trigger!.event !== 'comment' && (
+                  <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Whose PRs, reviews or issues" onClick={byMenu}>
+                    <Icon name="user" />
+                    <span className="nw-chip-text">{form.trigger!.by === 'others' ? 'by others' : form.trigger!.by === 'me' ? 'by me' : 'by anyone'}</span>
+                    <Icon name="chevron" size={11} />
+                  </button>
+                )}
+              </div>
+              <div className="schedule-preview muted">
+                <Icon name="check" /> One run an event, {form.trigger!.gap ?? 30} minutes apart at least, {form.trigger!.perDay ?? 10} a day at most{form.trigger!.event === 'comment' ? <>; {'{{event.body}}'} in the prompt is the comment's text after /laki (fenced, as data: never instructions); on a PR it runs in the PR's workspace, a fork's waits for your click</> : form.trigger!.event === 'webhook' ? <>, at once as a signed one comes; {'{{event.body}}'} in the prompt is what it posted (fenced, as data: never instructions)</> : <>; a fork's PR waits for your click. {'{{event.title}}'}, {'{{event.url}}'}, {'{{event.number}}'} and {'{{event.branch}}'} in the prompt are its</>}
+              </div>
+            </>
+          ) : form.after ? (
+            <>
+              <div className="nw-chips sched-event">
+                <button type="button" className="nw-chip" data-field="after" aria-haspopup="menu" data-tip="The task whose run it follows" onClick={afterMenu}>
+                  <Icon name="cornerUpRight" />
+                  <span className="nw-chip-text">after {afterName(form.after.task)}</span>
+                  <Icon name="chevron" size={11} />
+                </button>
+                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="How that run must end" onClick={afterHow}>
+                  <span className="nw-chip-text">{form.after.when === 'any' ? 'however it ended' : 'when it ended done'}</span>
+                  <Icon name="chevron" size={11} />
+                </button>
+              </div>
+              <div className="schedule-preview muted">
+                <Icon name="check" /> Runs at once as {afterName(form.after.task)}'s run ends{form.after.when === 'any' ? '' : ' done'}, {form.after.perDay ?? 10} a day at most
+              </div>
+            </>
+          ) : (
+            <>
+            <label className={`nw-chip sched-when ${rule && !valid ? 'bad' : ''}`}>
+              <Icon name="clock" />
+              <input className="nw-chip-input" value={form.when} aria-label="When" placeholder={`When: ${EXAMPLES[0]}`} spellCheck={false} onChange={e => set({ when: e.target.value })} />
+            </label>
+            {rule && 'error' in rule && <div className="field-err">{rule.error}</div>}
+            {typed && (typedTask ? <div className="schedule-preview"><Icon name="check" /> Runs as {titleOf(typedTask)}'s run ends{typed.when === 'any' ? '' : ' done'}</div> : <div className="field-err">No task in {project?.name} is named {typed.name}</div>)}
+            {valid && (
+              <button type="button" className="link small sched-missed" aria-haspopup="menu" onClick={missedMenu}>
+                If the Mac sleeps through it: {catchesOf(rule, form.missed) ? `runs when it wakes, until ${form.catchUntil !== undefined ? hm(form.catchUntil) : 'its next time'}` : 'skipped (the log says so)'}
+              </button>
+            )}
+            {typed ? null : valid ? (
+              <div className="schedule-preview">
+                <Icon name="check" /> {describe(rule)} · next {nextOf(rule).map(at).join(', ')}
+              </div>
+            ) : (
+              <div className="schedule-examples">
+                {EXAMPLES.map(x => (
+                  <button type="button" key={x} className="chip" onClick={() => set({ when: x })}>
+                    {x}
+                  </button>
+                ))}
+              </div>
+            )}
+              {!form.workflow && !form.widget && (
+                <button type="button" className="link small sched-missed" onClick={() => set({ trigger: { event: 'ci.failed' } })}>
+                  Or on an event: CI failing, a PR, an issue, a push…
+                </button>
+              )}
+              {afterOn && mine.length > 0 && !typed && (
+                <button type="button" className="link small sched-missed" onClick={() => set({ after: { task: mine[0].id, when: 'done' } })}>
+                  Or after another task ends…
+                </button>
+              )}
+            </>
+          )}
+        </section>
+        <section className="sched-field">
+          <h4>Where</h4>
+          <div className="nw-chips">
+            <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Its project" onClick={projectMenu}>
+              <Icon name={project?.git === false ? 'folder' : 'fork'} />
+              <span className="nw-chip-text">{project?.name}</span>
+              <Icon name="chevron" size={11} />
+            </button>
+            {!form.workflow && (!form.widget || scopedExt) && (
+              <button type="button" className="nw-chip" data-field="ws" aria-haspopup="menu" data-tip={form.ws.startsWith('local') && project ? `Where each run goes: ${project.path}` : 'Where each run goes'} onClick={whereMenu}>
+                <Icon name={WHERE.find(x => x[0] === form.ws)?.[2] ?? 'terminal'} />
+                <span className="nw-chip-text">{where(form.ws)}{skip ? ', no setup' : ''}</span>
+                <Icon name="chevron" size={11} />
+              </button>
+            )}
+            {shares && (
+              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="What a run tells the agent there: the session it has, or a new one" onClick={e => openMenu(e, [{ label: 'Continue its session', icon: 'agent', sub: 'Its agent there gets the prompt (after its turn)', hint: !form.fresh ? ON : undefined, run: () => set({ fresh: false }) }, { label: 'Start fresh', icon: 'plus', sub: 'A new agent tab there each run', hint: form.fresh ? ON : undefined, run: () => set({ fresh: true }) }])}>
+                <Icon name={form.fresh ? 'plus' : 'agent'} />
+                <span className="nw-chip-text">{form.fresh ? 'start fresh' : 'continue'}</span>
+                <Icon name="chevron" size={11} />
+              </button>
+            )}
+            {offBranch && (
+              <span className="nw-chip nw-base" data-field="base" data-tip="The branch each run's worktree starts off (empty: the one the project has checked out). Gone when it runs: that run fails and says why">
+                <Icon name="pr" />
+                <input className="nw-chip-input" value={base} aria-label="Base branch" placeholder="its checkout" spellCheck={false} onChange={e => set({ base: e.target.value })} />
+                {!!listed?.branches.length && <IconButton icon="chevron" title="Pick the base branch" className="nw-chip-more" onClick={baseMenu} />}
+              </span>
+            )}
+          </div>
+        </section>
+        <section className="sched-field">
+          <h4>Options</h4>
+          <div className="nw-chips">
+            {!form.workflow && !form.widget && (
+              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Run only when there's something to do: a skip is logged, no agent starts. What it found is {{check}} in the prompt" onClick={onlyMenu}>
+                <Icon name="filter" />
+                <span className="nw-chip-text">{onlyWords(form.onlyIf)}</span>
+                <Icon name="chevron" size={11} />
+              </button>
+            )}
+            {newEach && (
+              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Its older run workspaces archived as a new one starts (only those with nothing to lose); one that changed nothing archived as it ends" onClick={keepMenu}>
+                <Icon name="archive" />
+                <span className="nw-chip-text">{form.keep === 0 ? 'keeps every workspace' : `keeps its last ${form.keep ?? 5}`}</span>
+                <Icon name="chevron" size={11} />
+              </button>
+            )}
+            {!form.workflow && !form.widget && (
+              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="A run stops (as Stop does: its chat stays) after this much of its agent's working time; waiting for you isn't counted. Below it, every task's and how many run at once" onClick={limitMenu}>
+                <Icon name="clock" />
+                <span className="nw-chip-text">{(n => (n ? `stops after ${mins(n)}` : 'no time limit'))(form.maxMinutes ?? allMax)}</span>
+                <Icon name="chevron" size={11} />
+              </button>
+            )}
+            <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="When a run tells you (a notification, and a phone push if Settings has one)" onClick={e => openMenu(e, NOTIFY.map(([v, label, sub]) => ({ label, sub, icon: v === 'never' ? 'bellOff' : 'bell', hint: (form.notify ?? 'needs') === v ? ON : undefined, run: () => set({ notify: v }) }) as MenuItem))}>
+              <Icon name={form.notify === 'never' ? 'bellOff' : 'bell'} />
+              <span className="nw-chip-text">{form.notify === 'never' ? 'never tells you' : form.notify === 'always' ? 'tells you always' : 'tells you when it needs you'}</span>
+              <Icon name="chevron" size={11} />
+            </button>
+          </div>
+        </section>
+        <section className="sched-field">
+          <h4>Name</h4>
+          <div className="nw-chips">
+            <label className="nw-chip sched-name-field" data-tip={`Optional; a new workspace or session is named after it. {{DD-MM-YY}}, {{YYYY-MM-DD}}, {{HH:mm}} or {{ddd D MMM}} in the name or the prompt become the run's date and time`}>
+              <Icon name="pencil" />
+              <input className="nw-chip-input" value={form.name} aria-label="Name" placeholder={makes ? 'name: from the prompt, dated' : form.widget && !form.prompt.trim() ? `name: ${extName(form.widget, form.action)}` : 'name: from the prompt'} spellCheck={false} onChange={e => set({ name: e.target.value })} />
+            </label>
+          </div>
+          {first !== undefined && form.prompt.trim() && (makes || stamp(form.prompt, first) !== form.prompt) && (
+            <div className="schedule-preview muted">
+              {[makes && `Its ${form.ws === 'local-new' ? 'session' : 'workspace'}: ${wsTitle({ name: form.name.trim(), prompt: form.prompt }, first)}`, stamp(form.prompt, first) !== form.prompt && `${makes ? 'its' : 'Its'} prompt: “${stamp(form.prompt, first).slice(0, 80)}”`]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+          )}
+        </section>
+      </div>
+      <div className="buttons sched-side-foot">
+        <span className="muted small">⌘⏎ {form.id ? 'saves' : 'schedules it'}</span>
+        <span className="spacer" />
+        {form.id && api.copy && (
+          <button type="button" disabled={changed} data-tip={changed ? 'Save or cancel your changes first' : 'A copy of it as saved, named … (copy), off: change it and turn it on'} onClick={() => (s => s && void copy(s))(schedules.find(x => x.id === form.id))}>
+            Duplicate
+          </button>
+        )}
+        <button type="button" onClick={() => open(null)}>
+          Cancel
+        </button>
+        <button type="button" className="primary" onClick={save} disabled={!ready}>
+          {saving ? (
+            <>
+              <span className="btn-spin" /> Saving…
+            </>
+          ) : form.id ? (
+            'Save'
+          ) : (
+            'Schedule it'
+          )}
+        </button>
+      </div>
+    </form>
+  )
   return (
-    <Page title="Scheduled tasks" big esc={false} onClose={onClose}>
+    <Page title="Scheduled tasks" big esc={false} onClose={onClose} side={side}>
       <div className="schedules">
         <header className="sched-hero">
           <span className="sched-hero-icon">
@@ -516,7 +772,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                 <Icon name="chevron" size={11} />
               </button>
             )}
-            {!form && (
+            {!(form && !form.id) && (
               <button type="button" className="primary" disabled={!view.projects.length} data-tip={view.projects.length ? undefined : 'Open a project first (⌘O)'} onClick={() => open(blank())}>
                 <Icon name="plus" /> New task
               </button>
@@ -556,230 +812,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
           </div>
         ))}
 
-        {form && (
-          // Enter in a field never saves it (a time typed, a name): ⌘⏎ or the button does
-          <form className="form sched-form" onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), save())}>
-            <div className="nw-card nw-composer">
-              {form.widget && !form.action ? (
-                <div className="muted small sched-ext-says">Fetches {extOf(form.widget)?.name ?? form.widget} at its times, on top of its own schedule. Off, it waits until you turn it on.</div>
-              ) : (
-                <textarea rows={3} data-field="prompt" value={form.prompt} aria-label={form.workflow ? 'Its task' : form.widget ? 'Its argument' : 'Prompt'} placeholder={form.workflow ? `What ${flowName(form.workflow)} works on: its {{task}}` : form.widget ? `Optional: what ${form.action} gets as $WIDGET_ARG` : 'What the agent should do: update the dependencies, run the tests, open a PR if they pass'} onChange={e => set({ prompt: e.target.value })} autoFocus />
-              )}
-              <div className="prompt-tools">
-                <span className="prompt-tools-end">
-                  <button type="button" className="nw-pick" data-field="preset" aria-haspopup="menu" data-tip="The agent that gets it, a workflow that runs it, or an extension to fetch" onClick={agentMenu}>
-                    <Icon name={form.workflow ? 'flow' : form.widget ? 'panel' : 'agent'} />
-                    <span>{form.workflow ? flowName(form.workflow) : form.widget ? extName(form.widget, form.action) : form.preset}</span>
-                    <Icon name="chevron" size={11} />
-                  </button>
-                </span>
-              </div>
-            </div>
-            {evented ? (
-              <>
-                <div className="nw-chips sched-event">
-                  <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="What starts it: GitHub's, read every few minutes" onClick={eventMenu}>
-                    <Icon name="activity" />
-                    <span className="nw-chip-text">{triggerWords(form.trigger!)}</span>
-                    <Icon name="chevron" size={11} />
-                  </button>
-                  {form.trigger!.event === 'webhook' ? (
-                    <>
-                      <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Which of Settings › Webhooks" onClick={hookMenu}>
-                        <Icon name="zap" />
-                        <span className="nw-chip-text">{form.trigger!.hook ?? 'a webhook'}</span>
-                        <Icon name="chevron" size={11} />
-                      </button>
-                      <label className="nw-chip" data-tip="Only this event of it, as it sends it (issues, push; Linear's Issue). Empty, every event">
-                        <Icon name="activity" />
-                        <input className="nw-chip-input" value={form.trigger!.hookEvent ?? ''} aria-label="Its event" placeholder="any event" spellCheck={false} onChange={e => setTrigger({ hookEvent: e.target.value || undefined })} />
-                      </label>
-                    </>
-                  ) : form.trigger!.event === 'comment' ? (
-                    <>
-                      <label className="nw-chip" data-tip="The word after /laki that picks this task: fix for /laki fix (empty: every /laki comment)">
-                        <Icon name="message" />
-                        <input className="nw-chip-input" value={form.trigger!.word ?? ''} aria-label="Its word" placeholder="any word" spellCheck={false} onChange={e => setTrigger({ word: e.target.value || undefined })} />
-                      </label>
-                      <label className="nw-chip" data-tip="Who may start it besides you (your gh login): GitHub logins, a comma between">
-                        <Icon name="user" />
-                        <input className="nw-chip-input" value={(form.trigger!.logins ?? []).join(',')} aria-label="Logins" placeholder="only you" spellCheck={false} onChange={e => setTrigger({ logins: e.target.value ? e.target.value.split(',') : undefined })} />
-                      </label>
-                      <button type="button" className="nw-chip" aria-pressed={!!form.trigger!.reply} data-tip="As its turn ends, its agent's last answer goes back as a comment, by your gh" onClick={() => setTrigger({ reply: form.trigger!.reply ? undefined : true })}>
-                        <Icon name={form.trigger!.reply ? 'check' : 'message'} />
-                        <span className="nw-chip-text">{form.trigger!.reply ? 'replies with its answer' : 'no reply'}</span>
-                      </button>
-                    </>
-                  ) : form.trigger!.event === 'issue.opened' ? (
-                    <label className="nw-chip" data-tip="Only issues with this label (empty: any)">
-                      <Icon name="tag" />
-                      <input className="nw-chip-input" value={form.trigger!.label ?? ''} aria-label="Label" placeholder="any label" spellCheck={false} onChange={e => setTrigger({ label: e.target.value })} />
-                    </label>
-                  ) : (
-                    <label className="nw-chip" data-tip={form.trigger!.event.startsWith('pr.') ? 'Only PRs into this branch (empty: any)' : 'The branch (empty: its main)'}>
-                      <Icon name="pr" />
-                      <input className="nw-chip-input" value={form.trigger!.branch ?? ''} aria-label="Branch" placeholder={form.trigger!.event.startsWith('pr.') ? 'into any branch' : 'its main branch'} spellCheck={false} onChange={e => setTrigger({ branch: e.target.value })} />
-                    </label>
-                  )}
-                  {form.trigger!.event !== 'push' && form.trigger!.event !== 'ci.failed' && form.trigger!.event !== 'webhook' && form.trigger!.event !== 'comment' && (
-                    <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Whose PRs, reviews or issues" onClick={byMenu}>
-                      <Icon name="user" />
-                      <span className="nw-chip-text">{form.trigger!.by === 'others' ? 'by others' : form.trigger!.by === 'me' ? 'by me' : 'by anyone'}</span>
-                      <Icon name="chevron" size={11} />
-                    </button>
-                  )}
-                </div>
-                <div className="schedule-preview muted">
-                  <Icon name="check" /> One run an event, {form.trigger!.gap ?? 30} minutes apart at least, {form.trigger!.perDay ?? 10} a day at most{form.trigger!.event === 'comment' ? <>; {'{{event.body}}'} in the prompt is the comment's text after /laki (fenced, as data: never instructions); on a PR it runs in the PR's workspace, a fork's waits for your click</> : form.trigger!.event === 'webhook' ? <>, at once as a signed one comes; {'{{event.body}}'} in the prompt is what it posted (fenced, as data: never instructions)</> : <>; a fork's PR waits for your click. {'{{event.title}}'}, {'{{event.url}}'}, {'{{event.number}}'} and {'{{event.branch}}'} in the prompt are its</>}
-                </div>
-              </>
-            ) : form.after ? (
-              <>
-                <div className="nw-chips sched-event">
-                  <button type="button" className="nw-chip" data-field="after" aria-haspopup="menu" data-tip="The task whose run it follows" onClick={afterMenu}>
-                    <Icon name="cornerUpRight" />
-                    <span className="nw-chip-text">after {afterName(form.after.task)}</span>
-                    <Icon name="chevron" size={11} />
-                  </button>
-                  <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="How that run must end" onClick={afterHow}>
-                    <span className="nw-chip-text">{form.after.when === 'any' ? 'however it ended' : 'when it ended done'}</span>
-                    <Icon name="chevron" size={11} />
-                  </button>
-                </div>
-                <div className="schedule-preview muted">
-                  <Icon name="check" /> Runs at once as {afterName(form.after.task)}'s run ends{form.after.when === 'any' ? '' : ' done'}, {form.after.perDay ?? 10} a day at most
-                </div>
-              </>
-            ) : (
-              <>
-              <label className={`nw-chip sched-when ${rule && !valid ? 'bad' : ''}`}>
-                <Icon name="clock" />
-                <input className="nw-chip-input" value={form.when} aria-label="When" placeholder={`When: ${EXAMPLES[0]}`} spellCheck={false} onChange={e => set({ when: e.target.value })} />
-              </label>
-              {rule && 'error' in rule && <div className="field-err">{rule.error}</div>}
-              {typed && (typedTask ? <div className="schedule-preview"><Icon name="check" /> Runs as {titleOf(typedTask)}'s run ends{typed.when === 'any' ? '' : ' done'}</div> : <div className="field-err">No task in {project?.name} is named {typed.name}</div>)}
-              {valid && (
-                <button type="button" className="link small sched-missed" aria-haspopup="menu" onClick={missedMenu}>
-                  If the Mac sleeps through it: {catchesOf(rule, form.missed) ? `runs when it wakes, until ${form.catchUntil !== undefined ? hm(form.catchUntil) : 'its next time'}` : 'skipped (the log says so)'}
-                </button>
-              )}
-              {typed ? null : valid ? (
-                <div className="schedule-preview">
-                  <Icon name="check" /> {describe(rule)} · next {nextOf(rule).map(at).join(', ')}
-                </div>
-              ) : (
-                <div className="schedule-examples">
-                  {EXAMPLES.map(x => (
-                    <button type="button" key={x} className="chip" onClick={() => set({ when: x })}>
-                      {x}
-                    </button>
-                  ))}
-                </div>
-              )}
-                {!form.workflow && !form.widget && (
-                  <button type="button" className="link small sched-missed" onClick={() => set({ trigger: { event: 'ci.failed' } })}>
-                    Or on an event: CI failing, a PR, an issue, a push…
-                  </button>
-                )}
-                {afterOn && mine.length > 0 && !typed && (
-                  <button type="button" className="link small sched-missed" onClick={() => set({ after: { task: mine[0].id, when: 'done' } })}>
-                    Or after another task ends…
-                  </button>
-                )}
-              </>
-            )}
-            <div className="nw-chips">
-              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Its project" onClick={projectMenu}>
-                <Icon name={project?.git === false ? 'folder' : 'fork'} />
-                <span className="nw-chip-text">{project?.name}</span>
-                <Icon name="chevron" size={11} />
-              </button>
-              {!form.workflow && (!form.widget || scopedExt) && (
-                <button type="button" className="nw-chip" data-field="ws" aria-haspopup="menu" data-tip={form.ws.startsWith('local') && project ? `Where each run goes: ${project.path}` : 'Where each run goes'} onClick={whereMenu}>
-                  <Icon name={WHERE.find(x => x[0] === form.ws)?.[2] ?? 'terminal'} />
-                  <span className="nw-chip-text">{where(form.ws)}{skip ? ', no setup' : ''}</span>
-                  <Icon name="chevron" size={11} />
-                </button>
-              )}
-              {shares && (
-                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="What a run tells the agent there: the session it has, or a new one" onClick={e => openMenu(e, [{ label: 'Continue its session', icon: 'agent', sub: 'Its agent there gets the prompt (after its turn)', hint: !form.fresh ? ON : undefined, run: () => set({ fresh: false }) }, { label: 'Start fresh', icon: 'plus', sub: 'A new agent tab there each run', hint: form.fresh ? ON : undefined, run: () => set({ fresh: true }) }])}>
-                  <Icon name={form.fresh ? 'plus' : 'agent'} />
-                  <span className="nw-chip-text">{form.fresh ? 'start fresh' : 'continue'}</span>
-                  <Icon name="chevron" size={11} />
-                </button>
-              )}
-              {offBranch && (
-                <span className="nw-chip nw-base" data-field="base" data-tip="The branch each run's worktree starts off (empty: the one the project has checked out). Gone when it runs: that run fails and says why">
-                  <Icon name="pr" />
-                  <input className="nw-chip-input" value={base} aria-label="Base branch" placeholder="its checkout" spellCheck={false} onChange={e => set({ base: e.target.value })} />
-                  {!!listed?.branches.length && <IconButton icon="chevron" title="Pick the base branch" className="nw-chip-more" onClick={baseMenu} />}
-                </span>
-              )}
-              {!form.workflow && !form.widget && (
-                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Run only when there's something to do: a skip is logged, no agent starts. What it found is {{check}} in the prompt" onClick={onlyMenu}>
-                  <Icon name="filter" />
-                  <span className="nw-chip-text">{onlyWords(form.onlyIf)}</span>
-                  <Icon name="chevron" size={11} />
-                </button>
-              )}
-              {newEach && (
-                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Its older run workspaces archived as a new one starts (only those with nothing to lose); one that changed nothing archived as it ends" onClick={keepMenu}>
-                  <Icon name="archive" />
-                  <span className="nw-chip-text">{form.keep === 0 ? 'keeps every workspace' : `keeps its last ${form.keep ?? 5}`}</span>
-                  <Icon name="chevron" size={11} />
-                </button>
-              )}
-              {!form.workflow && !form.widget && (
-                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="A run stops (as Stop does: its chat stays) after this much of its agent's working time; waiting for you isn't counted. Below it, every task's and how many run at once" onClick={limitMenu}>
-                  <Icon name="clock" />
-                  <span className="nw-chip-text">{(n => (n ? `stops after ${mins(n)}` : 'no time limit'))(form.maxMinutes ?? allMax)}</span>
-                  <Icon name="chevron" size={11} />
-                </button>
-              )}
-              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="When a run tells you (a notification, and a phone push if Settings has one)" onClick={e => openMenu(e, NOTIFY.map(([v, label, sub]) => ({ label, sub, icon: v === 'never' ? 'bellOff' : 'bell', hint: (form.notify ?? 'needs') === v ? ON : undefined, run: () => set({ notify: v }) }) as MenuItem))}>
-                <Icon name={form.notify === 'never' ? 'bellOff' : 'bell'} />
-                <span className="nw-chip-text">{form.notify === 'never' ? 'never tells you' : form.notify === 'always' ? 'tells you always' : 'tells you when it needs you'}</span>
-                <Icon name="chevron" size={11} />
-              </button>
-              <label className="nw-chip" data-tip={`Optional; a new workspace or session is named after it. {{DD-MM-YY}}, {{YYYY-MM-DD}}, {{HH:mm}} or {{ddd D MMM}} in the name or the prompt become the run's date and time`}>
-                <Icon name="pencil" />
-                <input className="nw-chip-input" value={form.name} aria-label="Name" placeholder={makes ? 'name: from the prompt, dated' : form.widget && !form.prompt.trim() ? `name: ${extName(form.widget, form.action)}` : 'name: from the prompt'} spellCheck={false} onChange={e => set({ name: e.target.value })} />
-              </label>
-            </div>
-            {first !== undefined && form.prompt.trim() && (makes || stamp(form.prompt, first) !== form.prompt) && (
-              <div className="schedule-preview muted">
-                {[makes && `Its ${form.ws === 'local-new' ? 'session' : 'workspace'}: ${wsTitle({ name: form.name.trim(), prompt: form.prompt }, first)}`, stamp(form.prompt, first) !== form.prompt && `${makes ? 'its' : 'Its'} prompt: “${stamp(form.prompt, first).slice(0, 80)}”`]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-            )}
-            <div className="buttons">
-              <span className="muted small">⌘⏎ {form.id ? 'saves' : 'schedules it'} · Esc closes the page, the form stays</span>
-              <span className="spacer" />
-              {form.id && api.copy && (
-                <button type="button" disabled={changed} data-tip={changed ? 'Save or cancel your changes first' : 'A copy of it as saved, named … (copy), off: change it and turn it on'} onClick={() => (s => s && void copy(s))(schedules.find(x => x.id === form.id))}>
-                  Duplicate
-                </button>
-              )}
-              <button type="button" onClick={() => open(null)}>
-                Cancel
-              </button>
-              <button type="button" className="primary" onClick={save} disabled={!ready}>
-                {saving ? (
-                  <>
-                    <span className="btn-spin" /> Saving…
-                  </>
-                ) : form.id ? (
-                  'Save'
-                ) : (
-                  'Schedule it'
-                )}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {(timed.length > 0 || (!form && !onEvents.length)) && ( // none yet and the form open: no heading over nothing
+        {(timed.length > 0 || !onEvents.length) && (
         <section>
           <div className="sched-head">
             <h3>Tasks</h3>

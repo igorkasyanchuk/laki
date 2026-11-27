@@ -1009,9 +1009,10 @@ export function CopyComment({ text }: { text: string }) {
   return <IconButton icon={done ? 'check' : 'copy'} className="sp-copy" title={done ? 'Copied' : 'Copy the comment'} onClick={() => void navigator.clipboard.writeText(text).then(() => (setDone(true), setTimeout(() => setDone(false), 1500)), () => {})} />
 }
 
-export function ThreadCard({ t, api, noHead, ...a }: { t: Thread; api: PanelApi; noHead?: boolean } & ApplyProps) {
+// acts: Reply, Resolve and Unresolve on GitHub (the side panel's; head: the PR's head commit, Fixed in's), done after each
+export function ThreadCard({ t, api, noHead, acts, ...a }: { t: Thread; api: PanelApi; noHead?: boolean; acts?: { head?: string; done: () => void } } & ApplyProps) {
   return (
-    <div className="sp-thread">
+    <div className={`sp-thread${t.resolved ? ' resolved' : ''}`}>
       {!noHead && (
         <button className="sp-thread-head" onClick={() => api.preview(t.path, t.line)} data-tip="Show the file at this line">
           <Icon name="file" />
@@ -1041,6 +1042,70 @@ export function ThreadCard({ t, api, noHead, ...a }: { t: Thread; api: PanelApi;
             ))(suggestionOf(c.body))}
         </div>
       ))}
+      {acts && t.id && api.threadReply && api.threadResolve && <ThreadActs id={t.id} resolved={t.resolved} head={acts.head} api={api} done={acts.done} />}
+    </div>
+  )
+}
+
+// a thread's Reply… (a box: Reply, Reply and resolve), Resolve, and Fixed in <head> (that reply and resolve in one
+// click); a resolved one's Unresolve. Each posts as you on GitHub, then the threads load again
+function ThreadActs({ id, resolved, head, api, done }: { id: string; resolved: boolean; head?: string; api: PanelApi; done: () => void }) {
+  const [box, setBox] = useState(false)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const go = (f: () => Promise<unknown>) => {
+    setBusy(true)
+    setErr('')
+    f().then(
+      () => (setBox(false), setText(''), done()),
+      (e: Error) => setErr(e.message),
+    ).finally(() => setBusy(false))
+  }
+  const fixed = head ? `Fixed in ${head.slice(0, 7)}.` : ''
+  if (resolved)
+    return (
+      <span className="row-buttons sp-thread-acts">
+        <button type="button" className="ghost sm" disabled={busy} data-tip="Open it again on GitHub" onClick={() => go(() => api.threadResolve!(id, false))}>
+          Unresolve
+        </button>
+        {err && <span className="warn small">{err}</span>}
+      </span>
+    )
+  return (
+    <div className="sp-thread-acts">
+      {box ? (
+        <>
+          <textarea rows={2} value={text} autoFocus placeholder="Reply on GitHub, as you" aria-label="Reply" onChange={e => setText(e.target.value)} onKeyDown={e => (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && text.trim() && go(() => api.threadReply!(id, text)), e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), setBox(false)))} />
+          <span className="row-buttons">
+            <button type="button" className="sm" disabled={busy || !text.trim()} data-tip="⌘↩" onClick={() => go(() => api.threadReply!(id, text))}>
+              Reply
+            </button>
+            <button type="button" className="ghost sm" disabled={busy || !text.trim()} onClick={() => go(() => api.threadResolve!(id, true, text))}>
+              Reply and resolve
+            </button>
+            <button type="button" className="ghost sm" disabled={busy} onClick={() => setBox(false)}>
+              Cancel
+            </button>
+          </span>
+        </>
+      ) : (
+        <span className="row-buttons">
+          <button type="button" className="ghost sm" disabled={busy} onClick={() => setBox(true)}>
+            <Icon name="reply" /> Reply…
+          </button>
+          <span className="grow" />
+          {fixed && (
+            <button type="button" className="ghost sm" disabled={busy} data-tip={`Replies "${fixed}" and resolves it`} onClick={() => go(() => api.threadResolve!(id, true, fixed))}>
+              {fixed.slice(0, -1)}
+            </button>
+          )}
+          <button type="button" className="sm" disabled={busy} data-tip="Resolve it on GitHub" onClick={() => go(() => api.threadResolve!(id, true))}>
+            <Icon name="check" /> Resolve
+          </button>
+        </span>
+      )}
+      {err && <span className="warn small">{err}</span>}
     </div>
   )
 }

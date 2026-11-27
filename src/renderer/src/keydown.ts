@@ -28,6 +28,7 @@ export function onKey(app: AppCtx, e: KeyboardEvent, force?: KeyId, fixed?: bool
     info: () => showInfo(),
     palette: () => setDialog(d => (d === 'palette' ? null : 'palette')),
     files: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
+    searchText: () => ws && setDialog(d => (d === 'search' ? null : 'search')),
     find: () => dialog || findIn() || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog; a diff's own (findIn) first
     // the sidebar's filter: open, its box focused; pressed again in the box: closed
     filter: () => (document.activeElement?.closest('.side-find') ? setFind(null) : (setSideOpen(true), setFind(f => f ?? { q: '' }), requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.side-find input')?.focus()))),

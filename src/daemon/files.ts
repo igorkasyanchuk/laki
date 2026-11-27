@@ -720,6 +720,42 @@ export async function files(ref: string, project?: string, more: { ignored?: boo
   const all = [...new Set(list.filter(Boolean))]
   return { files: all.slice(0, MAX_FILES), changed, cut: all.length > MAX_FILES, ...(more.ignored && { ignored: ign.filter(Boolean).slice(0, MAX_FILES) }) }
 }
+// fileSearch: the text of the workspace's files (the finder's Text): git grep, tracked and untracked files, not what git
+// ignores (a plain folder: every file, --no-index), binary ones out. case: as typed (else any case); word: whole words;
+// regex: an extended one (else the text as it is). The first SEARCH_MAX matches, each line cut at SEARCH_LINE characters
+const SEARCH_MAX = 500
+const SEARCH_LINE = 300
+export async function fileSearch(o: { ws: string; q: string; case?: boolean; word?: boolean; regex?: boolean }) {
+  const ws = findWs(o.ws)
+  if (state.projects.find(p => p.id === ws.project)?.kind) return { files: [], total: 0, cut: false }
+  const text = String(o.q ?? '')
+  if (!text.trim()) return { files: [], total: 0, cut: false }
+  if (text.length > 500) throw new Error('500 characters at most')
+  // a plain folder: grep -r, its dependencies' folders out (git there would read a config an agent may have made: noNested)
+  const plain = state.projects.find(p => p.id === ws.project)?.git === false || (!ws.host && !existsSync(join(ws.path, '.git')))
+  const how = [...(o.case ? [] : ['-i']), ...(o.word ? ['-w'] : []), o.regex ? '-E' : '-F', '-e', text]
+  const [cmd, args] = plain ? ['grep', ['-rnI', ...[...SKIP_DIRS].map(d => `--exclude-dir=${d}`), ...how, '.']] : ['git', ['grep', '-n', '-I', '--no-color', '--full-name', '--untracked', ...how, '--', '.']]
+  const out = await exec(ws, cmd, args, { timeout: 15000, maxBuffer: 16 << 20 }).then(
+    r => r.stdout,
+    (e: { code?: number; stdout?: string; stderr?: string; killed?: boolean }) => {
+      if (e.code === 1 && !String(e.stderr ?? '').trim()) return '' // no match
+      if (e.killed || /maxBuffer/i.test(String((e as Error).message ?? ''))) return String(e.stdout ?? '') // too many: the first ones
+      throw new Error(o.regex && /regex|regcomp|Unmatched|Invalid|parenthes|brack/i.test(String(e.stderr)) ? `not a regex: ${firstLine(String(e.stderr)).replace(/^(fatal|grep): /, '')}` : `${cmd} failed: ${firstLine(String(e.stderr || (e as Error).message)) || 'it failed'}`)
+    },
+  )
+  const byFile = new Map<string, { line: number; text: string }[]>()
+  let total = 0
+  for (const l of out.split('\n')) {
+    const m = /^(?:\.\/)?(.+?):(\d+):(.*)$/.exec(l) // grep -r's paths start ./
+    if (!m) continue
+    total++
+    if (total > SEARCH_MAX) continue
+    const hits = byFile.get(m[1]) ?? (byFile.set(m[1], []), byFile.get(m[1])!)
+    hits.push({ line: Number(m[2]), text: m[3].length > SEARCH_LINE ? `${m[3].slice(0, SEARCH_LINE)}…` : m[3] })
+  }
+  return { files: [...byFile].map(([path, hits]) => ({ path, hits })), total, cut: total > SEARCH_MAX }
+}
+
 // a folder's entries, its folders ending in / (a link to one too: pnpm's node_modules) (an ignored one opened in Files:
 // git lists nothing in it)
 async function oneLevel(ws: Workspace, rel: string) {

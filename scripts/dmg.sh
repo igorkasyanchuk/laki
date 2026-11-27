@@ -18,6 +18,8 @@ npm run check
 if [ "${LAKI_SKIP_AUDIT:-}" = 1 ]; then loud "LAKI_SKIP_AUDIT=1: the dependency audit is SKIPPED"; else npm run audit:deps; fi
 echo "The oldest security shortcuts (npm run debt -- --old):" # never fails the build
 npm run -s debt -- --old 2> /dev/null | grep '  security  ' | head -3 || true
+# the price table (src/shared/prices.json, npm run prices): a warning past 30 days, never a failure
+node -e 'const d = require("./src/shared/prices.json").date; const n = Math.floor((Date.now() - Date.parse(d)) / 864e5); if (!(n <= 30)) console.log(`\x1b[33mWARNING: src/shared/prices.json is ${n} days old (${d}): npm run prices, then check its diff\x1b[0m`)' || true
 # the real window walked page by page and through the risky flows (scripts/ui-smoke.ts), before the version moves
 if [ "${LAKI_SKIP_UI:-}" = 1 ]; then
   loud "LAKI_SKIP_UI=1: the window is NOT smoke-tested (npm run test:ui)"

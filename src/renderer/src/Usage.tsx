@@ -16,6 +16,7 @@ export const USAGE_HOSTS: Record<string, string> = { claude: 'api.anthropic.com'
 export const USAGE_HINTS: Record<string, string> = {
   grok: 'Reads your Grok sign-in (~/.grok) and asks grok.com directly, as Grok’s own CLI does: undocumented, may break. Off: no numbers',
   gemini: 'Runs agy’s own /usage every 5 minutes: it takes no turn and uses no quota (agy 1.1.11 or newer). Off: no numbers',
+  codex: 'Runs codex app-server every 5 minutes and asks it: Codex reads its own sign-in, it takes no turn. An older Codex that can’t say: Laki asks chatgpt.com with your sign-in only if you say so (Ask chatgpt.com under its row). Off: what Codex reports as it works',
 }
 const STALE = 20 * 60_000 // R4: numbers older than this say so (an agent's own come only as it works)
 const old = usageOld // an agent's own numbers past STALE: dimmed, with Ask <host>
@@ -216,7 +217,19 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
                 ))}
             </div>
             {r.windows.map(w => windowRow(w, now))}
-            {r.error && <p className="muted small">{r.next ? waitText(r, now) : r.error}</p>}
+            {r.error && (
+              <p className="muted small">
+                {r.next ? waitText(r, now) : r.error}
+                {r.agent === 'codex' && r.error.startsWith('This Codex doesn’t say') && onAsk && asks?.codex !== true && (
+                  <>
+                    {' '}
+                    <button type="button" className="link small" data-tip="Reads your Codex sign-in (auth.json) and asks chatgpt.com directly: undocumented, may break" onClick={() => onAsk('codex')}>
+                      Ask chatgpt.com
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
             {old(r, now) ? (
               <p className="muted small">
                 As of {hm(r.at)} ({agoOf(r.at)}): {NAMES[r.agent] ?? r.agent} says them only as it works in Laki, so what it used since, outside Laki too, isn't in them.
@@ -258,6 +271,13 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
                 <span className="muted small usage-when">{tokensText(w.tokens)} tokens</span>
               </div>
             ))}
+            {today.unpriced?.map(u => (
+              <div key={u.model} className="usage-row usage-spent" data-tip="Laki has no price for this model: its tokens are counted, not what they cost">
+                <span className="usage-label muted">no price for {u.model}</span>
+                <span className="usage-pct" />
+                <span className="muted small usage-when">{tokensText(u.tokens)} tokens</span>
+              </div>
+            ))}
           </section>
         )}
         <p className="muted small usage-foot">
@@ -273,9 +293,11 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
 // call log, by what made each: ai), for one agent or model or all. A bar a day, stacked by agent (each its own color, in
 // SERIES order: a filter never repaints one), then Where it went (each workspace's tabs and each of Laki AI's sources),
 // then each model's share
-export type UsageDay = { day: string; agent: string; model: string; ws?: string; tokens: number; cost: number }
+// priced: false, no price for its model (its tokens counted, not their cost); old: some kept before Laki kept each part,
+// at the price then; read of input: what came from the cache (an older daemon's: none of these)
+export type UsageDay = { day: string; agent: string; model: string; ws?: string; tokens: number; cost: number; priced?: boolean; old?: boolean; read?: number; input?: number }
 export type UsageAi = { day: string; from: AiFrom; model: string; tokens: number; cost: number }
-type Row = { day: string; agent: string; model: string; src: string; tokens: number; cost: number } // src: ws:<id> or ai:<from>
+type Row = { day: string; agent: string; model: string; src: string; tokens: number; cost: number; priced?: boolean; old?: boolean; read?: number; input?: number } // src: ws:<id> or ai:<from>
 const RANGES = [7, 30, 90]
 const LAKI = 'laki' // Laki AI's series
 const SERIES = ['claude', 'codex', 'gemini', 'grok', 'opencode', LAKI] // the stack's order and colors, fixed
@@ -316,6 +338,10 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
   const top = Math.max(...days.map(dayTotal), 0)
   const group = <K extends string>(key: (r: Row) => K) => [...rows.reduce((m, r) => (x => ((x.tokens += r.tokens), (x.cost += r.cost), m))(m.get(key(r)) ?? (m.set(key(r), { key: key(r), agent: r.agent, model: r.model, src: r.src, tokens: 0, cost: 0 }), m.get(key(r))!)), new Map<K, { key: K; agent: string; model: string; src: string; tokens: number; cost: number }>()).values()].sort((a, b) => b[by] - a[by] || b.tokens - a.tokens)
   const byModel = group(r => `${r.agent}|${r.model}`)
+  // each model's: none priced, some old, its cache's share of its input
+  const facts = new Map<string, { none: boolean; old: boolean; read: number; input: number }>()
+  for (const r of rows) (x => ((x.none ||= r.priced === false), (x.old ||= !!r.old), (x.read += r.read ?? 0), (x.input += r.input ?? 0)))(facts.get(`${r.agent}|${r.model}`) ?? (facts.set(`${r.agent}|${r.model}`, { none: false, old: false, read: 0, input: 0 }), facts.get(`${r.agent}|${r.model}`)!))
+  const unpriced = byModel.filter(m => facts.get(m.key)?.none)
   const where = d?.where ? group(r => r.src) : [] // an older daemon's rows name no workspace: no Where it went
   const srcName = (src: string) => {
     if (src.startsWith('ai:')) return { name: AI_FROM[src.slice(3) as AiFrom] ?? src.slice(3), kind: 'Laki AI' }
@@ -448,6 +474,7 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
                       <th>Agent</th>
                       <th className="num">Tokens</th>
                       <th className="num">≈ API price</th>
+                      <th className="num" data-tip="Of its input, what came from the cache (reads: a tenth of the price or less)">From cache</th>
                       <th className="num">Share</th>
                     </tr>
                   </thead>
@@ -459,7 +486,18 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
                           <span className="usage-swatch" style={{ background: COLOR[m.agent] ?? 'var(--muted)' }} aria-hidden /> {nameOfAgent(m.agent)}
                         </td>
                         <td className="num">{tokensText(m.tokens)}</td>
-                        <td className="num">{money(m.cost)}</td>
+                        {(x =>
+                          x?.none ? (
+                            <td className="num muted" data-tip={`No price for ${m.model}: its tokens are counted, not what they cost`}>
+                              no price
+                            </td>
+                          ) : (
+                            <td className="num" data-tip={x?.old ? 'Some of it at the price when it was counted (kept before Laki kept each part of it)' : undefined}>
+                              {money(m.cost)}
+                              {x?.old ? '*' : ''}
+                            </td>
+                          ))(facts.get(m.key))}
+                        <td className="num muted">{(x => (x?.input ? pct(x.read, x.input) : ''))(facts.get(m.key))}</td>
                         <td className="num">{pct(m[by], total[by])}</td>
                       </tr>
                     ))}
@@ -469,6 +507,7 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
             ) : (
               <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts its own Claude Code, Codex, Grok and Antigravity tabs, from their own files, as they work, and Laki AI's calls.</p>
             )}
+            {unpriced.length > 0 && <p className="muted small">No price for {unpriced.map(m => m.model).join(', ')}: {tokensText(unpriced.reduce((n, m) => n + m.tokens, 0))} tokens counted, not what they cost.</p>}
             <p className="muted small">At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price); Grok's at its own price, Antigravity's tokens only: your plan bills its own way. Laki's own tabs only, {d.keep} days back.</p>
           </>
         )}

@@ -18,14 +18,14 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { move as moveFile, priorOf, readJson, syncDir, writeAtomic } from '../shared/conn.ts'
 import { envAllowOf, envSplit } from '../shared/env.ts'
-import { AGENT_NAMES, agentBin, LIMIT_AGENTS, endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen,
+import { AGENT_NAMES, agentBin, aliasFlags, LIMIT_AGENTS, endpointOk, keyEvent, MASK, type TurnMark, type DigestRow, LABS, CLAUDE_MODES, claudeMode, type NativeSeen,
   SEP_WHERE, type SepWhere, actionSlug, againOnEnter, checkOk, type CheckRun, type Proof, type Agent, AGENTS, ALIAS, agentVars, ANSWER_WHY, answerOk, API,
   type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate,
   type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, latin, nonLatin, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs,
   PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset,
   prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun,
   type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template,
-  type View, type TurnChanges, type TabLoop, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort, VIEWPORTS, viewportOf } from '../shared/types.ts'
+  type View, type TurnChanges, type TabLoop, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort, VIEWPORTS, viewportOf, type TabStuck } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
 import { PROOF_HEAD, proofMd } from '../shared/proof.ts'
 import { WALK_HEAD, walkFresh, walkMd, walkWithout } from '../shared/walk.ts'
@@ -69,6 +69,8 @@ import { asleep, isLive, restoredAt, sleepNow, wake } from './resources.ts'
 import { phone, phoneLong, prune, pushed } from './phone.ts'
 import { tgMigrate, tgView, tgWsGone } from './telegram.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
+import { stuck, stuckScan } from './stuck.ts'
+import { mcpShareStop, sharedFor } from './mcpShare.ts'
 import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { capOver, capParse, capSet, capToolEnd, capView, costWarnParse, wsCost } from './cap.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnIndex, viewWs } from './files.ts'
@@ -166,7 +168,7 @@ export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-export type Runtime = { loopSeen?: LoopSeen; loop?: TabLoop; loopLet?: boolean /* the same command failing (shared/loop.ts): this turn's failures, its mark, Let it work's (none till the turn ends) */; inTool?: number /* claude's PreToolUse to its PostToolUse: a tool call under way (cap.ts waits for its end) */; held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
+export type Runtime = { stuck?: TabStuck /* #3: why this worker can't go on (stuck.ts) */; stretchAt?: number /* its turn's start, kept past its end (stuck's key) */; retryFrom?: number /* retrying an API error since */; endAt?: number /* its last turn's end */; loopSeen?: LoopSeen; loop?: TabLoop; loopLet?: boolean /* the same command failing (shared/loop.ts): this turn's failures, its mark, Let it work's (none till the turn ends) */; inTool?: number /* claude's PreToolUse to its PostToolUse: a tool call under way (cap.ts waits for its end) */; held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
   stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; mcpAuth?: McpAuth /* an MCP server that needs a sign-in (mcpAuth.ts) */; boxed?: Boxed /* a command its sandbox stopped this turn
   (sandboxStop) */; marks?: (TurnMark & { data: unknown })[] /* P5: its turns' chips (widgetEvents' turnMark) */; turnFrom?: number; waitFrom?: number;
   waited?: number /* the turn's working time, by its hooks' at (turnTook) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a
@@ -892,16 +894,26 @@ export const LakiPlugin = async ({ client }) => {
 }
 `
 
-// A Finder-launched app has a bare PATH: take the login shell's, so git/gh/claude are found; its XDG_CONFIG_HOME too,
-// unless one is set (where OpenCode, run from that shell, reads its skills: skill.ts homeOf)
-export function adoptLoginPath() {
+// A Finder-launched app has a bare PATH: take the login shell's (path), so git/gh/claude are found; its
+// XDG_CONFIG_HOME too, unless one is set (where OpenCode, run from that shell, reads its skills: skill.ts homeOf). And
+// always the agents' aliases there (aliasOf), as the daemon starts
+const ARGS_REFUSED = /cannot be used with|cannot be used multiple times|unexpected argument|unknown option|unrecognized (option|argument)|error: unknown/i
+export function adoptLoginPath(path = true) {
   try {
-    const out = execFileSync(shell, ['-lic', 'printf "__LAKI__%s__LAKI__%s__LAKI__" "$PATH" "$XDG_CONFIG_HOME"'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
+    const out = execFileSync(shell, ['-lic', 'printf "__LAKI__%s__LAKI__%s__LAKI__\\n" "$PATH" "$XDG_CONFIG_HOME"; alias'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
     const m = out.match(/__LAKI__(.*)__LAKI__(.*)__LAKI__/)
-    if (m?.[1]) process.env.PATH = m[1]
-    if (m?.[2] && isAbsolute(m[2]) && !process.env.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = m[2]
+    if (path && m?.[1]) process.env.PATH = m[1]
+    if (path && m?.[2] && isAbsolute(m[2]) && !process.env.XDG_CONFIG_HOME) process.env.XDG_CONFIG_HOME = m[2]
+    Object.assign(aliasOf, aliasFlags(m ? out.slice(out.indexOf(m[0]) + m[0].length) : ''))
   } catch {}
 }
+// the flags your shell's alias for an agent's command adds (adoptLoginPath, types.ts aliasFlags): agents run in an
+// interactive login shell, so an alias's flags go in beside Laki's. Ones that set how freely it acts count as the
+// profile's own (ownArgs): Laki adds no mode beside them (codex refuses --approve-for-me beside an alias's
+// --dangerously-bypass-approvals-and-sandbox) and its never-asks checks see them. ponytail: the default shell's, read
+// as the daemon starts; a tab's own shell (tab.shell) and a host's aren't read
+export const aliasOf: Record<string, string> = {}
+export const ownArgs = (agent?: string, args?: string) => [args?.trim(), aliasOf[agent ?? '']].filter(Boolean).join(' ') || undefined
 
 // ---------- view and events
 
@@ -1014,6 +1026,7 @@ function tabView(t: Tab, status: Status): TabView {
     ...(signedOut && { signedOut }),
     ...(mcpAuth && { mcpAuth }),
     ...(r.failed && idle && !r.signedOut && { failed: r.failed }),
+    ...(r.stuck && { stuck: r.stuck }),
     ...(looping && { loop: looping }),
     ...(r.boxed && (waiting || idle) && { boxed: r.boxed }),
     // claude's permission mode, while it runs
@@ -1090,14 +1103,15 @@ function wsView(w: Workspace) {
 
 // a project as the view has it: a Terminals or Browsers one as it is; else what it waits on, its setup script, GitHub,
 // and (B6) the memory and notes in its checkout
-// #5: a project's picture for its badge: the repo's own logo or favicon (an SVG or PNG of 12 KB at most, the first of
-// PICTURES there), as a data URL. ponytail: read once per project and daemon start (a logo added later shows after a restart)
-const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg', 'favicon.png', 'public/favicon.svg', 'public/favicon.png', 'public/favicon-32x32.png', 'public/logo.svg', 'public/logo.png', 'public/apple-touch-icon.png', 'public/icon.svg', 'public/icon.png', 'app/icon.svg', 'app/icon.png', 'src/app/icon.svg', 'src/app/icon.png', 'static/favicon.svg', 'static/favicon.png', 'assets/logo.svg', 'assets/logo.png', 'docs/logo.svg', 'docs/logo.png', '.github/logo.svg', '.github/logo.png', 'build/icon.png', 'resources/icon.png']
+// #5: a project's picture for its badge: the folder's own logo or favicon (an SVG, PNG or ICO of 12 KB at most, the first
+// of PICTURES there), as a data URL; a plain folder's too. ponytail: read once per project and daemon start (a logo added
+// later shows after a restart); no web manifest or <link rel=icon> read
+const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg', 'favicon.png', 'public/favicon.svg', 'public/favicon.png', 'public/favicon-32x32.png', 'public/logo.svg', 'public/logo.png', 'public/apple-touch-icon.png', 'public/icon.svg', 'public/icon.png', 'public/icon-192.png', 'app/icon.svg', 'app/icon.png', 'src/app/icon.svg', 'src/app/icon.png', 'static/favicon.svg', 'static/favicon.png', 'assets/logo.svg', 'assets/logo.png', 'app/assets/images/logo.svg', 'app/assets/images/logo.png', 'docs/logo.svg', 'docs/logo.png', '.github/logo.svg', '.github/logo.png', 'build/icon.png', 'resources/icon.png', 'web/favicon.png', 'favicon.ico', 'public/favicon.ico', 'app/favicon.ico', 'src/app/favicon.ico', 'static/favicon.ico']
 // a new Rails app's public/icon.svg and icon.png: a plain red circle in every one, never the repo's own (its favicon is)
 const PLACEHOLDERS = new Set(['ba7398f28422ebe3abbaf1f677afae671c5a65e7', '52f3bfec2798e4cb7ef3e4814ad6e5adb1e71269'])
 const pictures = new Map<string, string>()
 export function pictureOf(p: Project) {
-  if (p.host || p.kind || p.git === false) return ''
+  if (p.host || p.kind) return ''
   let got = pictures.get(p.path) // by its folder: an id is given again to the next project of that name
   if (got === undefined) {
     got = ''
@@ -1107,7 +1121,7 @@ export function pictureOf(p: Project) {
         if (!st?.isFile() || st.size > 12 << 10 || !st.size) continue
         const b = readFileSync(join(p.path, f))
         if (PLACEHOLDERS.has(createHash('sha1').update(b).digest('hex'))) continue // a framework's stand-in, not the repo's
-        got = `data:image/${f.endsWith('.svg') ? 'svg+xml' : 'png'};base64,${b.toString('base64')}`
+        got = `data:image/${f.endsWith('.svg') ? 'svg+xml' : f.endsWith('.ico') ? 'x-icon' : 'png'};base64,${b.toString('base64')}`
         break
       } catch {}
     pictures.set(p.path, got)
@@ -1703,7 +1717,7 @@ export function projectSet(ref: string, o: { muted?: boolean; name?: string; con
       actions: actionsOk(o.config.actions),
       templates: templatesOk(o.config.templates),
       env: Object.keys(env).length ? env : undefined,
-      mcp: mcpOk(o.config.mcp, p.config?.mcp, MASK, ENV_KEY), // its MCP servers (shared/mcp.ts): main.ts refuses them to agents and remote access
+      mcp: (m => (setTimeout(() => mcpShareStop(), 0), m))(mcpOk(o.config.mcp, p.config?.mcp, MASK, ENV_KEY)), // its MCP servers (shared/mcp.ts): main.ts refuses them to agents and remote access; #5: a shared one changed: its process stops
       worktrees: typeof o.config.worktrees === 'string' && o.config.worktrees.trim() ? o.config.worktrees.trim().slice(0, 1000) : undefined,
       pr: prAllowOk(o.config.pr),
       check: checkOk(o.config.check),
@@ -1989,6 +2003,7 @@ export async function projectAdd(path: string, back = true): Promise<Project> {
   const top = await git({ path: abs }, 'rev-parse', '--show-toplevel').catch(() => '')
   const root = top || realpathSync(abs)
   const existing = state.projects.find(p => !p.host && !p.kind && p.path === root)
+  if (existing && top && existing.git === false) (existing.git = true), pictures.delete(root), save(), changed() // added again after a git init
   if (existing) return unshelve(existing, back)
   return projectPush({ id: '', name: basename(root), path: root, git: !!top })
 }
@@ -2195,10 +2210,11 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   let argv: string[]
   let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
   // what it's told at the start: Laki (its preset's switch) and progress; a host has no laki CLI
-  const told = h === localHooks ? [pr?.laki !== false && LAKI_NOTE(), pr?.laki !== false && (w => (p => memoryNote(p, p && memoryRoot(p, w)))(state.projects.find(p => p.id === w?.project)))(state.workspaces.find(w => w.id === tab.workspace)), state.settings?.progress && PROGRESS_NOTE()].filter(Boolean).join('\n\n') : ''
+  // and its profile's own system prompt (pr.system), on a host too: the user's own text, nothing of this Mac's
+  const told = [...(h === localHooks ? [pr?.laki !== false && LAKI_NOTE(), pr?.laki !== false && (w => (p => memoryNote(p, p && memoryRoot(p, w)))(state.projects.find(p => p.id === w?.project)))(state.workspaces.find(w => w.id === tab.workspace)), state.settings?.progress && PROGRESS_NOTE()] : []), pr?.system?.trim() && `The user's standing instructions for this profile (${pr.name}):\n${pr.system.trim()}`].filter(Boolean).join('\n\n')
   // its permission mode and fast mode: the tab's (the new-workspace page's; '' and false: none over the profile's), else
-  // its profile's; no mode when the profile's flags set one
-  const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)
+  // its profile's; no mode when the profile's flags set one, or your shell's alias for it (this Mac's: ownArgs)
+  const perm = permInArgs(tab.preset, h === localHooks ? ownArgs(tab.preset, pr?.args) : pr?.args) ? undefined : (tab.perm ?? pr?.perm)
   const fast = !!FAST[tab.preset as Agent] && !!(tab.fast ?? pr?.fast)
   // its sandbox: the tab's, else its profile's; none when bypass permissions turns it off (refused where it's set). The
   // git folders git commit writes in writable too (gitWrites: a worktree's live in the main repo's .git)
@@ -2206,7 +2222,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   const gitDirs = sandbox && h === localHooks ? gitWrites(state.workspaces.find(w => w.id === tab.workspace)?.path, tab.preset === 'codex') : [] // ponytail: a host's aren't added (git commit there is refused in the sandbox)
   // the project's MCP servers on for this profile (shared/mcp.ts): by flags as it starts; a host's tab none (the file is
   // this Mac's). claude's in a 0600 file; codex's by -c, an env's values in its own environment (codexMcpArgs)
-  const mcp = h === localHooks ? mcpFor(mcpAll(state.settings?.mcp, state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.config?.mcp), tab.profile ?? tab.preset ?? '') : [] // #6: every project's, then its own
+  const mcp = h === localHooks ? sharedFor(mcpOf(tab), tab.id) : [] // #6: every project's, then its own; #5: a shared one as its URL on the daemon (mcpShare.ts)
   if (tab.preset === 'claude') {
     const gated = existsSync(toolFlag())
     gated ? ungated.delete(tab.id) : ungated.add(tab.id) // S8: a gate turned on later doesn't reach it until it starts again
@@ -2379,6 +2395,8 @@ function codexBox(perm: string | undefined, args: string | undefined, gitDirs: s
 // data folder is out of its sandbox's reach). Anything else: none (the variant as it is). ponytail: this Mac's tabs only
 // S13: a claude tab's project MCP servers (their env too) in a 0600 file of its own, the path in argv
 // Laki's own MCP server (skill.ts' mcpArgv, which core can't import): a profile with Only Laki's MCP servers keeps it (#6)
+// #6: a tab's MCP servers: every project's, then its project's own, those on for its profile
+export const mcpOf = (tab: Tab) => mcpFor(mcpAll(state.settings?.mcp, state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)?.config?.mcp), tab.profile ?? tab.preset ?? '')
 const lakiMcp = (): McpServer => ({ name: 'laki', command: '/usr/bin/env', args: [...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp'] })
 function mcpFile(tab: Tab, list: McpServer[]): string {
   const file = join(dir, 'mcp', `${tab.id}.json`)
@@ -2538,7 +2556,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   if (tab.kind === 'agent') {
     const pr = presetOf(tab)
     try {
-      policyAgent(tab.preset ?? 'custom', tab.perm === undefined ? pr?.perm : tab.perm || undefined, pr?.args, tab.cmd)
+      policyAgent(tab.preset ?? 'custom', tab.perm === undefined ? pr?.perm : tab.perm || undefined, ownArgs(tab.preset, pr?.args), tab.cmd)
     } catch (e) {
       wsLog(ws, `${tab.name}: not started: ${(e as Error).message}`)
       try {
@@ -2640,6 +2658,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   r.since = undefined // a turn started by a prompt, not by Enter (input): it always notifies
   r.done = false
   s.onExit = code => {
+    if (sessions.get(tab.id) === s && tab.kind === 'agent' && rtOf(tab.id).status === 'running' && !asleep.has(tab.id)) stuck(tab, 'exited', { code }) // #3: died mid-turn (one we ended isn't in sessions)
     if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true }), s.term.write('', () => scriptLog(ws, 'setup', tab.cmd ?? '', born, code, s.allText().replace(/\s*\[process exited[^\]]*\]\s*$/, ''))) // less the session's own exit line
     // one we ended (close, restart, wake, archive, shutdown) is no longer in sessions: not this tab's end any more
     if (sessions.get(tab.id) !== s) return
@@ -2659,7 +2678,11 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
         tab.resumeId = undefined
         save()
         s.output('\x1b[90m[that chat can\'t be resumed · press Enter to start a new one]\x1b[0m\r\n')
-      } else s.output(tab.script === 'deploy' ? '\x1b[90m[Run ▾ › Deploy runs it again]\x1b[0m\r\n' : '\x1b[90m[press Enter to start it again]\x1b[0m\r\n')
+      } else {
+        // an agent that refused its own command line as it started (clap's words, codex's and agy's; claude's): what adds flags
+        if (tab.kind === 'agent' && code !== 0 && Date.now() - born < RESUME_FAIL && ARGS_REFUSED.test(s.screenText(12))) s.output(`\x1b[33m[it refused its arguments: Laki adds the profile's model, effort and permission mode${(a => (a ? `; your shell's alias ${agentBin(tab.preset as Agent)} adds ${a.slice(0, 120)}` : ''))(aliasOf[tab.preset ?? ''])}. Settings › Agents & profiles has the profile's Arguments]\x1b[0m\r\n`)
+        s.output(tab.script === 'deploy' ? '\x1b[90m[Run ▾ › Deploy runs it again]\x1b[0m\r\n' : '\x1b[90m[press Enter to start it again]\x1b[0m\r\n')
+      }
     })
   }
   changed()
@@ -2726,7 +2749,8 @@ export function agentNoCmd(o: { preset?: string; cmd?: string; perm?: string }) 
 export const ownCmd = (o: { preset?: string; cmd?: string }) => !!o.cmd?.trim() || o.preset === 'custom' || presetNamed(o.preset)?.agent === 'command'
 export function startsAskless(o: { preset?: string; perm?: string }) {
   const pr = presetNamed(o.preset || state.settings?.agent || 'claude')
-  return neverAsks(pr?.agent || o.preset || state.settings?.agent || 'claude', o.perm ?? pr?.perm, pr?.args)
+  const agent = pr?.agent || o.preset || state.settings?.agent || 'claude'
+  return neverAsks(agent, o.perm ?? pr?.perm, ownArgs(agent, pr?.args))
 }
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
@@ -3238,6 +3262,7 @@ export function settingsSet(o: Settings, own = false) {
   if ('backupEvery' in o && o.backupEvery !== undefined && o.backupEvery !== 'off' && o.backupEvery !== 'weekly') throw new Error(`Back up: weekly or off, not ${JSON.stringify(o.backupEvery)}`)
   if ('backupDir' in o && o.backupDir !== undefined) o = { ...o, backupDir: (d => { if (d && !(d.startsWith('/') || d === '~' || d.startsWith('~/'))) throw new Error("Back up into: a folder's full path (~ is home)"); return d || undefined })(String(o.backupDir).trim()) }
   if ('mcp' in o) o = { ...o, mcp: mcpOk(o.mcp, state.settings?.mcp, MASK, ENV_KEY) } // #6: every project's MCP servers (a value sent back masked: the one kept)
+  if ('mcp' in o) setTimeout(() => mcpShareStop(), 0) // #5: a shared one no longer shared, or changed: its process stops
   if (o.whenDone != null && o.whenDone !== 'off' && !Object.hasOwn(WHEN_DONE_CMD, o.whenDone)) throw new Error(`When everything is done: sleep, lock, shutdown or off, not ${JSON.stringify(o.whenDone)}`)
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)
@@ -3261,7 +3286,7 @@ export function settingsSet(o: Settings, own = false) {
 // laki preset (Settings › Agents & profiles, one profile by name, the others as they are): add a new name (agent claude
 // unless given), set its fields ('' or null drops one; name: a new name), off/on, rm (one stays). An agent's is asked
 // first in the app (main.ts' presetAsk): its args and env run in every tab of it
-const PRESET_TEXT = ['args', 'cmd', 'model', 'effort', 'perm', 'account'] as const
+const PRESET_TEXT = ['args', 'cmd', 'model', 'effort', 'perm', 'account', 'system'] as const
 export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set?: Record<string, unknown> }) {
   const name = String(p.name ?? '').trim()
   if (!name) throw new Error("a profile's name")
@@ -3291,6 +3316,8 @@ export function presetSave(p: { name?: unknown; add?: boolean; rm?: boolean; set
   if (pr.name !== name && list.some(x => x.name === pr.name)) throw new Error(`there's a profile ${pr.name} already`)
   if (pr.agent !== 'command' && !isAgent(pr.agent)) throw new Error(`agent: ${AGENTS.join(', ')} or command`)
   if (pr.agent === 'command' && !pr.cmd) throw new Error('a command profile needs --cmd')
+  if (pr.system && pr.system.length > 20000) throw new Error('a system prompt: 20,000 characters at most')
+  if (pr.system && pr.agent === 'command') delete pr.system // a command takes none
   if (pr.acp && pr.agent !== 'command') delete pr.acp // ACP: a command's
   if (pr.effort && !EFFORTS[pr.agent as Agent]?.includes(pr.effort)) throw new Error(`effort: ${EFFORTS[pr.agent as Agent]?.join(', ') ?? `none for ${pr.agent}`}`)
   if (pr.perm && !PERMS[pr.agent as Agent]?.some(x => x[0] === pr.perm)) throw new Error(`perm: ${PERMS[pr.agent as Agent]?.map(x => x[0]).join(', ') ?? `none for ${pr.agent}`}`)
@@ -3440,12 +3467,12 @@ function tabFilesGone(id: string) {
 // started so: claude itself only offers Bypass then
 // T1: a running tab whose agent never asks: started so (its mode, its profile's mode or flags) or switched to Bypass since
 // (tabMode's rt mode): a message to it is as strong as a command (main.ts' clientNo)
-export const tabNeverAsks = (t: Tab) => (pr => neverAsks(t.preset, t.perm ?? pr?.perm, pr?.args) || rt.get(t.id)?.mode === 'bypassPermissions')(presetOf(t))
+export const tabNeverAsks = (t: Tab) => (pr => neverAsks(t.preset, t.perm ?? pr?.perm, ownArgs(t.preset, pr?.args)) || rt.get(t.id)?.mode === 'bypassPermissions')(presetOf(t))
 export function bypassNo(t: Tab) {
   if (policy()?.bypass === false) return 'Your managed policy requires approvals'
   if (sandboxed(t)) return 'Its sandbox rules this out'
   const pr = presetOf(t)
-  const args = pr?.args ?? ''
+  const args = ownArgs(t.preset, pr?.args) ?? ''
   if (!neverAsks(t.preset, t.perm ?? pr?.perm, args) && !/--allow-dangerously-skip-permissions\b/.test(args)) return 'Only a tab started with Bypass can switch to it'
 }
 
@@ -3762,7 +3789,7 @@ function leadMode(fromTab: string | undefined, agent: Agent, preset: string, san
   const perm = t && (rt.get(t.id)?.mode ?? t.perm)
   if (!t || !perm || !PERMS[agent]?.some(x => x[0] === perm)) return undefined
   const prof = presetNamed(preset)
-  if (neverAsks(agent, perm, prof?.args) || ((sandbox ?? prof?.sandbox) && sandboxOff(agent, perm, prof?.args))) return undefined
+  if (neverAsks(agent, perm, ownArgs(agent, prof?.args)) || ((sandbox ?? prof?.sandbox) && sandboxOff(agent, perm, ownArgs(agent, prof?.args)))) return undefined
   return { perm, from: t.alias ? `@${t.alias}` : t.name }
 }
 async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
@@ -3782,7 +3809,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (lead) o = { ...o, perm: lead.perm } // #6: its lead's mode
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast, o.sandbox) // before the worktree: a wrong one makes nothing
   const prof = presetNamed(preset)
-  if (isAgent(agent) && (o.sandbox ?? prof?.sandbox) && sandboxOff(agent, o.perm === undefined ? prof?.perm : o.perm || undefined, prof?.args)) throw new Error(SANDBOX_NO) // tabSpec's, before the worktree too
+  if (isAgent(agent) && (o.sandbox ?? prof?.sandbox) && sandboxOff(agent, o.perm === undefined ? prof?.perm : o.perm || undefined, ownArgs(agent, prof?.args))) throw new Error(SANDBOX_NO) // tabSpec's, before the worktree too
   await modelKnown(agent, o.model?.trim() || presetNamed(preset)?.model, { path: proj.path, project: proj.id, host: proj.host }, preset)
   if (o.codespace !== undefined) cloudCheck(proj, o)
   if (o.startAt !== undefined) startCheck(o.startAt, preset, agent, o.codespace)
@@ -4909,8 +4936,9 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       return changed()
     case 'running':
       if (!late) {
+        if (was !== 'running') r.stretchAt = now // #3: a new stretch (stuck's key)
         r.status = 'running'
-        r.limit = r.escAt = r.suggest = r.failed = undefined
+        r.limit = r.escAt = r.suggest = r.failed = r.stuck = r.retryFrom = undefined
         r.turnFrom ??= now
         if (r.waitFrom !== undefined) (r.waited = (r.waited ?? 0) + Math.max(0, now - r.waitFrom)), (r.waitFrom = undefined) // an ask answered
       }
@@ -5019,8 +5047,12 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
       const out = !r.limit && !refused && (p.state === 'failed' || (tab.preset === 'claude' && said.length < 300) || (tab.preset === 'codex' && !last)) && turnSignedOut(tab, tab.preset === 'codex' ? `${said}\n${sessions.get(tab.id)?.screenText(6) ?? ''}` : said, p.state !== 'failed' && tab.preset === 'claude')
       // an API error's end (overloaded, a 500, the connection): not a limit, a refused model, signed out or your Esc
       r.failed = p.state === 'failed' && !r.limit && !refused && !out && !r.escAt ? failLine(err, last) : undefined
+      const goesOn = !!state.settings?.continueOnError && !r.autoContinued && !tab.flow // continueLater's: Laki sends continue itself
       if (r.failed) continueLater(tab, r)
       else if (p.state !== 'failed' && !out) r.autoContinued = false // a clean end: an agent with no prompt hook (opencode) has only this
+      r.endAt = now
+      if (r.limit) stuck(tab, 'limit', { reset: r.limit }) // #3: its lead told (a worker's)
+      else if (r.failed && !goesOn) stuck(tab, 'failed', { failed: r.failed })
       if (!viewed(tab.id)) r.done = true
       const checking = !r.limit && !out && p.state !== 'failed' && !!checkHooks.will?.(tab)
       const bell = !checking && ring(tab) // a check follows: its end rings it (verify.ts say)
@@ -5531,6 +5563,7 @@ export function sweepRunning(now = Date.now()) {
   for (const t of state.tabs) {
     const s = sessions.get(t.id)
     const r = rt.get(t.id)
+    if (r && t.kind === 'agent') stuckScan(t, now) // #3: a worker silent, retrying, or past its turn with a background task
     // ⇧⇥ in its terminal too; a menu over its footer says nothing, nor a screen without it (S9: the last one seen stays, marked)
     if (t.preset === 'claude' && s && !s.exited && r && r.status !== 'waiting') {
       const m = claudeMode(s.screenText(6))
@@ -5694,8 +5727,9 @@ export const agentCaller = (from?: unknown) => agentTab(from)?.workspace
 // mode or its profile's flags)
 export function sandboxed(tab: Tab) {
   const pr = presetOf(tab)
-  const perm = permInArgs(tab.preset, pr?.args) ? undefined : (tab.perm ?? pr?.perm)
-  return !!SANDBOX[tab.preset as Agent] && !!(tab.sandbox ?? pr?.sandbox) && !sandboxOff(tab.preset, perm, pr?.args)
+  const own = ownArgs(tab.preset, pr?.args)
+  const perm = permInArgs(tab.preset, own) ? undefined : (tab.perm ?? pr?.perm)
+  return !!SANDBOX[tab.preset as Agent] && !!(tab.sandbox ?? pr?.sandbox) && !sandboxOff(tab.preset, perm, own)
 }
 // a call from a sandboxed agent's tab (main.ts' boxNo)
 export const boxedCaller = (from?: unknown) => (t => !!t && sandboxed(t))(agentTab(from))

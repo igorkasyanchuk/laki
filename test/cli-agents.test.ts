@@ -535,3 +535,46 @@ test('S4: laki in a tab with a LAKI_HOME of its own starts no daemon there; laki
   assert.equal(r.code, 0, r.err)
   assert.ok(JSON.parse(r.out).workspaces.some((w: { id: string }) => w.id === ws.id))
 })
+
+test("#3: a worker that can't go on tells its lead once, in its chat (a plan limit, its process gone mid-turn); laki wait says stuck", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const lead = await until(async () => (x => x?.resumeId && x.status === 'idle' && x)(await rig.tab(ws.id)), 'lead up')
+  rig.env.LAKI_WORKSPACE = ws.id
+  rig.env.LAKI_TAB = lead.id
+  const made = await rig.cli('new', '.', '--preset', 'claude', '--name', 'worker', '--prompt', 'build it')
+  delete rig.env.LAKI_WORKSPACE
+  delete rig.env.LAKI_TAB
+  assert.equal(made.code, 0, made.err)
+  const worker = await until(async () => (x => x?.resumeId && x.status === 'idle' && x.last === 'answer: build it' && x)(await rig.tab('worker')), 'its first turn done') // its own hooks in before ours
+  await rig.rpc('hook', { tab: worker.id, state: 'running' })
+  await rig.rpc('hook', { tab: worker.id, state: 'failed', payload: { error: 'rate_limit', last_assistant_message: "You've hit your limit · resets in 2 hours" } })
+  const stuck = (await rig.tab('worker')).stuck
+  assert.equal(stuck.kind, 'limit')
+  assert.match(stuck.why, /^Claude plan limit \(resets \d\d:\d\d\)$/)
+  assert.match(stuck.next, /laki send worker "continue" after the reset/)
+  const told = () => rig.screen(lead.id).then(s => s.split('answer: Laki: your worker worker (').length - 1) // the fake's answer echoes it
+  await until(async () => (await told()) === 1, 'the lead told, in its chat')
+  // the same stretch again: not twice
+  await rig.rpc('hook', { tab: worker.id, state: 'failed', payload: { error: 'rate_limit', last_assistant_message: "You've hit your limit · resets in 2 hours" } })
+  const w = await rig.cli('wait', 'worker', '--timeout', '10s')
+  assert.equal(w.code, 2, w.out + w.err)
+  assert.match(w.out, /^worker\/\S+ +stuck: Claude plan limit \(resets \d\d:\d\d\)\. Next: laki send worker "continue"/m)
+  assert.equal(await told(), 1)
+  // a new turn clears it; its process gone mid-turn is told
+  await rig.rpc('hook', { tab: worker.id, state: 'running' })
+  assert.equal((await rig.tab('worker')).stuck, undefined)
+  const pid = (await rig.rpc('resources')).tabs?.find((x: { tab: string }) => x.tab === worker.id)?.procs.find((x: { cmd: string }) => /fakes\/claude/.test(x.cmd))?.pid
+  assert.ok(pid, 'its claude found')
+  {
+    process.kill(pid, 'SIGKILL')
+    await until(async () => (await rig.tab('worker')).stuck?.kind === 'exited', 'exited mid-turn')
+    await until(async () => (await rig.screen(lead.id)).includes('its process ended mid-turn'), 'told the lead')
+  }
+  // a workspace of yours (no lead): nothing
+  const mine = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'mine' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(mine.id)), 'mine up')
+  await rig.rpc('hook', { tab: tab.id, state: 'failed', payload: { error: 'rate_limit', last_assistant_message: "You've hit your limit · resets in 2 hours" } })
+  assert.equal((await rig.tab(mine.id)).stuck, undefined)
+})

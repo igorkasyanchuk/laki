@@ -3,6 +3,24 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
+## Next
+
+- A worker that can't go on (its plan limit, a failed turn, its process gone, silent for 10 minutes) tells the agent that started it, once, with what to do next; `laki wait` says *stuck*.
+- Search the text of a workspace's files: ⇧⌘P (or Tab in ⌘P), with match case, whole words and regex; Enter opens the file at the line.
+- Reply to, resolve and unresolve a PR's review threads from the side panel's GitHub tab, or *Fixed in <commit>* in one click.
+- Comment on a screenshot or a screen recording in Artifacts: mark a spot or a box (a video's at its time), and the notes go to the agent with the frames.
+- An MCP server can run as one process for every agent (Settings › Agents & profiles › MCP servers).
+- A profile can carry a system prompt of its own, on top of the project's memory, for each new tab (`laki preset set <name> --system "…"`).
+- Scheduled tasks open in a panel at the right of the page, the list beside it, in parts: What, When, Where, Options, Name.
+- The emoji picker has 400 more emojis (or paste your own), and a project's icon no longer shows twice in its settings.
+- A project's badge picks up a `favicon.ico` too, and a plain folder's logo.
+- Costs count a Claude chat's subagents and a Codex chat's spawned threads, 1-hour cache writes, long prompts and fast mode at their own prices, and an answer a forked chat copied only once.
+- A model Laki has no price for says *no price for <model>* on the Usage page, in Today and in a spend cap's tip, instead of $0; the Usage page shows how much of each model's input came from the cache.
+- Codex's plan limits come from Codex itself (its app server), with no sign-in read by Laki; an account's limits no longer go back to an idle tab's older numbers.
+- OpenCode tabs show what they used, at OpenCode's own price, on the Usage page and in Today.
+- Edit group picks from the group's agent's own models (its names shown, its id used), the efforts that model takes and that agent's permission modes; `laki new --group` starts them too.
+- An agent whose shell alias already sets its permissions (`alias codex='codex --dangerously-bypass-approvals-and-sandbox'`) starts, instead of refusing Laki's mode beside it.
+
 ## 0.67.0 · Nov 27, 2026
 
 - Frosted's menus, dialogs and toasts let the window's glass through more, by Glass › Strength (solid under Reduce transparency).

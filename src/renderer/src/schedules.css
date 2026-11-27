@@ -11,3 +11,18 @@
 .sched-example:hover:not(:disabled) { border-style: solid; background: var(--hover); }
 .sched-example-text { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
 .sched-missed { align-self: flex-start; }
+/* the task's form in a panel at the page's right (Page's side), the list beside it; over the list on a narrow window */
+.sched-side { flex: none; width: min(480px, 50%); min-height: 0; gap: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel); box-shadow: var(--lift-2); }
+.sched-side-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-5) var(--sp-5) var(--sp-5) var(--sp-6); border-bottom: 1px solid var(--line); }
+.sched-side-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.sched-side-title > b { font-size: var(--fs-4); }
+.sched-side-title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sched-side-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-6); padding: var(--sp-6); }
+.sched-field { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sched-field > h4 { margin: 0; font-size: var(--fs-1); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.sched-side .nw-composer textarea { min-height: 120px; }
+.sched-name-field { flex: 1; }
+.sched-side-foot { margin: 0; padding: var(--sp-4) var(--sp-6); border-top: 1px solid var(--line); }
+@media (max-width: 860px) { .sched-side { position: absolute; inset: 0; z-index: var(--z-sticky); width: auto; border-left: 0; } }
+@media (prefers-reduced-motion: no-preference) { .sched-side { animation: sched-side-in var(--t-mid) var(--ease-out); } }
+@keyframes sched-side-in { from { transform: translateX(24px); opacity: 0; } }

@@ -4,14 +4,14 @@
 // the agent's own config. claude: a 0600 file of { mcpServers } for one more --mcp-config (core.ts mcpFile); codex: -c
 // mcp_servers.<name>.… overrides (codexMcpArgs, its TOML values quoted here); opencode: its inline config's mcp
 // (OPENCODE_CONFIG_CONTENT, openCodeMcp); the others take none yet. Pure: test/units-more.test.ts
-export type McpServer = { name: string; command?: string; args?: string[]; url?: string; env?: Record<string, string>; presets?: string[] }
+export type McpServer = { name: string; command?: string; args?: string[]; url?: string; env?: Record<string, string>; presets?: string[]; shared?: boolean /* #5: a command's, one process for every agent (daemon/mcpShare.ts) */; bearer?: string /* #5: a shared one's key for its tab, sent as Authorization: Bearer (never saved, never on argv) */ }
 export const MCP_NAME = /^[\w-]{1,40}$/
 export const MCP_AGENTS = ['claude', 'codex', 'opencode'] // the ones that take them
 // every project's, then the project's own: one of the same name is the project's
 export const mcpAll = (all?: McpServer[], own?: McpServer[]) => [...(all ?? []).filter(s => !own?.some(o => o.name === s.name)), ...(own ?? [])]
 // opencode's config's mcp: a local server's command and args as one list, its env as environment; a URL's remote
 export const openCodeMcp = (list: McpServer[]) =>
-  Object.fromEntries(list.map(s => [s.name, s.url ? { type: 'remote', url: s.url } : { type: 'local', command: [s.command ?? '', ...(s.args ?? [])], ...(s.env && Object.keys(s.env).length && { environment: s.env }) }]))
+  Object.fromEntries(list.map(s => [s.name, s.url ? { type: 'remote', url: s.url, ...(s.bearer && { headers: { Authorization: `Bearer ${s.bearer}` } }) } : { type: 'local', command: [s.command ?? '', ...(s.args ?? [])], ...(s.env && Object.keys(s.env).length && { environment: s.env }) }]))
 // #6's Import: a server as an agent's own config has it (claude's and Antigravity's mcpServers, codex's [mcp_servers],
 // opencode's mcp), in Laki's shape; one Laki can't take (no command or URL, a name it refuses): none
 export function mcpFrom(name: string, c: Record<string, unknown>): McpServer | undefined {
@@ -59,6 +59,7 @@ export function codexMcpArgs(list: McpServer[]): { args: string[]; env: Record<s
   const env: Record<string, string> = {}
   const args = list.flatMap((s, i) => {
     const k = `mcp_servers.${tomlKey(s.name)}`
+    if (s.url && s.bearer) return ((env[`LAKI_MCP_${i}_BEARER`] = s.bearer), ['-c', `${k}.url=${tomlString(s.url)}`, '-c', `${k}.bearer_token_env_var=${tomlString(`LAKI_MCP_${i}_BEARER`)}`]) // #5: its key from codex's environment, never argv
     if (s.url) return ['-c', `${k}.url=${tomlString(s.url)}`]
     const vars = Object.entries(s.env ?? {}).map(([n, v]) => ((env[`LAKI_MCP_${i}_${n}`] = v), [n, `LAKI_MCP_${i}_${n}`]))
     if (!vars.length) return ['-c', `${k}.command=${tomlString(s.command ?? '')}`, ...(s.args?.length ? ['-c', `${k}.args=[${s.args.map(tomlString).join(', ')}]`] : [])]
@@ -69,7 +70,7 @@ export function codexMcpArgs(list: McpServer[]): { args: string[]; env: Record<s
 }
 // claude's --mcp-config file
 export const claudeMcpConfig = (list: McpServer[]) => ({
-  mcpServers: Object.fromEntries(list.map(s => [s.name, s.url ? { type: 'http', url: s.url } : { command: s.command, ...(s.args?.length && { args: s.args }), ...(s.env && Object.keys(s.env).length && { env: s.env }) }])),
+  mcpServers: Object.fromEntries(list.map(s => [s.name, s.url ? { type: 'http', url: s.url, ...(s.bearer && { headers: { Authorization: `Bearer ${s.bearer}` } }) } : { command: s.command, ...(s.args?.length && { args: s.args }), ...(s.env && Object.keys(s.env).length && { env: s.env }) }])),
 })
 
 // what projectSet keeps: up to 20, each a name (unique), a command or an https/http URL (not both), its args and env
@@ -97,7 +98,7 @@ export function mcpOk(v: unknown, cur: McpServer[] | undefined, mask: string, en
     const kept = Object.fromEntries(Object.entries(env as Record<string, string>).flatMap(([k, val]) => (val !== mask ? [[k, val]] : was?.[k] !== undefined ? [[k, was[k]]] : []))) // a mask with nothing behind it (a renamed server's): dropped
     const presets = x.presets === undefined ? [] : Array.isArray(x.presets) && x.presets.length <= 50 && x.presets.every((p: unknown) => typeof p === 'string' && p.length <= 64) ? (x.presets as string[]) : null
     if (!presets) throw new Error(`mcp: ${name}: presets, a list of profiles' ids`)
-    return { name, ...(command ? { command } : { url }), ...(!url && args.length && { args }), ...(!url && Object.keys(kept).length && { env: kept }), ...(presets.length && { presets }) }
+    return { name, ...(command ? { command } : { url }), ...(!url && args.length && { args }), ...(!url && Object.keys(kept).length && { env: kept }), ...(presets.length && { presets }), ...(command && x.shared === true && { shared: true }) }
   })
   return out.length ? out : undefined
 }

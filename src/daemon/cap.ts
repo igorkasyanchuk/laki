@@ -58,13 +58,15 @@ export function capView(w: Workspace): CapView | undefined {
   let tokens = 0
   let priced = usd > 0
   let counted = false
+  const none = new Set<string>() // models with no price: their tokens count in neither (the tip says so)
   for (const t of agents(w)) {
     const u = meterView(t).usage
     if (u?.cost !== undefined) (usd += u.cost), (priced = true)
     else if (u?.tokens) (tokens += u.tokens), (counted = true)
+    for (const m of u?.unpriced ?? []) none.add(m)
   }
   const parts = [cap.usd && priced ? usd / cap.usd : undefined, cap.tokens && counted ? tokens / cap.tokens : undefined].filter((x): x is number => x !== undefined)
-  return { cap, ...(priced && { usd: Math.round(usd * 100) / 100 }), ...(counted && { tokens }), measured: parts.length > 0, ...(parts.length && { share: Math.max(...parts) }) }
+  return { cap, ...(priced && { usd: Math.round(usd * 100) / 100 }), ...(counted && { tokens }), measured: parts.length > 0, ...(parts.length && { share: Math.max(...parts) }), ...(none.size && { unpriced: [...none] }) }
 }
 export const capOver = (ws?: string) => !!ws && !!state.workspaces.find(w => w.id === ws)?.capOver
 
@@ -78,11 +80,10 @@ const tell = (w: Workspace, text: string, choices?: string[], mac?: string[]) =>
   }
 }
 
-// #3: a workspace's cost warning. Its agents' priced chats summed (the status bar's tabs' meters; none priced: none);
+// #3: a workspace's cost warning. Its agents' priced chats summed (a claude chat's subagents and a codex chat's spawned threads in its meter) (the status bar's tabs' meters; none priced: none);
 // the amounts its project sets (on: false, none there), else Settings' when on, else none. Past yellow its cost shows
 // yellow, past red red; each amount is told once, as its cost goes past it while Laki watches: one passed while Laki
 // was off (a restart's first read) is marked told, never told late. A changed amount tells again.
-// ponytail: a claude chat's subagents count as its meter does (their own transcripts aren't read)
 export function wsUsd(w: { id: string; spentClosed?: number }) {
   let usd = w.spentClosed ?? 0
   let priced = usd > 0

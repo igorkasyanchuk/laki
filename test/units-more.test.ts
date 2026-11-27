@@ -615,7 +615,7 @@ test('F6: the Reader’s times (a message’s, a finished turn’s end, length a
   assert.deepEqual(out.map(x => [x.who, x.at && new Date(x.at).toISOString().slice(11, 19), x.end && new Date(x.end).toISOString().slice(11, 19)]), [['you', '12:00:00', undefined], ['agent', '12:00:05', '12:00:10']])
   const { costOf } = await import('../src/shared/types.ts')
   assert.ok(out[0].cost! > 0)
-  assert.equal(out[0].cost, costOf('claude-sonnet-4-5', { input: 1000, output: 1000, write: 0, read: 0 }))
+  assert.equal(out[0].cost, costOf('claude-sonnet-4-5', { in: 1000, out: 1000 }))
   assert.equal(chatOf('codex', line({ type: 'event_msg', timestamp: '2026-11-10T12:00:00.000Z', payload: { type: 'user_message', message: 'hi' } }))[0].at, Date.parse('2026-11-10T12:00:00.000Z'))
 })
 
@@ -1835,4 +1835,17 @@ test("#3: an artifact's notes: the picker's message checked, one message for the
     'Notes on the artifact report.html (in $LAKI_STORAGE_FOLDER), each on one part of the page:\n1. `section#totals > h2` "Totals": bigger\n   <h2>Totals</h2>\n2. `td`: red\n   <td> 4 </td>',
   )
   assert.match(artNotes('site/index.html', [{ ...p!, note: 'x' }], true), /^Notes on the page site\/index\.html \(in this workspace\),/, "a worktree's page: not in the storage folder")
+})
+
+test('#7: notes on a picture or a video: where each one is in words, its time, the frames named', async () => {
+  const { clock, mediaNotes, whereOf } = await import('../src/shared/artPick.ts')
+  assert.equal(clock(83.9), '01:23')
+  assert.equal(whereOf({ x: 0.1, y: 0.05, w: 0.3, h: 0.2 }), 'a box near the top left (x 10%–40%, y 5%–25%)')
+  assert.equal(whereOf({ x: 0.5, y: 0.5, w: 0, h: 0 }), 'a spot near the middle (x 50%, y 50%)')
+  assert.equal(whereOf({ x: 0.8, y: 0.9, w: 0, h: 0 }), 'a spot near the bottom right (x 80%, y 90%)')
+  assert.equal(
+    mediaNotes('checkout.mp4', true, [{ n: 1, x: 0.1, y: 0.05, w: 0.3, h: 0.2, t: 83, note: ' Total shows 0 after coupon ' }, { n: 2, x: 0.5, y: 0.5, w: 0, h: 0, t: 161, note: 'Spinner never stops' }], [{ path: '/s/a.png', ns: [1] }, { path: '/s/b.png', ns: [2] }]),
+    'Notes on the screen recording checkout.mp4 (in $LAKI_STORAGE_FOLDER), each on a moment and a place in it:\n1. at 01:23, a box near the top left (x 10%–40%, y 5%–25%): Total shows 0 after coupon\n2. at 02:41, a spot near the middle (x 50%, y 50%): Spinner never stops\nThe frames, with the numbered marks drawn on: /s/a.png (1), /s/b.png (2)',
+  )
+  assert.equal(mediaNotes('shot.png', false, [{ n: 1, x: 0.5, y: 0.1, w: 0, h: 0, note: 'too tight' }], []), 'Notes on the picture shot.png (in $LAKI_STORAGE_FOLDER), each on a place in it:\n1. a spot near the top (x 50%, y 10%): too tight')
 })

@@ -1,4 +1,4 @@
-// What Grok's and Antigravity's chats used, by day and model, for the Usage page and Today (meters.ts' keepDays,
+// What Grok's, Antigravity's and OpenCode's chats used, by day and model, for the Usage page and Today (meters.ts' keepDays,
 // spentNow): read only, from their own files; nothing written there.
 // - Grok: ~/.grok/sessions/<its folder>/<chat id>/usage.json (the chat id Laki picks, --session-id): each turn's
 //   endedAt, and per model its totalTokens and costUsdTicks (xAI's ticks: 1e-10 USD, Grok's own price).
@@ -8,18 +8,25 @@
 //   model's name from `gen_metadata` (1.3 → 1.19). Cloned to a temp folder first (agy keeps it open, its WAL beside it;
 //   APFS: no bytes copied, else a copy), read with node's own sqlite: only the steps past the last one counted, each
 //   tab's days kept (agyNext); past AGY_BIG in a worker (agyWorker.ts). No price: tokens only.
-// ponytail: agy's field numbers read off its files (Nov 2026, agy 1.x); a release that moves them reads as nothing
+// - OpenCode: its own SQLite database (opencode.db in the data folder `opencode debug paths` names, OPENCODE_DB when
+//   set), cloned with its WAL as agy's: the tab's session and every one under it (session.parent_id: its subagents),
+//   each assistant message's data (modelID; tokens: input, output, reasoning, cache read and write; cost: OpenCode's
+//   own, USD), by day and model; only the rows past the last counted (one still answering, no time.completed, read
+//   again for an hour from its start), every 30 s at most, past AGY_BIG in the worker.
+// ponytail: agy's field numbers read off its files (Nov 2026, agy 1.x); OpenCode's schema read off this Mac's
+// opencode.db (2026-11-27, OpenCode 1.19.5: message.data JSON, session.parent_id); a release that moves them reads as nothing
+import { execFile } from 'node:child_process'
 import { constants, copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import type { Tab } from '../shared/types.ts'
-import { type ByModel, dayOf } from './share.ts'
+import { dayOf } from './share.ts'
 
-export type Days = Record<string, ByModel>
+export type Days = Record<string, Record<string, { tokens: number; cost: number }>> // a day's, by the model that answered
 const ID = /^[\w-]{1,80}$/
-const AGY_EVERY = 30_000 // at most this often per tab (agy writes its DB at every step)
+const AGY_EVERY = Number(process.env.LAKI_AGY_EVERY_MS) || 30_000 // at most this often per tab (agy and OpenCode write their DB at every step); the env: tests'
 const AGY_BIG = 32 << 20 // a DB and its WAL past this: read in a worker (a first read whole, or a copy where the clone falls back, would stall the daemon)
 const AGY_MAX = 256 << 20 // past this: not read
 const AGY_MS = 20_000 // a worker's read at most
@@ -123,8 +130,10 @@ export type AgyRead = { days: Days; last: number; again: boolean }
 // agy's steps past from (a rowid: what was counted before) and their days; last: the newest row with usage now (one with
 // none yet, a step under way, is read again next time); again: its newest rowid went below from (another conversation in
 // that file): read whole. ponytail: a step's usage, once there, is taken as final (a row rewritten later isn't read again)
-export function agyRead(db: string, from = 0): AgyRead | undefined {
-  const sqlite = process.getBuiltinModule?.('node:sqlite') as Sqlite | undefined // loaded only here: its warning only for an agy user
+// a DB read on a clone of it and its WAL in a temp folder of its own (gone after, even when it throws); undefined: no
+// node:sqlite, or it couldn't be read
+function withClone<T>(db: string, read: (d: InstanceType<Sqlite['DatabaseSync']>) => T): T | undefined {
+  const sqlite = process.getBuiltinModule?.('node:sqlite') as Sqlite | undefined // loaded only here: its warning only for an agy or OpenCode user
   if (!sqlite) return
   const tmp = mkdtempSync(join(tmpdir(), 'laki-agy-'))
   try {
@@ -133,16 +142,7 @@ export function agyRead(db: string, from = 0): AgyRead | undefined {
     if (existsSync(`${db}-wal`)) copyFileSync(`${db}-wal`, `${copy}-wal`, constants.COPYFILE_FICLONE)
     const d = new sqlite.DatabaseSync(copy)
     try {
-      const top = Number((d.prepare('SELECT max(rowid) AS m FROM steps').get() as { m?: unknown } | undefined)?.m ?? 0)
-      const again = top < from
-      const since = again ? 0 : from
-      const steps = d.prepare('SELECT rowid AS id, metadata FROM steps WHERE rowid > ? ORDER BY rowid').all(since) as { id: number | bigint; metadata: unknown }[]
-      agyRows.n += steps.length
-      let last = since
-      const blobs: Uint8Array[] = []
-      for (const r of steps) if (r.metadata instanceof Uint8Array) (blobs.push(r.metadata), msg(pbFields(r.metadata), 9) && (last = Number(r.id)))
-      const gens = (d.prepare('SELECT data FROM gen_metadata').all() as { data: unknown }[]).flatMap(r => (r.data instanceof Uint8Array ? [r.data] : []))
-      return { days: agyParse(blobs, gens), last, again }
+      return read(d)
     } finally {
       d.close()
     }
@@ -152,6 +152,69 @@ export function agyRead(db: string, from = 0): AgyRead | undefined {
     rmSync(tmp, { recursive: true, force: true })
   }
 }
+export function agyRead(db: string, from = 0): AgyRead | undefined {
+  return withClone(db, d => {
+    const top = Number((d.prepare('SELECT max(rowid) AS m FROM steps').get() as { m?: unknown } | undefined)?.m ?? 0)
+    const again = top < from
+    const since = again ? 0 : from
+    const steps = d.prepare('SELECT rowid AS id, metadata FROM steps WHERE rowid > ? ORDER BY rowid').all(since) as { id: number | bigint; metadata: unknown }[]
+    agyRows.n += steps.length
+    let last = since
+    const blobs: Uint8Array[] = []
+    for (const r of steps) if (r.metadata instanceof Uint8Array) (blobs.push(r.metadata), msg(pbFields(r.metadata), 9) && (last = Number(r.id)))
+    const gens = (d.prepare('SELECT data FROM gen_metadata').all() as { data: unknown }[]).flatMap(r => (r.data instanceof Uint8Array ? [r.data] : []))
+    return { days: agyParse(blobs, gens), last, again }
+  })
+}
+// OpenCode's: the session's and its subagents' assistant messages past from (a rowid), their days; last: the row read
+// up to (before the first of theirs still answering); again: the table's newest went below from (another database)
+export const ocRows = { n: 0 } // its message rows read, all reads (tests: only the new ones are)
+export function ocRead(db: string, session: string, from = 0): AgyRead | undefined {
+  return withClone(db, d => {
+    const top = Number((d.prepare('SELECT max(rowid) AS m FROM message').get() as { m?: unknown } | undefined)?.m ?? 0)
+    const again = top < from
+    const since = again ? 0 : from
+    const rows = d.prepare('WITH RECURSIVE t(id) AS (SELECT ? UNION SELECT s.id FROM session s JOIN t ON s.parent_id = t.id) SELECT rowid AS id, data FROM message WHERE rowid > ? AND session_id IN (SELECT id FROM t) ORDER BY rowid').all(session, since) as { id: number | bigint; data: unknown }[]
+    ocRows.n += rows.length
+    const days: Days = {}
+    let last = top
+    for (const r of rows) {
+      let m: { role?: unknown; modelID?: unknown; cost?: unknown; error?: unknown; time?: { created?: unknown; completed?: unknown }; tokens?: { input?: unknown; output?: unknown; reasoning?: unknown; cache?: { read?: unknown; write?: unknown } } }
+      try {
+        m = JSON.parse(String(r.data))
+      } catch {
+        continue
+      }
+      if (m?.role !== 'assistant') continue
+      // still answering: from here next time; one begun over an hour ago never will (its opencode was killed): as it is
+      if (!m.time?.completed && !m.error && Date.now() - n(m.time?.created) < 3_600_000) {
+        last = Number(r.id) - 1
+        break
+      }
+      const k = m.tokens
+      add(days, n(m.time?.completed) || n(m.time?.created) || NaN, typeof m.modelID === 'string' ? m.modelID : '', n(k?.input) + n(k?.output) + n(k?.reasoning) + n(k?.cache?.read) + n(k?.cache?.write), n(m.cost))
+    }
+    return { days, last, again }
+  })
+}
+// OpenCode's data folder, as the installed opencode says (`opencode debug paths`: asked once, again every 10 minutes
+// while it hasn't said), else its default (XDG_DATA_HOME or ~/.local/share, then opencode); its DB: OPENCODE_DB, else
+// opencode.db there, else the newest opencode-<channel>.db
+let ocData: { at: number; dir?: string } | undefined
+export function ocDb(): string | undefined {
+  if (!ocData || (!ocData.dir && Date.now() - ocData.at > 600_000)) {
+    const asked = (ocData = { at: Date.now() })
+    execFile('opencode', ['debug', 'paths'], { timeout: 10_000 }, (_e, out) => (d => d && asked === ocData && (ocData.dir = d))(/^data\s+(\S.*)$/m.exec(String(out ?? ''))?.[1]?.trim()))
+  }
+  const dir = ocData.dir ?? join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'opencode')
+  const env = process.env.OPENCODE_DB
+  if (env && env !== ':memory:') return isAbsolute(env) ? env : join(dir, env)
+  const f = join(dir, 'opencode.db')
+  if (existsSync(f)) return f
+  try {
+    return readdirSync(dir).filter(x => /^opencode-[\w.-]+\.db$/.test(x)).map(x => join(dir, x)).sort((a, b) => (statSync(b, { throwIfNoEntry: false })?.mtimeMs ?? 0) - (statSync(a, { throwIfNoEntry: false })?.mtimeMs ?? 0))[0]
+  } catch {}
+}
 // the days kept and a read's: added to them, or instead of them (again)
 export function agyNext(kept: Days | undefined, r: AgyRead): Days {
   const days: Days = r.again || !kept ? {} : structuredClone(kept)
@@ -159,12 +222,12 @@ export function agyNext(kept: Days | undefined, r: AgyRead): Days {
   return days
 }
 // past AGY_BIG: agyRead in a worker of its own (its build entry: out/main/agyWorker.js), ended at AGY_MS
-function agyWorker(db: string, from: number): Promise<AgyRead | undefined> {
+function agyWorker(db: string, from: number, session?: string): Promise<AgyRead | undefined> {
   const here = dirname(fileURLToPath(import.meta.url))
   const file = [join(here, 'agyWorker.js'), join(here, '../agyWorker.js'), join(here, 'agyWorker.ts')].find(p => existsSync(p))
   if (!file) return Promise.resolve(undefined)
   return new Promise(res => {
-    const w = new Worker(file, { workerData: { db, from }, resourceLimits: { maxOldGenerationSizeMb: 512 } })
+    const w = new Worker(file, { workerData: { db, from, session }, resourceLimits: { maxOldGenerationSizeMb: 512 } })
     const t = setTimeout(() => void w.terminate(), AGY_MS)
     w.once('message', (m: { r?: AgyRead }) => res(m.r))
     w.once('error', () => res(undefined))
@@ -184,16 +247,18 @@ function agyFile(tab: Tab, cwd: string): string | undefined {
   return id && ID.test(id) ? join(AGY(), 'conversations', `${id}.db`) : undefined
 }
 
-// a grok or gemini tab's chat (id: its own, as its file names it) and days, read again only when its file changed
-// (agy's: at most every AGY_EVERY, unless now)
+// a grok, gemini or opencode tab's chat (id: its own, as its file names it; OpenCode's session) and days, read again only
+// when its file changed (agy's and OpenCode's: at most every AGY_EVERY, unless now)
 export function agentDays(tab: Tab, cwd: string, now = false): { id: string; days: Days } | undefined {
   const c = seen.get(tab.id)
   const was = () => (c?.days && c.id ? { id: c.id, days: c.days } : undefined)
-  if (tab.preset === 'gemini' && !now && c && Date.now() - c.at < AGY_EVERY) return was()
-  const f = tab.preset === 'grok' ? grokFile(tab, cwd) : tab.preset === 'gemini' ? agyFile(tab, cwd) : undefined
-  if (!f) return was()
-  const id = tab.preset === 'grok' ? tab.resumeId! : basename(f, '.db')
-  const key = `${f}|${stamp(f)}|${tab.preset === 'gemini' ? stamp(`${f}-wal`) : ''}`
+  const oc = tab.preset === 'opencode'
+  if ((tab.preset === 'gemini' || oc) && !now && c && Date.now() - c.at < AGY_EVERY) return was()
+  if (oc && !(tab.resumeId && ID.test(tab.resumeId))) return was()
+  const f = tab.preset === 'grok' ? grokFile(tab, cwd) : tab.preset === 'gemini' ? agyFile(tab, cwd) : oc ? ocDb() : undefined
+  if (!f || !existsSync(f)) return was()
+  const id = tab.preset === 'grok' || oc ? tab.resumeId! : basename(f, '.db')
+  const key = `${f}|${id}|${stamp(f)}|${tab.preset !== 'grok' ? stamp(`${f}-wal`) : ''}`
   if (c?.key === key) return (c.at = Date.now()), was()
   if (tab.preset === 'grok') {
     const s = statSync(f, { throwIfNoEntry: false })
@@ -205,7 +270,7 @@ export function agentDays(tab: Tab, cwd: string, now = false): { id: string; day
   if (c?.reading) return was() // a worker's read under way: its days next time
   const size = (statSync(f, { throwIfNoEntry: false })?.size ?? Infinity) + (statSync(`${f}-wal`, { throwIfNoEntry: false })?.size ?? 0)
   if (size >= AGY_MAX) return c && (c.at = Date.now()), was() // past AGY_MAX: not read
-  const same = c?.db === f // the same conversation: only its new steps
+  const same = c?.db === f && c.id === id // the same conversation (OpenCode's: the same session): only its new rows
   const from = same ? (c.rowid ?? 0) : 0
   const keep = (r: AgyRead | undefined) => {
     const now = seen.get(tab.id)
@@ -214,9 +279,9 @@ export function agentDays(tab: Tab, cwd: string, now = false): { id: string; day
     seen.set(tab.id, { key, days, at: Date.now(), id, db: f, rowid: r.last })
     return days
   }
-  if (size < AGY_BIG) return (days => (days ? { id, days } : was()))(keep(agyRead(f, from)))
+  if (size < AGY_BIG) return (days => (days ? { id, days } : was()))(keep(oc ? ocRead(f, id, from) : agyRead(f, from)))
   seen.set(tab.id, { ...(c ?? { key: '' }), at: Date.now(), reading: true })
-  void agyWorker(f, from).then(r => seen.has(tab.id) && keep(r)) // the tab closed meanwhile (agentDaysTidy): not kept
+  void agyWorker(f, from, oc ? id : undefined).then(r => seen.has(tab.id) && keep(r)) // the tab closed meanwhile (agentDaysTidy): not kept
   return was()
 }
 export const agentDaysTidy = (live: (id: string) => boolean) => { for (const id of seen.keys()) if (!live(id)) seen.delete(id) }

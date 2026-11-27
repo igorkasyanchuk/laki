@@ -1,8 +1,9 @@
 // How agents start: the prompt as an env var (never shell-quoted), agent variables, presets, model, effort, permission and fast mode.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { connect } from 'node:net'
+import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { type TestContext, test } from 'node:test'
 import { sandboxStop } from '../src/shared/types.ts'
@@ -426,7 +427,7 @@ test("a sandboxed profile's network: claude's list in a settings file of its own
   // the host its sandbox named as it refused: the card's Allow this domain
   await rig.rpc('hook', { tab: listed.id, state: 'running', payload: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'curl https://evil.dev' }, tool_response: { stdout: 'Connection to evil.dev blocked by the sandbox proxy', stderr: '' } } })
   await rig.rpc('hook', { tab: listed.id, state: 'idle' })
-  assert.equal((await rig.tab(ws.id, 'listed')).boxed.host, 'evil.dev')
+  assert.equal((await until(async () => (await rig.tab(ws.id, 'listed'))?.boxed, 'its card')).host, 'evil.dev')
   // an agent can't change its network, nor the list
   const from = { ws: ws.id, tab: listed.id }
   await assert.rejects(rig.rpc('projectNetAllow', { project: p.id, host: 'evil.dev', from }), /an agent can't change the hosts a sandboxed agent may reach/)
@@ -635,4 +636,72 @@ test("#6: Settings' MCP servers go to every project's agents (a project's of the
   assert.deepEqual((await rig.rpc('state')).settings.mcp.map((s: any) => s.name), ['docs', 'search', 'linear', 'pg'])
   assert.equal(readFileSync(join(rig.home, '.codex', 'config.toml'), 'utf8'), toml, "codex's own as it was")
   await until(() => !readFileSync(join(rig.data, 'state.json'), 'utf8').includes('fake-pass'), 'a secret value kept out of state.json')
+})
+
+test("a profile's system prompt: told to claude by --append-system-prompt and to codex by developer_instructions, with Laki's note; a command's dropped", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'reviewer', add: true, set: { agent: 'claude', system: '  Review only: never edit files.  ' } })
+  await rig.rpc('presetSave', { name: 'cx', add: true, set: { agent: 'codex', system: 'Be terse.' } })
+  const pr = (await rig.rpc('state')).presets.find((x: { name: string }) => x.name === 'reviewer')
+  assert.equal(pr.system, 'Review only: never edit files.') // trimmed
+  await rig.rpc('wsNew', { project: p.id, preset: 'reviewer', prompt: 'hi' })
+  const run = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find(l => l.bin === 'claude'), 'claude up')
+  const note = run.args[run.args.indexOf('--append-system-prompt') + 1]
+  assert.match(note, /Laki/)
+  assert.match(note, /standing instructions for this profile \(reviewer\):\nReview only: never edit files\.$/)
+  await rig.rpc('wsNew', { project: p.id, preset: 'cx', prompt: 'hi' })
+  const cx = await until(() => rig.fakeLog().find(l => l.bin === 'codex'), 'codex up')
+  assert.ok(cx.args.some((a: string) => a.startsWith('developer_instructions=') && a.includes('Be terse.')), cx.args.join(' '))
+  // laki off: the profile's own still goes
+  await rig.rpc('presetSave', { name: 'reviewer', set: { laki: false } })
+  await rig.rpc('wsNew', { project: p.id, preset: 'reviewer', prompt: 'again' })
+  const quiet = await until(() => rig.fakeLog().filter(l => l.bin === 'claude')[1], 'second claude')
+  assert.equal(quiet.args[quiet.args.indexOf('--append-system-prompt') + 1], "The user's standing instructions for this profile (reviewer):\nReview only: never edit files.")
+  await assert.rejects(rig.rpc('presetSave', { name: 'reviewer', set: { system: 'x'.repeat(20001) } }), /20,000/)
+  await rig.rpc('presetSave', { name: 'cmd', add: true, set: { agent: 'command', cmd: 'true', system: 'nope' } })
+  assert.equal((await rig.rpc('state')).presets.find((x: { name: string }) => x.name === 'cmd').system, undefined)
+})
+
+test("your shell's alias for an agent: its permission flags count as the profile's (no second mode of Laki's beside them), and its never-asks checks see them", async t => {
+  const { aliasFlags } = await import('../src/shared/types.ts')
+  assert.deepEqual(aliasFlags(["codex='codex --dangerously-bypass-approvals-and-sandbox'", "alias claude='/Users/me/.claude/local/claude'", "agy='agy --mode auto'", "alias grok='npx grok --x'", 'll=\'ls -l\'', "alias opencode 'opencode --print-logs'", "codex2='codex --x'"].join('\n')), { codex: '--dangerously-bypass-approvals-and-sandbox', gemini: '--mode auto', opencode: '--print-logs' })
+  assert.deepEqual(aliasFlags("codex='codex -c '\\''model=\"x\"'\\'''"), { codex: `-c 'model="x"'` }, "zsh's quoted quote")
+  // a shell whose interactive login has the alias (tsh's has none): its -lic runs bash with it, aliases on
+  const dir = mkdtempSync(join(tmpdir(), 'laki-alias-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const sh = join(dir, 'ash')
+  writeFileSync(sh, `#!/bin/bash\nif [ "$1" = "-lic" ] || [ "$1" = "-lc" ]; then c=$2; shift 2; BASH_SILENCE_DEPRECATION_WARNING=1 exec /bin/bash --noprofile --norc -O expand_aliases -c "alias codex='codex --dangerously-bypass-approvals-and-sandbox'
+$c" "$@"; fi\nBASH_SILENCE_DEPRECATION_WARNING=1 exec /bin/bash --noprofile --norc -i\n`, { mode: 0o755 })
+  const rig = await fresh(t, { env: { SHELL: sh } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'cx', add: true, set: { agent: 'codex', perm: 'auto' } })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'cx', prompt: 'hi' })
+  const run = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find(l => l.bin === 'codex' && l.args[0] !== 'app-server'), 'codex up')
+  assert.ok(run.args.includes('--dangerously-bypass-approvals-and-sandbox'), run.args.join(' '))
+  assert.ok(!run.args.includes('--approve-for-me'), 'no mode of its own beside the alias’s')
+  // an agent's call may not start one that never asks: the alias's counts
+  const tab = await until(async () => await rig.tab(ws.id), 'its tab')
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'cx', prompt: 'x', from: tab.id }), /never asks|approval|bypass/i)
+})
+
+test("a group's agent, model, effort and permission mode: laki new --group starts them (the new-workspace page's too); another agent named keeps its own", async t => {
+  const { groupDefaults } = await import('../src/shared/tools.ts')
+  const g = { preset: 'cx', where: 'bare', perm: 'ask', model: 'gpt-x', effort: 'high', base: 'dev' }
+  assert.deepEqual(groupDefaults({}, g), { local: false, noSetup: true, base: 'dev', perm: '', model: 'gpt-x', effort: 'high' })
+  assert.deepEqual(groupDefaults({ preset: 'claude', local: true, model: 'opus' }, g), { preset: 'claude', local: true, model: 'opus', base: 'dev' }, 'another agent: only where it goes')
+  assert.deepEqual(groupDefaults({ effort: 'low' }, undefined), { effort: 'low' })
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('presetSave', { name: 'cx', add: true, set: { agent: 'codex' } })
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a', name: 'Astra', preset: 'cx', model: 'gpt-x', effort: 'high', perm: 'acceptEdits', where: 'bare' }, { id: 'sep-b', name: 'Odd', preset: 'cx', effort: 'max' }] })
+  const r = await rig.cli('new', p.id, '--group', 'astra', '--prompt', 'hi')
+  assert.equal(r.code, 0, r.out + r.err)
+  const run = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find(l => l.bin === 'codex' && l.args[0] !== 'app-server'), 'codex up')
+  const line = run.args.join(' ')
+  for (const want of ['-m gpt-x', 'model_reasoning_effort="high"', '-s workspace-write -a never']) assert.ok(line.includes(want), `${want}: ${line}`)
+  // an effort its agent doesn't take (codex has no max): left out, the start goes on
+  await rig.cli('new', p.id, '--group', 'odd', '--prompt', 'again')
+  const two = await until(() => rig.fakeLog().filter(l => l.bin === 'codex' && l.args[0] !== 'app-server')[1], 'second codex')
+  assert.ok(!two.args.join(' ').includes('model_reasoning_effort'), two.args.join(' '))
 })

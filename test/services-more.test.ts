@@ -134,7 +134,8 @@ test('usage: which sign-in, plans with no limits, an API key, and each way the s
   assert.equal((await claude()).error, 'Can’t reach the server: offline?')
   process.env.LAKI_USAGE_API = api
 
-  // Codex: an API key has no plan limits (nothing asked); no account id, no header; a plan with no windows; a failure
+  // Codex (no node on PATH: the fake's app-server ends at once, as an older codex's does: chatgpt.com, asked for): an API
+  // key has no plan limits (nothing asked); no account id, no header; a plan with no windows; a failure
   const asked = hits.length
   auth({ OPENAI_API_KEY: 'sk-test' })
   assert.equal((await codex()).error, 'Signed in with an API key: billed per token, no plan limits')

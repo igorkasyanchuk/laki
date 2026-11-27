@@ -60,8 +60,8 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
 // bypass permissions), and an agent's event for another workspace asks you first, as a send there does
 test("#3: an agent's event starts no agent that never asks, by its mode or its flags; one for another workspace asks first", async t => {
   assert.deepEqual(
-    [['claude', 'bypassPermissions'], ['claude', undefined, '--dangerously-skip-permissions'], ['claude', 'bypassPermissions', '--permission-mode plan'], ['codex', 'acceptEdits'], ['codex', undefined, '-a never'], ['codex', undefined, '--ask-for-approval=never'], ['codex', 'bypassPermissions', '-c approval_policy="never"'], ['codex', undefined, '-a on-request'], ['codex', 'auto'], ['claude', 'acceptEdits'], ['gemini', 'bypassPermissions']].map(([a, p, x]) => neverAsks(a, p, x)),
-    [true, true, false, true, true, true, true, false, false, false, true],
+    [['claude', 'bypassPermissions'], ['claude', undefined, '--dangerously-skip-permissions'], ['claude', 'bypassPermissions', '--permission-mode plan'], ['codex', 'acceptEdits'], ['codex', undefined, '-a never'], ['codex', undefined, '--ask-for-approval=never'], ['codex', 'bypassPermissions', '-c approval_policy="never"'], ['codex', undefined, '-a on-request'], ['codex', 'auto'], ['claude', 'acceptEdits'], ['gemini', 'bypassPermissions'], ['codex', 'auto', '--yolo']].map(([a, p, x]) => neverAsks(a, p, x)),
+    [true, true, false, true, true, true, true, false, false, false, true, true],
   )
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

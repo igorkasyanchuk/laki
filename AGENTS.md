@@ -28,6 +28,7 @@ npm run pack:x64                  # the Intel app from an Apple silicon Mac → 
 npm run pack:linux                # in Docker: dist/linux/Laki-<version>-<arch>.AppImage, then the tests and pack-smoke.sh under Xvfb (ARCH=x64)
 npm run dmg                       # scripts/dmg.sh: check, audit:deps, test:ui (before the version moves), minor version +1, the app built, pack-smoke on it, then dist/release/Laki-<version>-arm64.dmg from that app (the user's ask: every dmg); a failed step: no dmg, version as it was; LAKI_SKIP_SMOKE=1, LAKI_SKIP_AUDIT=1, LAKI_SKIP_UI=1 skip loudly
 npm run audit:deps                # scripts/audit.ts: npm audit of what ships, high or critical fails unless scripts/audit-allow.json allows it (until a date); build tools' warn; offline warns unless LAKI_AUDIT_STRICT=1 (release.sh)
+npm run prices                    # scripts/prices.ts: LiteLLM's model price table into src/shared/prices.json (claude-*, gpt-5*, grok-*, gemini-*; cache, 1-hour write, long-prompt rates; dated), by hand before a release; types.ts PRICE_OWN wins; the app never fetches prices; dmg warns past 30 days
 npm run eval:ai -- --model <id>   # Laki AI's tool choice against a real model (OPENROUTER_API_KEY, never written down), each ask of scripts/ai-evals.json in a demo world of its own: pass or fail, the total, the money; into dist/ai-evals (scripts/ai-evals.ts; not in test, check, dmg or release)
 npm run release                   # every platform from this Mac to a draft on the public releases repo, test:ui after its build and before signing (LAKI_SKIP_UI=1 skips loudly; docs/manual-release.md)
 npm run dev                       # Electron + renderer dev server on :5199
@@ -93,7 +94,7 @@ for the part you change, and keep it up to date with the change.
 
 - [docs/dev/api.md](docs/dev/api.md): the daemon's API (`src/daemon/main.ts` `api`): each method over `/rpc` and the
   WebSocket, its events and the view; `laki mcp`, the MCP server.
-- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 233. Bump `API` (`src/shared/types.ts`)
+- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 234. Bump `API` (`src/shared/types.ts`)
   when the renderer starts relying on a new method or daemon behavior (a setting needs no bump); the next one goes at its end.
 - [docs/dev/agents.md](docs/dev/agents.md): profiles and accounts, layouts, agent variables, turns, asks, sessions, sleep,
   terminal queries, agents and their hooks, projects and their trust, presets, interrupts, resume after a restart.

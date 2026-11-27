@@ -18,7 +18,7 @@ export type Changes = { base: string; from?: string; files: { path: string; stat
 export type Commit = { sha: string; short: string; author: string; at: number; subject: string; pushed: boolean }
 export type Commits = { base?: string; commits: Commit[]; more?: boolean } // base: a worktree's (none: a folder's own, what no remote has); more: past 200
 // at: an older daemon gives none; startLine: a range's first; side: its lines' (LEFT: the old file's); hunk: the diff the review saw
-export type Thread = { path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
+export type Thread = { id?: string /* GitHub's node id: Reply and Resolve's */; path: string; line?: number; startLine?: number; side?: 'LEFT' | 'RIGHT'; hunk?: string; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
 export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean; media?: string; src?: string; sheets?: { name: string; rows: string[][]; cut?: boolean }[]; why?: string; db?: { tables: DbTable[] } } // db: a SQLite database's tables (#1: the daemon's db.ts); lossy: not UTF-8; media: audio or video, src its data URL (asked for with media: true); sheets: an Excel workbook's (the daemon's sheet.ts)
 // an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
@@ -49,6 +49,8 @@ export type PanelApi = {
   prFile: (path: string) => Promise<FileContent> // as the PR's head commit has it (the PR's diff's expand arrows)
   agents: { id: string; name: string }[] // the workspace's live agent tabs, the one to send to first
   threads: () => Promise<Thread[]>
+  threadReply?: (thread: string, body: string) => Promise<unknown> // a reply on a review thread, as you (prThreadReply)
+  threadResolve?: (thread: string, resolved: boolean, body?: string) => Promise<unknown> // resolve or unresolve one, a reply first when given
   apply: (path: string, edits: Suggestion[], then?: () => void) => Promise<unknown> // Review's suggestions put in the file, Undo in the toast; then: after it and after its Undo
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
   toAgent: (text: string, line?: boolean, tab?: string) => Promise<unknown> // to the workspace's agent (tab: that one), when its turn ends; line: a comment on a line (an achievement)
@@ -639,13 +641,13 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
           {!threads && !err && <span className="muted small">Loading…</span>}
           {threads && !open.length && <span className="muted small">{resolved.length ? 'No open review comments' : 'No review comments'}</span>}
           {open.map(t => (
-            <ThreadCard key={threadKey(t)} t={t} api={p.api} {...props(t)} />
+            <ThreadCard key={threadKey(t)} t={t} api={p.api} {...props(t)} acts={{ head: pr.head, done: reload }} />
           ))}
           {resolved.length > 0 && (
             <details className="sp-resolved">
               <summary>{resolved.length} resolved</summary>
               {resolved.map(t => (
-                <ThreadCard key={threadKey(t)} t={t} api={p.api} />
+                <ThreadCard key={threadKey(t)} t={t} api={p.api} acts={{ done: reload }} />
               ))}
             </details>
           )}
@@ -1935,18 +1937,47 @@ export function FilePreview(p: {
   )
 }
 
-// ⌘P: find a file in the workspace by a few letters of its name or path
-export function FileFinder(p: { files: () => Promise<FileList>; onPick: (path: string) => void; onClose: () => void }) {
+// ⌘P: find a file in the workspace by a few letters of its name or path; ⇧⌘P (or Tab): its files' text (the daemon's
+// fileSearch: git grep), matches grouped by file, Aa / ab / .* for case, whole word and regex, Enter opens it at the line
+export type TextFound = { files: { path: string; hits: { line: number; text: string }[] }[]; total: number; cut: boolean }
+type TextOpts = { q: string; case?: boolean; word?: boolean; regex?: boolean }
+export function FileFinder(p: { files: () => Promise<FileList>; search?: (o: TextOpts) => Promise<TextFound>; text?: boolean; where?: string; onPick: (path: string, line?: number) => void; onClose: () => void }) {
+  const [text, setText] = useState(!!p.text && !!p.search)
   const [all, setAll] = useState<string[] | null>(null)
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
+  const [opts, setOpts] = useState(() => load<{ case?: boolean; word?: boolean; regex?: boolean }>('laki.searchOpts', {}))
+  const [hits, setHits] = useState<TextFound | null>(null)
+  const [busy, setBusy] = useState(false)
   const list = useRef<HTMLDivElement>(null)
-  useEffect(() => void p.files().then(f => setAll(f?.files ?? []), e => setErr(String(e?.message ?? e))), [])
-  const found = useMemo(() => findFiles(q, all ?? []), [q, all])
-  useEffect(() => setI(0), [q])
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => void (!text && !all && p.files().then(f => setAll(f?.files ?? []), e => setErr(String(e?.message ?? e)))), [text])
+  const found = useMemo(() => (text ? [] : findFiles(q, all ?? [])), [q, all, text])
+  // Text: asked 250 ms after the last key, the newest answer kept
+  const asked = useRef(0)
+  useEffect(() => {
+    if (!text || !p.search) return
+    setErr('')
+    if (!q.trim()) return setHits(null), setBusy(false)
+    const n = ++asked.current
+    setBusy(true)
+    const t = setTimeout(
+      () =>
+        p.search!({ q, ...opts }).then(
+          r => n === asked.current && (setHits(r), setBusy(false)),
+          (e: Error) => n === asked.current && (setErr(e.message), setHits(null), setBusy(false)),
+        ),
+      250,
+    )
+    return () => clearTimeout(t)
+  }, [q, text, opts.case, opts.word, opts.regex])
+  const rows = useMemo(() => (hits?.files ?? []).flatMap(f => f.hits.map(h => ({ path: f.path, ...h }))), [hits])
+  const count = text ? rows.length : found.length
+  useEffect(() => setI(0), [q, text, hits])
   useEffect(() => void list.current?.querySelector('.ff-item.sel')?.scrollIntoView({ block: 'nearest' }), [i])
-  const pick = (path?: string) => path && (p.onClose(), p.onPick(path))
+  const pick = (path?: string, line?: number) => path && (p.onClose(), p.onPick(path, line))
+  const flip = (k: 'case' | 'word' | 'regex') => setOpts(o => (n => (keep('laki.searchOpts', n), n))({ ...o, [k]: !o[k] || undefined }))
   const mark = (path: string, hits: number[]) => {
     const at = path.lastIndexOf('/') + 1
     const span = (from: number, to: number) =>
@@ -1957,37 +1988,115 @@ export function FileFinder(p: { files: () => Promise<FileList>; onPick: (path: s
       </>
     )
   }
+  // a line's match in bold: the regex's first, else the text's (any case unless Aa); built once per query
+  const re = useMemo(() => {
+    try {
+      return q ? new RegExp(opts.regex ? q : q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), opts.case ? '' : 'i') : null
+    } catch {
+      return null
+    }
+  }, [q, opts.regex, opts.case])
+  const lit = (line: string) => {
+    const m = re ? re.exec(line) : null
+    const from = m && m[0] ? Math.max(0, m.index - 40) : 0
+    const cut = from ? `…${line.slice(from)}` : line
+    if (!m || !m[0]) return cut.trimStart()
+    const at = m.index - from + (from ? 1 : 0)
+    return (
+      <>
+        {cut.slice(0, at).trimStart()}
+        <b>{cut.slice(at, at + m[0].length)}</b>
+        {cut.slice(at + m[0].length)}
+      </>
+    )
+  }
+  let last = ''
   return (
     <div className="overlay top" onMouseDown={e => e.target === e.currentTarget && p.onClose()}>
-      <div className="finder" role="dialog" aria-label="Find a file">
-        <input
-          autoFocus
-          value={q}
-          placeholder={all ? `Find a file (${all.length.toLocaleString()} files)` : 'Find a file…'}
-          spellCheck={false}
-          onChange={e => setQ(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              e.preventDefault()
-              setI(x => Math.max(0, Math.min(found.length - 1, x + (e.key === 'ArrowDown' ? 1 : -1))))
-            } else if (e.key === 'Enter') {
-              e.preventDefault() // or its keypress reaches the terminal focused after the finder closes
-              pick(found[i]?.path)
-            }
-            else if (e.key === 'Escape') (e.stopPropagation(), p.onClose())
-          }}
-        />
+      <div className={`finder ${text ? 'ff-text' : ''}`} role="dialog" aria-label={text ? 'Search in files' : 'Find a file'}>
+        <div className="ff-bar">
+          <input
+            ref={input}
+            autoFocus
+            value={q}
+            aria-label={text ? 'Search in files' : 'Find a file'}
+            placeholder={text ? `Search in ${p.where ?? 'its files'}` : all ? `Find a file (${all.length.toLocaleString()} files)` : 'Find a file…'}
+            spellCheck={false}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                setI(x => Math.max(0, Math.min(count - 1, x + (e.key === 'ArrowDown' ? 1 : -1))))
+              } else if (e.key === 'Enter') {
+                e.preventDefault() // or its keypress reaches the terminal focused after the finder closes
+                text ? (r => r && pick(r.path, r.line))(rows[i]) : pick(found[i]?.path)
+              } else if (e.key === 'Tab' && p.search && !e.shiftKey) (e.preventDefault(), setText(t => !t))
+              else if (e.key === 'Escape') (e.stopPropagation(), p.onClose())
+            }}
+          />
+          {text && (
+            <span className="ff-opts" role="group" aria-label="Search options">
+              {(
+                [
+                  ['case', 'Aa', 'Match case'],
+                  ['word', 'ab', 'Whole words'],
+                  ['regex', '.*', 'Regular expression'],
+                ] as const
+              ).map(([k, l, tip]) => (
+                <button key={k} type="button" className={`ff-opt ${opts[k] ? 'on' : ''}`} aria-pressed={!!opts[k]} aria-label={tip} data-tip={tip} onMouseDown={e => e.preventDefault()} onClick={() => (flip(k), input.current?.focus())}>
+                  {l}
+                </button>
+              ))}
+            </span>
+          )}
+        </div>
+        {p.search && (
+          <div className="ff-modes muted small">
+            <button type="button" className={`link small ${!text ? 'on' : ''}`} onMouseDown={e => e.preventDefault()} onClick={() => setText(false)}>
+              Files
+            </button>
+            <button type="button" className={`link small ${text ? 'on' : ''}`} onMouseDown={e => e.preventDefault()} onClick={() => setText(true)}>
+              Text
+            </button>
+            <span className="grow" />
+            {text && hits && <span>{hits.cut ? `the first ${rows.length} of ${hits.total.toLocaleString()} results` : `${hits.total} ${hits.total === 1 ? 'result' : 'results'} in ${hits.files.length} ${hits.files.length === 1 ? 'file' : 'files'}`}</span>}
+            {text && busy && <span className="btn-spin" role="status" aria-label="Searching" />}
+          </div>
+        )}
         <div className="ff-list" ref={list}>
           {err && <div className="warn small pad">{err}</div>}
-          {!all && !err && <div className="muted small pad">Loading the files…</div>}
-          {found.map((f, k) => (
-            <div key={f.path} className={`ff-item ${k === i ? 'sel' : ''}`} onMouseEnter={() => setI(k)} {...act(() => pick(f.path))}>
-              <Icon name="file" />
-              {mark(f.path, f.hits)}
-            </div>
-          ))}
-          {all && !found.length && <div className="muted small pad">{q ? 'No file matches.' : 'No files here.'}</div>}
+          {!text && !all && !err && <div className="muted small pad">Loading the files…</div>}
+          {!text &&
+            found.map((f, k) => (
+              <div key={f.path} className={`ff-item ${k === i ? 'sel' : ''}`} onMouseEnter={() => setI(k)} {...act(() => pick(f.path))}>
+                <Icon name="file" />
+                {mark(f.path, f.hits)}
+              </div>
+            ))}
+          {text &&
+            rows.map((r, k) => {
+              const head = r.path !== last && ((last = r.path), true)
+              return (
+                <Fragment key={`${r.path}:${r.line}:${k}`}>
+                  {head && (
+                    <div className="ff-file">
+                      <Icon name="file" />
+                      {mark(r.path, [])}
+                      <span className="sp-count">{hits!.files.find(f => f.path === r.path)?.hits.length}</span>
+                    </div>
+                  )}
+                  <div className={`ff-item ff-hit ${k === i ? 'sel' : ''}`} onMouseEnter={() => setI(k)} {...act(() => pick(r.path, r.line))}>
+                    <span className="ff-line">{r.line}</span>
+                    <span className="ff-hit-text mono">{lit(r.text)}</span>
+                  </div>
+                </Fragment>
+              )
+            })}
+          {!text && all && !found.length && <div className="muted small pad">{q ? 'No file matches.' : 'No files here.'}</div>}
+          {text && !q.trim() && <div className="muted small pad">Type to search the text of its files (what git ignores is left out). Tab: find a file by its name.</div>}
+          {text && hits && !rows.length && !busy && <div className="muted small pad">No matches.</div>}
         </div>
+        <div className="ff-foot muted small">↑↓ move · ⏎ open{text ? ' at the line' : ''} · Tab {text ? 'files by name' : 'search the text'} · Esc close</div>
       </div>
     </div>
   )

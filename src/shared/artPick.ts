@@ -67,3 +67,25 @@ export function pickOf(d: unknown): Omit<ArtMark, 'note'> | undefined {
   if (!x || x.laki !== 'artPick' || !Number.isInteger(x.n) || typeof x.selector !== 'string' || typeof x.html !== 'string' || typeof x.text !== 'string') return undefined
   return { n: x.n as number, selector: x.selector.slice(0, 500), html: x.html.slice(0, 2000), text: x.text.slice(0, 200) }
 }
+
+// #7: notes on a picture or a video artifact: a spot (w and h 0) or a box, its place as fractions of the frame (0 to 1),
+// a video's at its time (seconds); said in words for the agent ("at 01:23, a box near the top left"), each frame's
+// picture (its marks drawn, imageSave's path) named after them
+export type MediaMark = { n: number; x: number; y: number; w: number; h: number; t?: number; note: string }
+export const clock = (s: number) => (m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.floor(m % 60)).padStart(2, '0')}`)(Math.max(0, Math.floor(s)))
+export function whereOf(m: Pick<MediaMark, 'x' | 'y' | 'w' | 'h'>) {
+  const cx = m.x + m.w / 2
+  const cy = m.y + m.h / 2
+  const v = cy < 1 / 3 ? 'top' : cy > 2 / 3 ? 'bottom' : 'middle'
+  const h = cx < 1 / 3 ? 'left' : cx > 2 / 3 ? 'right' : ''
+  const place = v === 'middle' && !h ? 'the middle' : `the ${v}${h ? ` ${h}` : ''}`
+  const pct = (a: number) => `${Math.round(a * 100)}%`
+  return m.w > 0.01 || m.h > 0.01 ? `a box near ${place} (x ${pct(m.x)}–${pct(m.x + m.w)}, y ${pct(m.y)}–${pct(m.y + m.h)})` : `a spot near ${place} (x ${pct(m.x)}, y ${pct(m.y)})`
+}
+export function mediaNotes(path: string, video: boolean, marks: MediaMark[], shots: { path: string; ns: number[] }[]) {
+  return [
+    `Notes on the ${video ? 'screen recording' : 'picture'} ${path} (in $LAKI_STORAGE_FOLDER), each on ${video ? 'a moment and a place in it' : 'a place in it'}:`,
+    ...marks.map(m => `${m.n}. ${video && m.t !== undefined ? `at ${clock(m.t)}, ` : ''}${whereOf(m)}: ${m.note.trim()}`),
+    ...(shots.length ? [`${video ? 'The frames' : 'The picture'}, with the numbered marks drawn on: ${shots.map(s => `${s.path} (${s.ns.join(', ')})`).join(', ')}`] : []),
+  ].join('\n')
+}

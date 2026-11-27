@@ -118,7 +118,7 @@ export function spendEntries(agent: string, jsonl: string, root?: string): Spend
         const was = total && n(all.total_tokens) >= n(total.total_tokens) ? total : {}
         const d = (k: string) => n(all[k]) - n(was[k])
         total = all
-        if (d('total_tokens')) out.push({ kind: 'request', input: d('input_tokens'), output: d('total_tokens') - d('input_tokens') }) // as the meter counts it
+        if (d('total_tokens')) out.push({ kind: 'request', id: JSON.stringify(p), input: d('input_tokens'), output: d('total_tokens') - d('input_tokens') }) // as the meter counts it; its id its totals and limits: a spawned thread's copy of its parent's counts once (meters.ts wsSpend reads them together)
       }
     }
   }

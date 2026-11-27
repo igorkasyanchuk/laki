@@ -30,6 +30,7 @@
     "test:sheet": "node --experimental-strip-types --no-warnings scripts/ui-sheet.ts",
     "test:cov": "node --experimental-strip-types --no-warnings scripts/cov.ts",
     "debt": "node --experimental-strip-types --no-warnings scripts/debt.ts",
+    "prices": "node --experimental-strip-types --no-warnings scripts/prices.ts",
     "size": "node --experimental-strip-types --no-warnings scripts/size.ts",
     "mem": "node --experimental-strip-types --no-warnings scripts/mem.ts",
     "audit:deps": "node --experimental-strip-types --no-warnings scripts/audit.ts",
@@ -157,8 +158,8 @@
     }
   },
   "lakiSize": {
-    "js": 584,
-    "css": 358
+    "js": 603,
+    "css": 370
   },
   "lakiMem": {
     "daemon": 114,

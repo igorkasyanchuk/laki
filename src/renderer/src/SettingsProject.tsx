@@ -6,7 +6,7 @@ import { ask, Icon, IconButton, iconItems, iconWords, ProjectMark, Switch, TAB_C
 import { MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
 import { actionSlug, type Agent, AGENT_NAMES, AGENT_VARS, AGENTS, CHECK_STEPS, COST_WARN, type CostWarn, type DoneCheck, type Memory, type MergeMethod, type PRAllow, prAllows, type SecretKept } from '../../shared/types'
 import { Group, Says, Scope } from './SettingsKit'
-import { emojiOf } from '../../shared/icons'
+import { emojiOf, emojiWords } from '../../shared/icons'
 import { ALWAYS_ASK_EG, type AllowRule, RULE_TOOLS, rulePattern } from '../../shared/ask'
 import { MCP_AGENTS, MCP_NAME, type McpServer } from '../../shared/mcp'
 import { ago } from '../../shared/widget'
@@ -158,6 +158,10 @@ export function McpServers({ list = [], profiles, onChange, title = 'MCP servers
             <>
               <textarea className="mono" rows={2} value={(s.args ?? []).join('\n')} aria-label="Arguments" placeholder="Arguments, one per line" spellCheck={false} onChange={e => set(i, { args: e.target.value.split('\n') })} />
               <EnvField value={s.env} placeholder="Its env: KEY=value, one per line (shown as •••• once saved)" onChange={env => set(i, { env })} />
+              {/* #5: one process for every agent (daemon/mcpShare.ts), over HTTP on the daemon */}
+              <Switch className="switch-row" on={!!s.shared} onChange={on => set(i, { shared: on || undefined })}>
+                <Says title="One process for every agent" hint="Laki starts it once and every agent talks to it, instead of each agent starting its own copy: less memory and CPU with many agents. Off by default: a server that keeps state per session (a browser with its tabs, a login) may not suit sharing" />
+              </Switch>
             </>
           )}
           {profiles.some(x => MCP_AGENTS.includes(x.agent)) && (
@@ -596,7 +600,7 @@ export function ProjectSection(p: {
       <Group title="Color and icon" hint="Its mark before its name in the sidebar, menus, the palette and the window's title (an emoji there); the color also on its workspaces' bar where they have none of their own, rail pins and the bubbles">
         <div className="button-row">
           <button type="button" className="pick-btn" aria-haspopup="menu" onClick={lookMenu}>
-            <ProjectMark p={p.project} or={p.project.git ? 'fork' : 'folder'} size={14} /> {[p.project.color, p.project.icon && (emojiOf(p.project.icon) ?? iconWords(p.project.icon))].filter(Boolean).join(' · ') || 'None yet'}
+            <ProjectMark p={p.project} or={p.project.git ? 'fork' : 'folder'} size={14} /> {[p.project.color, p.project.icon && (emojiOf(p.project.icon) ? emojiWords(p.project.icon) : iconWords(p.project.icon))].filter(Boolean).join(' · ') || 'None yet'}
             <Icon name="chevron" size={11} />
           </button>
         </div>

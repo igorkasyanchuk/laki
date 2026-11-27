@@ -7,7 +7,7 @@ import { describe, type Edge, groupsOf, tabsOf } from './layout.ts'
 import { dist, norm } from './talk.ts'
 import { BRAINSTORM_OUTPUT } from './plans.ts'
 import { FIND, HELP, isBasic, SECTIONS } from './settingsMap.ts'
-import { AI_ACTS, AI_ITEMS, creatorOf, DEVICE_OPS, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView, recorded } from './types.ts'
+import { AI_ACTS, AI_ITEMS, creatorOf, DEVICE_OPS, EFFORTS, isAgent, SECRET_WAIT, ALERT_WAIT, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView, recorded } from './types.ts'
 import { atOrThrow, stamp } from './when.ts'
 import { WORKFLOW_FORMAT } from './workflow.ts'
 import { widgetFormat } from './widgetGuide.ts'
@@ -106,7 +106,7 @@ export async function askAgent(rpc: Rpc, target: string, question: string, me = 
 
 // A5: laki wait and MCP's laki_wait: until none of the named workspaces' agent tabs (or the tabs named, <ws>/<tab>)
 // is running, a look every few seconds; then each one's line: idle with its last answer's first line, or waiting with
-// what it asks. waiting: one waits for the user; timedOut: some still run when ms ran out. The first look comes after a
+// what it asks, or stuck with why and the next step. waiting: one waits for the user or is stuck; timedOut: some still run when ms ran out. The first look comes after a
 // moment: a prompt sent just before may not have started its turn yet (one queued counts as running)
 export type Waited = { ws: string; tab: string; name: string; status: string; text: string }
 export async function waitTabs(rpc: Rpc, targets: string[], ms: number, every = 3000): Promise<{ tabs: Waited[]; waiting: boolean; timedOut: boolean }> {
@@ -123,11 +123,12 @@ export async function waitTabs(rpc: Rpc, targets: string[], ms: number, every = 
       if (t && !of.length) throw new Error(`no tab ${t} in ${ws.id}`)
       return of.map(y => ({ ws: ws.id, t: y }))
     })
-    const running = tabs.some(({ t }) => t.status === 'running' || !!t.queue?.length)
+    // #3: a stuck worker (a plan limit, a failed turn, its process gone, silent or retrying for minutes) ends the wait too
+    const running = tabs.some(({ t }) => (t.status === 'running' || !!t.queue?.length) && !t.stuck)
     if (running && Date.now() < end) continue
     const line = (s?: string) => (s ?? '').trim().split('\n')[0].slice(0, 200)
-    const rows = tabs.map(({ ws, t }) => ({ ws, tab: t.id, name: t.name, status: t.status === 'running' || t.queue?.length ? 'running' : t.status, text: t.status === 'waiting' ? line((t.ask?.tool ? `${t.ask.tool}: ${t.ask.what ?? ''}` : '') || t.ask?.question || 'it asks you something') : line(t.last) }))
-    return { tabs: rows, waiting: rows.some(r => r.status === 'waiting'), timedOut: running }
+    const rows = tabs.map(({ ws, t }) => ({ ws, tab: t.id, name: t.name, status: t.stuck && t.status !== 'waiting' ? 'stuck' : t.status === 'running' || t.queue?.length ? 'running' : t.status, text: t.stuck && t.status !== 'waiting' ? `${t.stuck.why}. Next: ${t.stuck.next}` : t.status === 'waiting' ? line((t.ask?.tool ? `${t.ask.tool}: ${t.ask.what ?? ''}` : '') || t.ask?.question || 'it asks you something') : line(t.last) }))
+    return { tabs: rows, waiting: rows.some(r => r.status === 'waiting' || r.status === 'stuck'), timedOut: running }
   }
 }
 // "20m", "90s", "1h", a bare number: minutes
@@ -142,14 +143,18 @@ export function parseWait(s: unknown, def = 20 * 60000) {
 // laki skill's laki new): where: how the caller reads the groups
 export const groupRule = (where: string) =>
   `A project's groups (${where}: the sidebar's headings) sort its workspaces: put a new one in the group its task belongs to, judged by what each group's name means, not by matching words: reviewing a pull request (anyone's) goes in a group for reviews (On review, To review, Reviews, PRs); a spike, prototype or experiment in one like POC or Experiments; a group for general work (Work, Main, Dev) takes only ordinary tasks no other group fits. When no group plainly fits, or two fit equally, leave the group out: no group. Say which group it went in.`
-// a group of a project by its name (any case) or id: its id (wsNew's place), its prompt template and agent, if any
+// a group of a project by its name (any case) or id: its id (wsNew's place), its prompt template and agent, if any, and
+// what a new workspace in it starts with (Edit group's): where, its permission mode, model and effort (an effort its
+// agent doesn't take: none), its base
 async function groupOf(rpc: Rpc, project: string, group: string) {
   const v: View = await rpc('state')
   const p = v.projects.find(x => x.id === project || x.name === project || x.path === project || `${x.host}:${x.path}` === project) // as findProject takes it
   const want = String(group).trim().toLowerCase()
   const s = p?.seps?.find(x => x.id === group || (x.name || 'Unnamed group').toLowerCase() === want)
   if (!s) throw new Error(`no group ${group} in ${project}${p?.seps?.length ? `: its groups are ${p.seps.map(x => x.name || 'Unnamed group').join(', ')}` : ': it has none (leave group out)'}`)
-  return { id: s.id, template: s.template, preset: s.preset && v.presets.some(x => x.name === s.preset && !x.off) ? s.preset : undefined, project: p!.id } // its agent while that profile is there and on
+  const preset = s.preset && v.presets.some(x => x.name === s.preset && !x.off) ? s.preset : undefined // its agent while that profile is there and on
+  const agent = v.presets.find(x => x.name === preset)?.agent
+  return { id: s.id, template: s.template, preset, project: p!.id, where: s.where, perm: s.perm, model: s.model, effort: s.effort && (!isAgent(agent) || EFFORTS[agent]?.includes(s.effort)) ? s.effort : undefined, base: s.base }
 }
 
 // a new workspace's group, template and action (laki_new_workspace's, the CLI's laki new): where it goes (wsNew's
@@ -159,7 +164,22 @@ export async function newWsKit(rpc: Rpc, a: { project: string; prompt?: string; 
   // no template given: the group's, as the new-workspace page opened from the group starts with it (one gone since: none)
   const template = a.template || (sep?.template && (await kit(rpc, sep.project)).templates.some(t => t.name.trim().toLowerCase() === sep.template!.trim().toLowerCase()) ? sep.template : undefined)
   const prompt = template || a.action ? await promptOf(rpc, sep?.project ?? a.project, a.prompt ?? '', template, a.action, a.pr, a.base) : a.prompt
-  return { place: sep?.id, preset: sep?.preset, prompt, vars: template || a.action ? true : undefined }
+  return { place: sep?.id, preset: sep?.preset, prompt, vars: template || a.action ? true : undefined, ...(sep && { group: sep }) }
+}
+// a group's defaults for a new workspace in it, under what the caller said (o): its where, base, and, when it starts the
+// group's agent (no other named), its permission mode ('ask': the agent's own), model and effort, as the new-workspace
+// page takes them (text.ts groupNew)
+export function groupDefaults<T extends { preset?: string; local?: boolean; noSetup?: boolean; base?: string; perm?: string; model?: string; effort?: string }>(o: T, g?: { preset?: string; where?: string; perm?: string; model?: string; effort?: string; base?: string }): T {
+  if (!g) return o
+  const theirs = !o.preset || o.preset === g.preset
+  return {
+    ...o,
+    ...(g.where && !o.local && !o.noSetup && { local: g.where === 'local', noSetup: g.where === 'bare' || undefined }),
+    ...(g.base && !o.base && { base: g.base }),
+    ...(theirs && g.perm && o.perm === undefined && { perm: g.perm === 'ask' ? '' : g.perm }),
+    ...(theirs && g.model && !o.model && { model: g.model }),
+    ...(theirs && g.effort && !o.effort && { effort: g.effort }),
+  }
 }
 
 // where a new tab goes: beside a pane (a split in its tab), else as the user's setting says
@@ -200,7 +220,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     ),
     run: async a => {
       const k = await newWsKit(rpc, a)
-      const o = { project: a.project, prompt: k.prompt, preset: a.preset || k.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, noSetup: a.no_setup === true || undefined, startAt: a.start_at === undefined || a.start_at === '' ? undefined : a.start_at === 'limit' ? ('limit' as const) : atOrThrow(a.start_at), from, place: k.place, agent: who ?? 'agent', vars: k.vars }
+      const o = groupDefaults({ project: a.project, prompt: k.prompt, preset: a.preset || k.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, perm: undefined as string | undefined, issue: a.issue, pr: a.pr, link: a.link, noSetup: a.no_setup === true || undefined, startAt: a.start_at === undefined || a.start_at === '' ? undefined : a.start_at === 'limit' ? ('limit' as const) : atOrThrow(a.start_at), from, place: k.place, agent: who ?? 'agent', vars: k.vars }, k.group) // the group's model, effort and mode too
       if (!k.prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },

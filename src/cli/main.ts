@@ -15,7 +15,7 @@ import { mcp } from './mcp.ts'
 import { RECIPE_IDS, RECIPES, recipeOf, recipeText } from '../shared/clientRecipes.ts'
 import type { Spend } from '../shared/spend.ts'
 import { completion } from './completion.ts'
-import { askAgent, newWsKit, parseWait, sentLine, state, waitTabs } from '../shared/tools.ts'
+import { askAgent, groupDefaults, newWsKit, parseWait, sentLine, state, waitTabs } from '../shared/tools.ts'
 import { blockName, check, filesFinder, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { atOrThrow, describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
@@ -86,7 +86,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (!textOnly && args[0] === 'notice' && a === '--to') flags.to = argv[++i] ?? '' // laki notice's only
   else if (!textOnly && args[0] === 'secret' && a === '--field') fieldArgs.push(argv[++i] ?? '') // laki secret's only
   else if (!textOnly && args[0] === 'show' && (a === '--open' || a === '--title')) a === '--open' ? opens.push(argv[++i] ?? '') : (flags.title = argv[++i] ?? '') // laki show's only
-  else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
+  else if (!textOnly && ['preset', 'presets'].includes(args[0]) && ['--agent', '--args', '--account', '--env', '--system'].includes(a)) a === '--env' ? envs.push(argv[++i] ?? '') : (flags[k] = argv[++i] ?? '') // laki preset's only
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && args[1] === 'logs' && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(!args.length && (a === 'ext' || a === 'exts') ? 'widget' : a) // U9: laki ext is laki widget
@@ -507,18 +507,18 @@ async function main() {
       // a group (the sidebar's heading it goes under: its template and agent too), a prompt template, an agent action
       const str = (f: string) => (flags[f] as string | undefined) || undefined // a valued flag's: always a string
       const k = await newWsKit(rpcAny, { project, prompt: str('prompt') || rest.slice(1).join(' ') || undefined, group: str('group'), template: str('template'), action: str('action'), pr: str('pr'), base: str('base') })
-      const o = {
+      const o = groupDefaults({
         project,
-        base: flags.base,
-        preset: flags.preset || k.preset,
+        base: str('base'),
+        preset: str('preset') || k.preset,
         cmd: flags.cmd,
         prompt: k.prompt,
         name: flags.name,
         named: flags.name ? true : undefined, // yours (an agent's laki new isn't): no agent renames it
         local: !!flags.local,
-        model: flags.model,
-        effort: flags.effort,
-        perm: flags.perm, // its permission mode (claude's, codex's); none: its profile's
+        model: str('model'),
+        effort: str('effort'),
+        perm: str('perm'), // its permission mode (claude's, codex's); none: its profile's
         fast: flags.fast ? true : undefined,
         sandbox: flags.sandbox ? true : flags['no-sandbox'] ? false : undefined,
         place: k.place,
@@ -530,7 +530,7 @@ async function main() {
         cap: typeof flags.cap === 'string' ? flags.cap : undefined, // its spend cap: 5 ($5), 2M tokens (cap.ts)
         startAt: flags['after-limit'] ? ('limit' as const) : flags.at ? atOrThrow(flags.at) : undefined, // its agent later (the workspace now)
         caller: { ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB }, // an agent's (its tab, or typed in a shell: the daemon's agentCaller): the prompt's PRs are only related; yours in a shell aren't
-      }
+      }, k.group) // the group's where, base, model, effort and mode under what's typed
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
       if (tabs.length && o.startAt !== undefined) throw new Error('--tab starts its tabs now: not with --at or --after-limit (add them with laki tab once it starts)')
       // a race: the same prompt to each preset, a worktree each
@@ -538,7 +538,7 @@ async function main() {
       if (flags.fan) {
         if (tabs.length) throw new Error('--tab: one workspace at a time, not with --fan')
         const presets = String(flags.fan).split(',').map(p => p.trim()).filter(Boolean)
-        const made: Workspace[] = await rpc('wsFan', { ...o, presets }, 120000 * Math.max(1, presets.length))
+        const made: Workspace[] = await rpc('wsFan', { ...o, model: str('model'), effort: str('effort'), perm: str('perm'), presets }, 120000 * Math.max(1, presets.length)) // the group's model, effort and mode are its agent's: each one's own here
         return out(made, made.map(line).join('\n'))
       }
       // --tab: an agent or profile (agent:model) starts there with no prompt (laki send gives it one), anything else
@@ -716,19 +716,19 @@ async function main() {
     case 'preset':
     case 'presets': {
       // Settings › Agents & profiles: laki preset [ls] | add|set <name> [--agent a] [--args "…"] [--model m] [--effort e]
-      // [--perm p] [--fast] [--sandbox|--no-sandbox] [--cmd c] [--env K=V…] [--account id] [--name new] | on|off|rm <name>.
+      // [--perm p] [--fast] [--sandbox|--no-sandbox] [--cmd c] [--env K=V…] [--account id] [--system "…"] [--name new] | on|off|rm <name>.
       // '' drops a field
       const [sub = 'ls', name] = rest
       if (sub === 'ls') {
         const v: View = await rpc('state')
         const def = v.settings?.agent
-        const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.sandbox && 'sandbox', p.wrap && 'wrapper sandbox', p.sandbox && p.net && `net ${p.net}`, p.account && `account ${p.account}`, p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
+        const line = (p: Preset) => `${p.name.padEnd(16)}  ${p.agent.padEnd(8)}  ${[[p.model, p.effort, p.perm && `perm ${p.perm}`, p.fast && 'fast', p.sandbox && 'sandbox', p.wrap && 'wrapper sandbox', p.sandbox && p.net && `net ${p.net}`, p.account && `account ${p.account}`, p.system && 'system prompt', p.args, p.cmd, p.env && Object.keys(p.env).map(k => `${k}=…`).join(' ')].filter(Boolean).join(' · '), p.off && '(off)', p.name === def && '(default)'].filter(Boolean).join('  ')}`.trimEnd()
         return out(v.presets, v.presets.map(line).join('\n'))
       }
       if (!['add', 'set', 'on', 'off', 'rm'].includes(sub)) unknown('preset', sub)
       if (!name) throw new Error('usage: laki preset [ls] | add|set <name> [--agent claude] [--args "…"] [--model m] [--effort e] [--perm p] [--fast] [--sandbox|--no-sandbox] [--net all|list|off] | on|off|rm <name>')
       const set: Record<string, unknown> = {}
-      for (const k of ['agent', 'args', 'cmd', 'model', 'effort', 'perm', 'account', 'name', 'net'] as const) if (typeof flags[k] === 'string') set[k] = flags[k]
+      for (const k of ['agent', 'args', 'cmd', 'model', 'effort', 'perm', 'account', 'name', 'net', 'system'] as const) if (typeof flags[k] === 'string') set[k] = flags[k]
       if (flags.fast) set.fast = true
       if (flags.sandbox || flags['no-sandbox']) set.sandbox = flags.sandbox ? true : null // --no-sandbox: off
       if (flags.wrap || flags['no-wrap']) set.wrap = !!flags.wrap // the macOS wrapper sandbox (shared/wrap.ts)
@@ -811,7 +811,7 @@ async function main() {
       return out({ ok: true, waitingOn: text || null }, text ? `${ws} waits on ${text}` : `${ws} isn't waiting on anything`)
     }
     case 'wait': {
-      // A5: laki wait <ws>[/<tab>]… [--timeout 20m]: until none of their agents works; exit 0 idle, 2 one waits, 3 timed out
+      // A5: laki wait <ws>[/<tab>]… [--timeout 20m]: until none of their agents works; exit 0 idle, 2 one waits or is stuck (#3), 3 timed out
       const r = await waitTabs(rpcAny, rest, parseWait(flags.timeout))
       out(r, r.tabs.map(t => `${t.ws}/${t.name}  ${t.status}${t.text ? `: ${t.text}` : ''}`).join('\n') || 'no agent tab there')
       process.exitCode = r.timedOut ? 3 : r.waiting ? 2 : 0

@@ -20,6 +20,7 @@ export const KEYS = [
   { id: 'info', label: 'Workspace info', key: '⌘I' },
   { id: 'palette', label: 'Palette', key: '⌘K' },
   { id: 'files', label: 'Find a file', key: '⌘P' },
+  { id: 'searchText', label: "Search the text of the workspace's files", key: '⇧⌘P' },
   { id: 'find', label: 'Find in the terminal or a diff', key: '⌘F' },
   { id: 'filter', label: 'Filter the sidebar (its box gets the keys)', key: '⇧⌘F' },
   { id: 'chatSearch', label: 'Search chats', key: '⌥⌘F' }, // ⇧⌘F is the filter's

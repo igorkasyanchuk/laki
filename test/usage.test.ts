@@ -5,9 +5,9 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { agyRead, base, claudeWindows, codexWindows, grokCred, grokWindows, waitOf } from '../src/daemon/usage.ts'
+import { agyRead, base, claudeWindows, codexAppWindows, codexWindows, grokCred, grokWindows, waitOf } from '../src/daemon/usage.ts'
 import { tools } from '../src/shared/tools.ts'
-import { fresh } from './helpers.ts'
+import { fresh, until } from './helpers.ts'
 
 test('usage: the windows of Claude and Codex answers', () => {
   assert.deepEqual(
@@ -27,6 +27,14 @@ test('usage: the windows of Claude and Codex answers', () => {
   )
   assert.deepEqual(claudeWindows({}), [])
   assert.deepEqual(claudeWindows(null), [])
+  // codex app-server's account/rateLimits/read (0.171.0's): its main limit, then each other one by its name
+  const main = { limitId: 'codex', primary: { usedPercent: 13, windowDurationMins: 43200, resetsAt: 1796416139 }, secondary: null, planType: 'free' }
+  assert.deepEqual(codexAppWindows({ rateLimits: main, rateLimitsByLimitId: { codex: main, spark: { limitId: 'spark', limitName: 'GPT-5.3-Codex-Spark', primary: { usedPercent: 2.6, windowDurationMins: 300 } }, other: { primary: { usedPercent: 1, windowDurationMins: 10080 } } } }), [
+    { label: '30-day', used: 13, resets: 1796416139000 },
+    { label: '5-hour · GPT-5.3-Codex-Spark', used: 3, resets: undefined },
+    { label: 'Weekly · other', used: 1, resets: undefined },
+  ])
+  assert.deepEqual([codexAppWindows({}), codexAppWindows(null)], [[], []])
   assert.deepEqual(
     codexWindows(
       {
@@ -76,7 +84,7 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   })
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => srv.close())
-  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } })
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, FAKE_CODEX_LIMITS: 'unknown' } }) // a codex too old to say: chatgpt.com, asked for
   await rig.rpc('settingsSet', { usage: { claude: true, codex: true } }) // R4: the endpoints, asked for
 
   // no sign-ins: nothing asked
@@ -125,7 +133,7 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   writeFileSync(join(rig.home, '.claude', '.credentials.json'), cred('older', Date.now() - 2000))
   await rig.rpc('settingsSet', { usage: { claude: true } })
   u = await rig.rpc('usage')
-  assert.deepEqual([u.length, u[0].error, u[0].plan, u[1].source], [2, 'Sign-in expired: Claude Code renews it on its next run', 'max', 'own'])
+  assert.deepEqual([u.length, u[0].error, u[0].plan, u[1].source, u[1].error], [2, 'Sign-in expired: Claude Code renews it on its next run', 'max', 'endpoint', 'This Codex doesn’t say its limits: update it, or ask chatgpt.com with your sign-in'], 'codex asked, not chatgpt.com: it isn’t on')
   assert.equal(hits.length, 2)
   await rig.stop()
   await rig.start()
@@ -136,7 +144,7 @@ test('usage: read with the agents’ own sign-in, kept 5 minutes, per agent, nev
   assert.equal(hits.at(-1)?.auth, 'Bearer revoked')
 })
 
-test('usage: R4: by default no server is asked, signed in or not; an install from before hears it once', async t => {
+test('usage: R4: by default no server is asked, signed in or not (codex says its own); an install from before hears it once', async t => {
   let hits = 0
   const srv = createServer((_q, r) => (hits++, r.writeHead(500).end()))
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
@@ -146,7 +154,7 @@ test('usage: R4: by default no server is asked, signed in or not; an install fro
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'tok', expiresAt: Date.now() + 3_600_000 } }))
   mkdirSync(join(rig.home, '.codex'))
   writeFileSync(join(rig.home, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: 'codex-token', account_id: 'acc-1' } }))
-  assert.deepEqual((await rig.rpc('usage')).map((x: any) => [x.agent, x.source]), [['claude', 'own'], ['codex', 'own']])
+  assert.deepEqual((await rig.rpc('usage')).map((x: any) => [x.agent, x.source, x.windows.length]), [['claude', 'own', 0], ['codex', 'endpoint', 3]])
   assert.equal(hits, 0)
   assert.equal((await rig.rpc('state')).settings.usageNote, false, 'a new install: no note')
   await rig.stop()
@@ -218,7 +226,7 @@ test('laki limits: each agent read or its own error, --agent, --json; the policy
   const policy = join(mkdtempSync(join(tmpdir(), 'laki-policy-')), 'policy.json')
   t.after(() => rmSync(dirname(policy), { recursive: true, force: true }))
   writeFileSync(policy, '{}')
-  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, LAKI_POLICY: policy } })
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, LAKI_POLICY: policy, FAKE_CODEX_LIMITS: 'unknown' } })
   await rig.rpc('settingsSet', { usage: { claude: true, codex: true } }) // R4: the endpoints, asked for
   mkdirSync(join(rig.home, '.claude'))
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'fake-token', expiresAt: Date.now() + 3_600_000, subscriptionType: 'max' } }))
@@ -312,4 +320,81 @@ test('usage: Grok asked with its own sign-in only when turned on; Antigravity fr
   assert.deepEqual([row('grok').source, row('grok').plan, row('grok').windows.map((w: any) => [w.label, w.used, w.resets])], ['endpoint', 'SuperGrok', [['Weekly', 30, Date.parse('2099-01-01T00:00:00Z')]]])
   assert.deepEqual(hits, [{ url: '/v1/billing?format=credits', auth: 'Bearer fake-grok-token', cli: 'xai-grok-cli', user: 'u-1' }])
   assert.equal(rig.fakeLog().filter(l => l.bin === 'agy').length, 2, 'not run again')
+})
+
+test('usage: Codex asked through its own app server (the account’s CODEX_HOME), kept 5 minutes; an older one: chatgpt.com only when asked for; no answer in 15 s: killed', async t => {
+  const hits: string[] = []
+  const srv = createServer((q, r) => (hits.push(q.url!), r.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ rate_limit: { primary_window: { used_percent: 12, limit_window_seconds: 18000 } } }))))
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const env = (lim?: string) => ({ LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, LAKI_CODEX_APP_MS: '1500', ...(lim && { FAKE_CODEX_LIMITS: lim }) })
+  const rig = await fresh(t, { env: env() })
+  const codex = async () => (await rig.rpc('usage')).find((x: any) => x.agent === 'codex')
+  const asks = () => rig.fakeLog().filter((l: any) => l.bin === 'codex' && l.args[0] === 'app-server')
+  let u = await codex()
+  assert.deepEqual([u.source, u.plan, u.error, u.windows.map((w: any) => [w.label, w.used])], ['endpoint', 'plus', undefined, [['5-hour', 21], ['Weekly', 8], ['Weekly · GPT-X', 50]]])
+  assert.ok(u.windows[0].resets > Date.now())
+  assert.deepEqual([asks().length, asks()[0].env.CODEX_HOME, hits], [1, undefined, []], 'the agent’s own home; no server')
+  await codex()
+  assert.equal(asks().length, 1, 'kept 5 minutes')
+  // an account: its own folder as CODEX_HOME
+  const acct = await rig.rpc('accountAdd', { agent: 'codex', name: 'Work' })
+  await until(async () => (await rig.rpc('usage')).filter((x: any) => x.agent === 'codex').length === 2, 'its row')
+  assert.ok(asks().some((l: any) => l.env.CODEX_HOME === acct.dir), JSON.stringify(asks().map((l: any) => l.env)))
+  // off: not asked
+  await rig.rpc('settingsSet', { usage: { codex: false } })
+  const n = asks().length
+  assert.equal((await codex()).source, 'own')
+  assert.equal(asks().length, n)
+  await rig.stop()
+
+  // a codex that doesn't know account/rateLimits/read: said so, chatgpt.com not asked; asked once it's on
+  Object.assign(rig.env, env('unknown')) // the rig's own env object: its next start's
+  await rig.start()
+  await rig.rpc('settingsSet', { usage: {} })
+  u = await codex()
+  assert.deepEqual([u.error, hits], ['This Codex doesn’t say its limits: update it, or ask chatgpt.com with your sign-in', []])
+  await rig.stop()
+  await rig.start()
+  mkdirSync(join(rig.home, '.codex'), { recursive: true })
+  writeFileSync(join(rig.home, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: 'fake-codex-token' } }))
+  await rig.rpc('settingsSet', { usage: { codex: true } })
+  u = await codex()
+  assert.deepEqual([u.error, u.windows.map((w: any) => [w.label, w.used]), hits], [undefined, [['5-hour', 12]], ['/backend-api/wham/usage']])
+  await rig.stop()
+
+  // no answer: killed at its time, asked again a minute later; its own error said
+  Object.assign(rig.env, env('slow')) // the rig's own env object: its next start's
+  await rig.start()
+  await rig.rpc('settingsSet', { usage: {} })
+  u = await codex()
+  assert.equal(u.error, "codex didn't say its limits in 1.5 seconds")
+  await rig.stop()
+  Object.assign(rig.env, env('fail')) // the rig's own env object: its next start's
+  await rig.start()
+  assert.equal((await codex()).error, 'Codex: not signed in')
+})
+
+// Read-only (usage.ts' head): asked with every reader on and turned away, Laki asks no token endpoint and leaves each
+// sign-in it read byte for byte as it was
+test('usage: guard: turned away (401) with Claude and Codex asked for, no token refresh is tried and no sign-in file changes', async t => {
+  const urls: string[] = []
+  const srv = createServer((q, r) => (urls.push(q.url!), r.writeHead(401, { 'content-type': 'application/json' }).end('{"error":"invalid_token"}')))
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const rig = await fresh(t, { env: { LAKI_USAGE_API: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, FAKE_CODEX_LIMITS: 'unknown' } })
+  const cred = JSON.stringify({ claudeAiOauth: { accessToken: 'fake-access', refreshToken: 'fake-refresh', expiresAt: Date.now() + 3_600_000, subscriptionType: 'max' } })
+  mkdirSync(join(rig.home, '.claude'))
+  mkdirSync(join(rig.home, '.codex'))
+  const files = [join(rig.home, 'keychain'), join(rig.home, '.claude', '.credentials.json'), join(rig.home, '.codex', 'auth.json')]
+  writeFileSync(files[0], cred)
+  writeFileSync(files[1], cred)
+  writeFileSync(files[2], JSON.stringify({ tokens: { access_token: 'fake-codex-access', refresh_token: 'fake-codex-refresh', account_id: 'acc-1' }, last_refresh: '2026-11-01T00:00:00Z' }))
+  const before = files.map(f => readFileSync(f))
+  await rig.rpc('settingsSet', { usage: { claude: true, codex: true } })
+  const u = await rig.rpc('usage')
+  assert.deepEqual(u.map((x: any) => [x.agent, x.error]), [['claude', 'Sign-in expired: Claude Code renews it on its next run'], ['codex', 'Sign-in expired: Codex renews it on its next run']])
+  assert.deepEqual(urls.sort(), ['/api/oauth/usage', '/backend-api/wham/usage'], 'the usage endpoints, once each')
+  assert.equal(urls.filter(x => /oauth\/token|\/token/.test(x)).length, 0, 'no token endpoint')
+  files.forEach((f, i) => assert.ok(readFileSync(f).equals(before[i]), `${f}: as it was`))
 })

@@ -231,6 +231,7 @@ export const appMenu = () => Menu.setApplicationMenu(
         key('Open Project Folder…', 'CmdOrCtrl+O', 'o'),
         { type: 'separator' },
         bound('Go to File…', 'files'),
+        bound('Search in Files…', 'searchText'),
         key('Open in Editor', 'CmdOrCtrl+E', 'e'),
         { type: 'separator' },
         bound('Close Tab', 'closeTab'),

@@ -1580,6 +1580,8 @@ export function App() {
     // the workspace's live agent tabs, the focused one first: where a comment or the full review's go
     agents: (ts => [...ts.filter(t => t.id === tabByWs[w.id]), ...ts.filter(t => t.id !== tabByWs[w.id])])((view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')).map(t => ({ id: t.id, name: t.name })),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
+    threadReply: (thread, body) => api.call('prThreadReply', { ws: w.id, thread, body }).then(() => toast('Replied on GitHub')),
+    threadResolve: (thread, resolved, body) => api.call('prThreadResolve', { ws: w.id, thread, resolved, body }).then(() => toast(resolved ? 'Resolved on GitHub' : 'Unresolved on GitHub')),
     // the file read again: its lines must still be what the review saw (applySuggestions), and fileWrite's was keeps an
     // agent's write meanwhile; Undo writes the text back the same way
     apply: async (path, edits, then) => {

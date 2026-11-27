@@ -591,7 +591,7 @@ export function usePageTitle(ref: { current: HTMLElement | null }, on = true) {
   }, [ref, on])
 }
 
-export function Page({ title, head, tools, onClose, children, wide, esc = true, backdrop, big }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean; backdrop?: ReactNode /* Backdrop.tsx's: behind the page's body */; big?: boolean /* its title large over its content, small in its head once scrolled (usePageTitle; the page imports pagetitle.css) */ }) {
+export function Page({ title, head, tools, onClose, children, wide, esc = true, backdrop, big, side }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean; backdrop?: ReactNode /* Backdrop.tsx's: behind the page's body */; big?: boolean /* its title large over its content, small in its head once scrolled (usePageTitle; the page imports pagetitle.css) */; side?: ReactNode /* a panel at its right, beside the body under the head (Scheduled's task form); over it on a narrow window */ }) {
   useEffect(() => {
     if (!esc) return
     const f = (e: KeyboardEvent) => escapes(e) && onClose()
@@ -609,7 +609,7 @@ export function Page({ title, head, tools, onClose, children, wide, esc = true, 
         {tools}
         <IconButton icon="x" title={esc ? 'Close (Esc)' : 'Close'} onClick={onClose} />
       </div>
-      {(body => (backdrop ? <div className="page-frame">{backdrop}{body}</div> /* under the body, in its card (a chrome design's), never under the head */ : body))(<div className={`page-body ${wide ? 'wide' : ''}`}>{big && !head && <h1 className="page-title-l" aria-hidden>{title}</h1>}{children}</div>)}
+      {(body => (side ? <div className="page-split">{body}{side}</div> : body))((body => (backdrop ? <div className="page-frame">{backdrop}{body}</div> /* under the body, in its card (a chrome design's), never under the head */ : body))(<div className={`page-body ${wide ? 'wide' : ''}`}>{big && !head && <h1 className="page-title-l" aria-hidden>{title}</h1>}{children}</div>))}
       {toTop}
     </div>
   )
@@ -771,7 +771,7 @@ export const iconItems = (now: string | undefined, set: (icon?: string) => void)
     label: 'Emoji…',
     icon: 'smile',
     ...(emojiOf(now) && { hint: now }),
-    items: [{ filter: 'Find an emoji: rocket, bug, fire…', typed: q => (e => (e ? { label: `Use ${e}`, run: () => set(e) } : null))(emojiOf(q)) }, { emojis: EMOJIS, value: now, pick: e => set(e) }],
+    items: [{ filter: navigator.platform.startsWith('Mac') ? 'Find one, or paste any emoji (⌃⌘Space)' : 'Find one, or paste any emoji', typed: q => (e => (e ? { label: `Use ${e}`, run: () => set(e) } : null))(emojiOf(q)) }, { emojis: EMOJIS, value: now, pick: e => set(e) }],
   },
   ...(now ? [{ label: 'No icon', icon: 'x', run: () => set() } as MenuItem] : []),
 ]

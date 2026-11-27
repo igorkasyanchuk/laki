@@ -61,6 +61,9 @@ case "$1 $2" in
       *closedByPullRequestsReferences*) o=; n=; for a in "$@"; do case $a in owner=*) o=${a#owner=} ;; name=*) n=${a#name=} ;; esac; done
         f "issues-${o}_${n}.json" || f issues.json || exit 1 ;;
       *revertPullRequest*) f refuse >&2 && exit 1; f revert.json || exit 1 ;; # prAct revert: the new PR, or GitHub's errors
+      *addPullRequestReviewThreadReply*) f refuse >&2 && exit 1; echo '{"data":{"addPullRequestReviewThreadReply":{"comment":{"url":"https://example.invalid/pr/7#discussion_r1"}}}}' ;; # prThreadReply
+      *unresolveReviewThread*) f refuse >&2 && exit 1; echo '{"data":{"unresolveReviewThread":{"thread":{"isResolved":false}}}}' ;; # prThreadResolve's
+      *resolveReviewThread*) f refuse >&2 && exit 1; echo '{"data":{"resolveReviewThread":{"thread":{"isResolved":true}}}}' ;;
       *) f graphql.json || exit 1 ;;
     esac ;;
   "api user") f user || echo me ;;

@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { esc, imgsAsLinks, markdownHtml } from '../shared/markdown.ts'
 import { planFrom, type TabPlan } from '../shared/todos.ts'
-import { costOf, type Goal, type GoalState, type Retry, type SecretFound, type UsageWindow } from '../shared/types.ts'
+import { costOf, type Goal, type Parts, partsAdd, partsOf, partsTokens, priceOf, type GoalState, type Retry, type SecretFound, type UsageWindow } from '../shared/types.ts'
 import { codexRateWindows } from './usage.ts'
 import { SECRETS } from '../shared/secrets.ts'
 
@@ -66,7 +66,7 @@ export function chatOf(agent: string, jsonl: string, out: Said[] = [], calls?: M
   const spent = (j: any) => {
     const u = j.message?.usage
     const you = ids && u && j.message.model !== '<synthetic>' ? out.findLast(x => x.who === 'you') : undefined
-    const cost = you && costOf(j.message.model, { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0 })
+    const cost = you && costOf(j.message.model, usageParts(j.message.model, u))
     if (!you || cost === undefined) return
     const key = '$' + (j.message.id ?? '')
     you.cost = (you.cost ?? 0) + cost - (j.message.id ? (ids!.get(key) ?? 0) : 0)
@@ -188,12 +188,35 @@ export function bgOf(jsonl: string, r: BgRead): BgRead {
 
 // what a chat used, from its transcript read on (meters.ts; onto m, what its earlier lines said): used, what its
 // context holds now (claude: the last answer's prompt, its cache's too; codex: its last token_count's) of max (codex's
-// window; claude's transcript doesn't say), the tokens it took so far (input, output, cache writes and reads) and their
-// cost by each turn's model (costOf; priced: some had a price), today's of them by each line's time (this Mac's day),
-// and each day's by model (days: the Usage page's, meters.ts' usage-days.json)
-type Spent = { tokens: number; cost: number; day: string; model?: string }
-export type ByModel = Record<string, { tokens: number; cost: number }> // a day's, by the model that answered
-export type Meter = { limits?: { windows: UsageWindow[]; at: number } /* R4: codex's rate_limits, its last */; used?: number; max?: number; model?: string; tokens: number; cost: number; priced?: boolean; day: string; today: { tokens: number; cost: number }; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry; skills?: SkillUse[]; goal?: Goal } // goal (A1): its /goal, the last said (goalIn); skills (B7): the skills the chat loaded, in that order (skillsIn); retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+// window; claude's transcript doesn't say), the tokens it took so far (input, output, cache writes and reads) as parts by
+// each answer's model (by: types.ts partsOf; meterCost prices them now) and each day's of them (days: this Mac's day, the
+// Usage page's and Today's, meters.ts' usage-days.json). owns: an answer's key (answerKey: claude's message id and
+// request id, codex's token_count: its totals and limits), true when this chat counts it (meters.ts: the
+// first chat to report it owns it; a forked or resumed chat's copied lines are another's)
+type Spent = { p: Parts; day: string; model: string }
+export type ByModel = Record<string, Parts> // a day's, by the model that answered
+export type Owns = (key: string, day: string) => boolean
+export type Meter = { limits?: { windows: UsageWindow[]; at: number } /* R4: codex's rate_limits, its last */; used?: number; max?: number; model?: string; tokens: number; by: ByModel; days?: Record<string, ByModel>; seen?: Map<string, Spent>; total?: Record<string, number>; plan?: TabPlan; retry?: Retry; skills?: SkillUse[]; goal?: Goal } // goal (A1): its /goal, the last said (goalIn); skills (B7): the skills the chat loaded, in that order (skillsIn); retry: claude's last API error it waits out (api_error), until an answer comes; seen: what claude's last 50 messages counted, by id; total: codex's last running totals; plan: codex's update_plan (claude's comes by its hooks)
+// claude's usage as parts: its cache writes split by how long they're kept (cache_creation's ephemeral_1h_input_tokens:
+// an hour, the rest 5 minutes; no split said: all 5 minutes), fast mode by usage.speed
+export function usageParts(model: string | undefined, u: Record<string, any>): Parts {
+  const w = num(u.cache_creation_input_tokens) ?? 0
+  const w1 = Math.min(w, num(u.cache_creation?.ephemeral_1h_input_tokens) ?? 0)
+  return partsOf(model, { in: num(u.input_tokens), out: num(u.output_tokens), w5: w - w1, w1, rd: num(u.cache_read_input_tokens) }, u.speed === 'fast')
+}
+export const answerKey = (a: string, b?: string) => createHash('sha256').update(b ? `${a}\0${b}` : a).digest('base64url').slice(0, 11) // 11 characters: 66 bits
+// parts by model at today's prices: what the priced cost, the tokens of each model with no price (none)
+export function meterCost(by: ByModel) {
+  let cost = 0
+  let priced = false
+  const none: Record<string, number> = {}
+  for (const [model, p] of Object.entries(by)) {
+    const c = costOf(model, p)
+    if (c === undefined) (none[model] = (none[model] ?? 0) + partsTokens(p))
+    else (cost += c), (priced = true)
+  }
+  return { cost, priced, none }
+}
 // B7: a skill the chat loaded: its name, its folder once the transcript says it (claude's "Base directory for this
 // skill:" line, or the SKILL.md a tool read)
 export type SkillUse = { name: string; path?: string }
@@ -253,18 +276,12 @@ function goalIn(agent: string, j: GoalLine, m: Meter, now: number) {
 }
 export const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : undefined)
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
-export const meterNew = (now = Date.now()): Meter => ({ tokens: 0, cost: 0, day: dayOf(now), today: { tokens: 0, cost: 0 } })
-export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()): Meter {
-  const day = dayOf(now)
-  if (m.day !== day) (m.day = day), (m.today = { tokens: 0, cost: 0 }) // a new day
+export const meterNew = (): Meter => ({ tokens: 0, by: {} })
+export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now(), owns?: Owns): Meter {
   const add = (s: Spent, by = 1) => {
-    m.tokens += by * s.tokens
-    m.cost += by * s.cost
-    if (s.day === day) (m.today.tokens += by * s.tokens), (m.today.cost += by * s.cost)
-    const d = ((m.days ??= {})[s.day] ??= {})
-    const x = (d[s.model || 'unknown'] ??= { tokens: 0, cost: 0 })
-    x.tokens += by * s.tokens
-    x.cost += by * s.cost
+    m.tokens += by * partsTokens(s.p)
+    partsAdd((m.by[s.model] ??= {}), s.p, by)
+    partsAdd(((m.days ??= {})[s.day] ??= {})[s.model] ??= {}, s.p, by)
   }
   for (const line of jsonl.split('\n')) {
     const skill = line.includes('SKILL.md') || line.includes('"Skill"') || line.includes('Base directory for this skill')
@@ -288,15 +305,16 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       if (j.type === 'assistant' && !j.isSidechain) m.retry = undefined // it answered: the wait's over
       const u = j.type === 'assistant' && j.message?.usage
       if (!u || j.message.model === '<synthetic>') continue // claude's own notes: no call
-      const n = { input: u.input_tokens ?? 0, output: u.output_tokens ?? 0, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0 }
-      const cost = costOf(j.message.model, n)
-      if (cost !== undefined) m.priced = true
+      const model = String(j.message.model || 'unknown')
+      const p = usageParts(model, u)
+      if (!j.isSidechain) m.used = (num(u.input_tokens) ?? 0) + (num(u.cache_creation_input_tokens) ?? 0) + (num(u.cache_read_input_tokens) ?? 0) // a subagent's is a context of its own
       // an answer is a line per block, each with its usage so far: the last one counts, by its id, so a subagent's lines
-      // in between don't count it twice
+      // in between don't count it twice; one another chat owns (copied in) counts there
       const id = j.message.id
+      if (id && owns && !owns(answerKey(String(id), typeof j.requestId === 'string' ? j.requestId : undefined), at)) continue
       const was = id && m.seen?.get(id)
       if (was) add(was, -1)
-      const spent: Spent = { tokens: n.input + n.output + n.write + n.read, cost: cost ?? 0, day: at, model: j.message.model }
+      const spent: Spent = { p, day: at, model }
       add(spent)
       if (id) {
         const seen = (m.seen ??= new Map())
@@ -304,7 +322,6 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
         seen.set(id, spent)
         if (seen.size > 50) seen.delete(seen.keys().next().value!)
       }
-      if (!j.isSidechain) m.used = n.input + n.write + n.read // a subagent's is a context of its own
     } else {
       const p = j.payload
       if (j.type === 'turn_context' && p?.model) m.model = p.model
@@ -334,12 +351,51 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       const d = (k: string) => (all[k] ?? 0) - (was[k] ?? 0)
       m.total = all
       if (!d('total_tokens')) continue // a rate limit's update: the same totals
-      const cost = costOf(m.model, { input: d('input_tokens') - d('cached_input_tokens'), output: d('output_tokens'), read: d('cached_input_tokens') }) // its input has the cached in it
-      if (cost !== undefined) m.priced = true
-      add({ tokens: d('total_tokens'), cost: cost ?? 0, day: at, model: m.model })
+      if (owns && !owns(answerKey(JSON.stringify(p)), at)) continue // a fork's or spawned thread's copy of its parent's: its totals and limits as they were (its line's time is the copy's)
+      // its input has the cached in it; a long prompt by the request's whole input (partsOf)
+      const p2 = partsOf(m.model, { in: d('input_tokens') - d('cached_input_tokens'), out: d('output_tokens'), rd: d('cached_input_tokens') })
+      add({ p: p2, day: at, model: m.model || 'unknown' })
     }
   }
   return m
+}
+
+// a day's tokens of one model, kept: its parts (p: priced by costOf now), the agent's own count (own: Grok's price,
+// OpenCode's; no cost: no price, agy's), or one kept before parts (neither: its cost as it was, old)
+export type Row = { p: Parts } | { tokens: number; cost?: number; own?: true }
+export const isOld = (r: Row) => !('p' in r) && !r.own
+export const rowTokens = (r: Row) => ('p' in r ? partsTokens(r.p) : (r.tokens ?? 0))
+export const rowCost = (model: string, r: Row) => ('p' in r ? costOf(model, r.p) : r.cost)
+// the more of what was kept and what's read now (a restart reads each chat anew), part by part; an old row stays until
+// now's is as big
+export function rowMerge(was: Row | undefined, now: Row): Row | undefined {
+  if (!was) return now
+  if ('p' in now && 'p' in was) {
+    const p = { ...was.p }
+    let up = false
+    for (const [k, v] of Object.entries(now.p)) if (v > (p[k] ?? 0)) (p[k] = v), (up = true)
+    return up ? { p } : undefined
+  }
+  return rowTokens(now) > rowTokens(was) || (isOld(was) && !isOld(now) && rowTokens(now) >= rowTokens(was)) ? now : undefined
+}
+export const rowsOf = (by: ByModel): Record<string, Row> => Object.fromEntries(Object.entries(by).map(([m, p]) => [m, { p: { ...p } }]))
+export function daysRows(chats: Record<string, { ws: string; agent: string; days: Record<string, Record<string, Row>> }>) {
+  type Day = { day: string; agent: string; model: string; ws: string; tokens: number; cost: number; priced: boolean; old?: true; read?: number; input?: number }
+  const sum = new Map<string, Day>()
+  for (const c of Object.values(chats))
+    for (const [d, models] of Object.entries(c.days))
+      for (const [model, r] of Object.entries(models)) {
+        const day = (([y, m, dd]) => `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`)(d.split('-'))
+        const key = `${day}|${c.agent}|${model}|${c.ws}`
+        const x = sum.get(key) ?? (sum.set(key, { day, agent: c.agent, model, ws: c.ws, tokens: 0, cost: 0, priced: true }), sum.get(key)!)
+        const usd = rowCost(model, r)
+        x.tokens += rowTokens(r)
+        x.cost += usd ?? 0
+        if (usd === undefined || (isOld(r) && !usd && !priceOf(model))) x.priced = false
+        if (isOld(r)) x.old = true
+        if ('p' in r) for (const [k, v] of Object.entries(r.p)) k.startsWith('rd') && (x.read = (x.read ?? 0) + v), k.startsWith('out') || (x.input = (x.input ?? 0) + v)
+      }
+  return [...sum.values()].map(r => ({ ...r, cost: Math.round(r.cost * 1e4) / 1e4 })).sort((a, b) => a.day.localeCompare(b.day))
 }
 
 export const redact = (t: string) => SECRETS.reduce((s, [re, to]) => s.replace(re, to), t)

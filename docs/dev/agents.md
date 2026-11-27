@@ -517,6 +517,24 @@ pickers, the new-tab menu, the new-workspace page and its races, scheduled tasks
 apply on restart. Env order: process < `settings.env` (global) < project (`.laki.json`, then the app's) <
 preset < Laki's own vars.
 
+Your shell's aliases (core.ts `aliasOf`, `ownArgs`): agents run in `$SHELL -lic`, so an alias for an agent's command
+expands and its flags go in beside Laki's. As the daemon starts, `adoptLoginPath` (the app's PATH probe, now always run)
+lists `alias` in that shell; `types.ts` `aliasFlags` keeps, by agent, the flags an alias adds after the agent's own
+command (`alias codex='codex --dangerously-bypass-approvals-and-sandbox'`, or its short form `--yolo`, which clap's error
+names by the long one; an alias to another command or with none: none).
+`ownArgs(agent, pr.args)` (the profile's args and those) is what `permInArgs`, `neverAsks`, `sandboxOff` and the policy
+see: an alias that sets how freely it acts takes the place of Laki's mode (codex refuses `--approve-for-me` beside
+`--dangerously-bypass-approvals-and-sandbox`), and counts for the never-asks gates. An agent that exits at once
+refusing its arguments (`ARGS_REFUSED`: clap's and others' words) gets a line saying what adds flags, the alias named.
+ponytail: the default shell's, read once; a tab's own shell and a host's aren't. `test/presets.test.ts`.
+
+A group's defaults (`Sep`: `preset`, `where`, `perm`, `model`, `effort`, `base`; Edit group: panels.tsx `GroupEdit`: with
+its agent picked, that agent's models from `agentModels` by name (its id kept: a name typed is taken as its id), the
+picked model's efforts (none said: the agent's), the agent's permission modes; another agent clears them) apply to a
+new workspace there: the new-workspace page's (text.ts `groupNew`) and `laki new --group` / `laki_new_workspace`'s
+(tools.ts `groupOf`, `groupDefaults`: where and base always, mode, model and effort when it starts the group's agent;
+an effort that agent doesn't take left out). `test/presets.test.ts`.
+
 A tab's `model` and `effort` (`wsNew`, `tabNew`, kept by `wsFork`; `modelCheck` before a worktree is made: a name, an
 effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/`--effort`, codex `-m` and `-c
 model_reasoning_effort="…"`, opencode its inline config (above), the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's

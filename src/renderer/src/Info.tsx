@@ -16,6 +16,7 @@ export type PRInfo = {
   state: string // OPEN, MERGED, CLOSED
   url: string
   checks: '' | 'pass' | 'fail' | 'pending' | 'cancelled'
+  head?: string // its head commit (a review thread's Fixed in)
   list?: Check[]
   title?: string
   author?: string

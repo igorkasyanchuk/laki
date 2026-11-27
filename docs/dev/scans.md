@@ -665,18 +665,36 @@ Laki AI's OpenRouter credits (ai.ts `aiCredits`, `Usage.tsx` `creditsPart`; low:
 shown when the other is refused; `creditsLow`: under $1 or 10% left of the credits or of the key's own limit.
 
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below are undocumented and asked only when
-`settings.usage[agent] === true` (Settings › Layout › *Ask … for plan limits*, off by default). Otherwise each
+`settings.usage[agent] === true` (Settings › Layout › *Ask … for plan limits*, off by default); Codex's own app server and
+agy's own /usage unless it's false (`OWN_CMD`). Otherwise each
 account's numbers are what the agent reports itself (meters.ts' `statusLimits(w, now, true)`: Claude's status line
 `rate_limits`, Codex's transcripts' `token_count` `rate_limits` (share.ts' `meterOf` keeps the newest as `Meter.limits`,
-`codexRateWindows`), of any age: `at` says when; past 20 minutes Usage.tsx dims them (`old`) with *As of HH:MM (11h ago)*, what they miss (use since, outside Laki too) and *Ask <host>* (`onAsk`: App's `settingsSet` of `usage[agent]` true, then read again; its tip Layout's words); the ring's tip says *as of*), `source: 'own'`;
+`codexRateWindows`), chosen window by window across the account's tabs (an idle claude rewrites its status line with the
+numbers it had, so the newest file can be behind): of a label's readings the later `resets` wins, then the higher
+percent (usage never falls inside a window), then the newer; `at` the oldest reading chosen; one past its reset shows 0
+(Usage.tsx `live`); `test/statusline.test.ts`. Of any age: `at` says when; past 20 minutes Usage.tsx dims them (`old`) with *As of HH:MM (11h ago)*, what they miss (use since, outside Laki too) and *Ask <host>* (`onAsk`: App's `settingsSet` of `usage[agent]` true, then read again; its tip Layout's words); the ring's tip says *as of*), `source: 'own'`;
 none yet: a row with `SAYS`' error. Asked, `source: 'endpoint'`. An install from
 before (state.json there, an agent's `usage` unset) gets `settings.usageNote` true once: Settings › Resources' note,
 OK sets it false. A delayed start's *after the plan limit* (schedule.ts `pendingTick`) reads the same: an own window
 whose reset has passed starts it. With the endpoint on, `usage` reads Claude's `GET api.anthropic.com/api/oauth/usage`
 (`Authorization: Bearer` + `anthropic-beta: oauth-2025-04-20`; no redirect followed, both; the token is the freshest of `security
 find-generic-password [-a $USER] -s "Claude Code-credentials" -w` and `~/.claude/.credentials.json`) and Codex's `GET
-chatgpt.com/backend-api/wham/usage` (`$CODEX_HOME/auth.json` `tokens`, `chatgpt-account-id`). Tokens are read-only:
-never refreshed (that can sign the agent out), an expired one isn't sent. Each agent's answer is kept 5 minutes
+chatgpt.com/backend-api/wham/usage` (`$CODEX_HOME/auth.json` `tokens`, `chatgpt-account-id`: `codexWham`, only for a codex
+that can't say its own, below). Tokens are read-only: never refreshed (that can sign the agent out), an expired one isn't
+sent; `test/usage.test.ts`' guard: turned away (401) with both on, no URL with `oauth/token` or `/token` is asked, and the
+fake Keychain item, `~/.claude/.credentials.json` and `$CODEX_HOME/auth.json` are byte for byte as they were.
+Codex's (`codex`, unless `usage.codex` is false: Settings › Layout › *Ask Codex for its plan limits*): its own app
+server, `codex app-server` (no shell; the account's folder as `CODEX_HOME`, else the agent's own), JSON-RPC on its stdio
+(`asked`, shared with accounts.ts' model lists): `initialize`, the `initialized` notification, `account/rateLimits/read`;
+killed at its answer or 15 s (`APP_MS`, `LAKI_CODEX_APP_MS`: tests'). Codex reads its own sign-in: Laki reads none.
+`codexAppWindows`: `rateLimits`' `primary` and `secondary` (`usedPercent`, `windowDurationMins`, `resetsAt` in seconds,
+as `codexRateWindows` reads a transcript's), then each other limit of `rateLimitsByLimitId` by its `limitName`; `plan`
+its `planType`. An error naming the method (`-32601`, *unknown variant*: an older codex), a codex that ends without an
+answer (one with no `app-server`) or none installed:
+`wham/usage` only when `usage.codex` is true, else *This Codex doesn't say its limits* (the popup's *Ask chatgpt.com*
+sets it); one saying 429: the back-off. Measured on an M-series MacBook Air (codex 0.171.0): 0.65 s to its answer and
+0.15 s of CPU, 3.6 s and 0.3 s the first time in a while (its network). The fake: `test/fakes/codex`'s app-server
+(`FAKE_CODEX_LIMITS`: `unknown`, `slow`, `fail`). Each agent's answer is kept 5 minutes
 (`USAGE_TTL`; Claude's 7.5, `TTL`: Anthropic turns away faster pollers; a turned-away token too), one that asked no server or failed on the way 1
 (`AGAIN`); a 429 (`busy`) its `Retry-After` (`waitOf`), else `BACK_OFF` (10, 20, 40, then 60 minutes, `slows` in a row), the last
 answer with numbers (`last`) given meanwhile with the error and `next` (Usage.tsx' `waitText`: from when, checked again when); the RPC's `now` (tests'). The renderer asks every minute (and notifies near a limit: Notifications). Tests set `LAKI_USAGE_API`
@@ -724,28 +742,56 @@ codespace's or codex's; your status line's `padding` and managed settings aren't
 A claude or codex tab's context and what its chat used (`meters.ts` `meterTick`, every 10 s, `LAKI_METER_MS`: tests'; and
 1 s after a turn's end; both settings off: the tick reads none; an archived workspace's tabs skipped): each tab's transcript read on by `tailOf` (a `MeterRun` per tab:
 its file, `pos`; another chat's file, a /clear: none until this one's), parsed by `share.ts` `meterOf` (only lines that
-name `"usage"`, `token_count` or `turn_context`). Claude: an answer's lines share a `message.id`, the last one's usage
+name `"usage"`, `token_count` or `turn_context`). With it, the chat's other transcripts (`extraFiles`, each a `Sub`
+read on by `readOn`, keyed by path; `r.sum` (`meterSum`) the spend of all of them, the view's usage, today's and the days;
+never `used`): claude's subagents, every `*.jsonl` in `<its file without .jsonl>/subagents/`; codex's threads it spawned
+(`codexKids`, looked for every 30 s): a rollout whose first line's `session_meta` names a parent (`parent_thread_id`,
+under `source.subagent.thread_spawn`) in the chat or one of its threads, in the day folders from the chat's own on, each
+file's first line read once (`parents`). None for Laki's copy of a chat. Claude: an answer's lines share a `message.id`, the last one's usage
 counts (`msg`, `was`); `used` is its `input_tokens` + `cache_creation_input_tokens` + `cache_read_input_tokens` (not a
 sidechain's; `<synthetic>` skipped); the window `WINDOW` (200K), 1M for a `[1m]` model (the tab's or its preset's
 `model`, the preset's args; none named: claude's own settings, `claudeBig`: the workspace's `.claude/settings.local.json`,
 `settings.json`, then the account's folder's) or once `used` is past it. Codex: `turn_context`'s model, the last `token_count`'s
 `last_token_usage.total_tokens` of `model_context_window`, its `total_token_usage` growing (`total`: a smaller one is
-counted anew). Tokens: input, output, cache writes and reads; cost by `shared/types.ts` `PRICES` (`costOf`, the first
-regex on the model; `priced`: some had one, else tokens only). `meterView`: `TabView.context` `{ used, max }`, `usage`
+counted anew). Tokens as parts by model (`Meter.by`, `days`; `types.ts` `Parts`: `in` (input not from the cache), `out`, `w5` and `w1`
+(cache writes kept 5 minutes and an hour: claude's `cache_creation.ephemeral_1h_input_tokens`, the rest 5 minutes; no
+split said, all), `rd` (reads); `L` past the model's long line, `F` fast mode: `partsOf`, share.ts `usageParts`), priced as
+they're read (`meterCost`: the priced cost, the tokens of each model with no price). Prices: `shared/prices.json`
+(`npm run prices`, scripts/prices.ts: LiteLLM's table, the claude-*, gpt-5*, grok-* and gemini-* chat rows, dated), then
+`types.ts` `PRICE_OWN` over a row field by field (retired claude ids old chats name, Sonnet 4 and 4.5's rates past 200K,
+fast mode's 2x on Opus 5.5, Opus 5, Opus 4.8, Fable 5.2 and Mythos 5.2); by the exact model id, never a family guess: a
+model with no row is unpriced. `costOf`: a 1-hour write 2x input and a 5-minute one 1.25x unless the row says; a
+request whose whole input (cache too) is past the row's `long.above` (Haiku 5.5's 100K, Sonnet 4/4.5's 200K, gpt-5.4,
+5.5 and 5.6's 272K) at those rates, every token of it; fast (claude's `usage.speed` `fast`) times every rate. Copied
+answers count once: each claude answer's key (`answerKey`: message id and request id, sha-256, 11 characters), each
+codex `token_count`'s (its payload: totals and limits, copied as they were; a copy's line time and session are the
+copy's) is owned by the first chat to report it (meters.ts `ownsOf`: `owners`, kept as each chat's `keys` by day in
+usage-days.json, gone with the day) and, in a tab, by the first file of it (`keyFile`: a spawned codex thread's copy of
+its parent's turns); a forked or resumed chat's copied lines add nothing, its context still its own. `meterView`: `TabView.context` `{ used, max }`, `usage`
 `{ tokens, cost? }`, `skills` (B7: share.ts `skillsIn`, the lines that name `Skill`, `SKILL.md` or *Base directory for
 this skill*: claude's Skill calls (`input.skill`), the message that loads one (its folder; a `/skill` typed has only
 that), a Read of a SKILL.md; codex's shell calls that read one; the main chat's, by name in the order loaded, 50 at
 most). The status bar's `.sb-ctx` is a button: its menu lists them, a pick calls `skillOpen` (`tab`, `name`: the
 folder said, else the workspace's `.claude/skills/<name>` or `.codex/skills/<name>`, else the agent's own; its SKILL.md
-in the editor; the user's only). share.ts `toolLine` names a Skill call's skill (the Reader's `.rd-skill` chip). Today's (`dayOf`, by each line's `timestamp`, this Mac's day; `m.today` starts over at midnight)
-per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace and its name then,
+in the editor; the user's only). share.ts `toolLine` names a Skill call's skill (the Reader's `.rd-skill` chip). Today's (`dayOf`, by each line's `timestamp`, this Mac's day: the day's parts)
+per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace, its name then, `tokens` and
+`models` (each a `Row`; one kept before parts under `''` until the parts outgrow it),
 `nameOf`: none for a private one, so a removed one is still named, `gone` in StatusBar's Today; a chat's the more of
 what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
-(`todayView`: tokens, cost, the 5 workspaces that used most).
+(`todayView`: tokens, cost, the 5 workspaces that used most, `unpriced`: the models with no price and their tokens, the
+popup's *no price for <model>* lines). The Usage page's days: `<data>/usage-days.json` (`kept`: by chat its workspace,
+agent, `days` (day, model: a `Row`) and `keys`), written 2 s after a read (`daysLater`, once for a tick's tabs; `daysWrite`
+as the daemon stops), 90 days kept. A `Row` (share.ts): `{ p }` parts, priced now; `{ tokens, cost, own }` an agent's own
+count (Grok's and OpenCode's price; agy's no cost: no price); `{ tokens, cost }` one kept before parts (old: its cost then).
+`rowMerge`: part by part the more of kept and read (a restart reads each chat anew), an old row until parts reach it.
+`usageDays` (`daysRows`): a row per day, agent, model and workspace with `priced` (false: no price), `old`, `read` and
+`input` (the cache's share: Usage.tsx *From cache*). `test/meter.test.ts`: the prices, a 1-hour write, fast mode, long
+prompts, the fixtures' models all priced (`test/fixtures/transcripts`), a re-price of a kept day (`PRICE_OWN` changed), a
+subagent and a spawned codex thread (`test/fixtures/transcripts`), a fork's copy once over a restart.
 A workspace's spend cap (`daemon/cap.ts`; `Workspace.cap` as `Cap` `{ usd?, tokens? }`, `{}` none; unset: its first agent
 tab's profile's `cap`, else its project's: `capOf`; `capParse`: a number or `$5`, `2M tokens`; `wsNew`'s and `laki new`'s
-`cap`, `wsSet`'s, `projectSet`'s, `presetSave`'s): `capView` sums its agent tabs' `meterView` usage, dollars of a priced
-chat and tokens of an unpriced one (the view's `spend`: `share`, the larger part spent; `measured` false when nothing it
+`cap`, `wsSet`'s, `projectSet`'s, `presetSave`'s): `capView` sums its agent tabs' `meterView` usage (their subagents' and spawned threads' too), dollars of a priced
+chat and tokens of an unpriced one, `unpriced` the models with no price (the tip's *no price for …*: `capSpent`) (the view's `spend`: `share`, the larger part spent; `measured` false when nothing it
 has counts against it: *not measured*). `capTick` after each `meterTick`: at 80% one notice (`capTold`, reset as the cap
 changes), at 100% `capOver`, a push (`flowPhone`) and one notice with *Add $5 again* (the cap doubled), *Leave it
 stopped*, *Remove the cap* (`alertShow`'s `mac`: those two refused to remote access at Answer only, main.ts' ANSWER
@@ -756,7 +802,7 @@ lower cap only (`capRaises`, main.ts' `agentNo`), never a project's or profile's
 one (`WS_SET`, `NEW_KEYS`). A workflow's budget holds in its runs too: whichever ends first stops it. A closed
 tab's cost stays in the sum and the cost warning's: `Workspace.spentClosed`, added in core.ts `closeTab` (the daemon's,
 no call sets it), its `ClosedTab.spent` taken off again when ⇧⌘T resumes its chat (its meter counts it then); an
-unpriced chat's tokens leave it. ponytail: a host's tabs aren't metered. `test/meter.test.ts`, `test/agent-gates.test.ts`. Grok's and Antigravity's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
+unpriced chat's tokens leave it. ponytail: a host's tabs aren't metered. `test/meter.test.ts`, `test/agent-gates.test.ts`. Grok's, Antigravity's and OpenCode's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
 their days and today's under their own chat ids: Grok's `~/.grok/sessions/<folder>/<id>/usage.json` (each turn's
 `endedAt`, per model `totalTokens` and `costUsdTicks`, 1e-10 USD, its own price; the folder `encodeURIComponent` of the
 worktree, else any holding the id), agy's `~/.gemini/antigravity-cli/conversations/<id>.db` (its id, else
@@ -766,8 +812,17 @@ past the last one with usage that tab counted (`agyRead`'s `last`, kept in `seen
 row with no usage yet, a step under way, is read again; the table's rowid going below it is another conversation: read
 whole); a DB and its WAL past 32 MB (`AGY_BIG`) are read in a worker (`agyWorker.ts`, its own build entry: 512 MB heap,
 ended at 20 s; the tab's days as they were until it answers), past 256 MB not at all: `steps`' metadata, field 1 its time, field 9 its usage, 2+3+4+5 input, output, cache writes
-and reads; `gen_metadata`'s 1.3 → 1.19 the model's name; tokens only). Tested in `test/meter.test.ts`. ponytail: agy's
-field numbers are read off its files (Nov 2026); their plan limits: Plan limits, above; and
+and reads; `gen_metadata`'s 1.3 → 1.19 the model's name; tokens only). OpenCode's: its own `opencode.db` (the `data`
+folder `opencode debug paths` names, `ocDb`: asked once, again every 10 minutes while it hasn't said; else
+`XDG_DATA_HOME` or `~/.local/share`, then `opencode`; `OPENCODE_DB` when set; else the newest `opencode-<channel>.db`),
+cloned with its WAL as agy's (`withClone`), every 30 s at most (`AGY_EVERY`, `LAKI_AGY_EVERY_MS`: tests'): `ocRead`, the
+tab's session (its `resumeId`) and each under it (`session.parent_id`, recursive: its subagents), each assistant message's
+`data` (`modelID`; `tokens` input, output, reasoning, cache read and write; `cost`, OpenCode's own, USD), by its time and
+model, only the rows past the last counted (a message still answering, no `time.completed`, read again, for an hour from
+its start: one older was cut off, its opencode killed, and counts as it is; the newest rowid
+below it: another database, read whole); past 32 MB in the worker too (`agyWorker.ts`' `session`). Tested in
+`test/meter.test.ts` (a fixture DB). ponytail: agy's field numbers are read off its files (Nov 2026), OpenCode's schema
+off this Mac's (2026-11-27, OpenCode 1.19.5); their plan limits: Plan limits, above; and
 a limit notice on their screen (core's `checkLimit` for every agent but claude: limits.ts' `lineRe` takes Grok's *You
 hit your weekly limit*). The renderer (`settings.contextMeter`, `settings.costs`,
 on unless false, Settings › Appearance; `contextMeter` `line` (unset, true), `ring` or `status`, App's `ctxLook`): TabBar.tsx' `TabList` `.tab-ctx` (its place: one rule in styles.css, a 2px line
@@ -776,7 +831,8 @@ along the tab's bottom edge; a split's fullest), or Usage.tsx' `Ring` there, and
 `ctxText`, `usageText`. Tested in `test/meter.test.ts`.
 
 Where it went (`wsSpend { ws }`, API 197, cap `ws.spend`): `meters.ts` reads each claude and codex tab's transcript of the
-workspace whole (its last 64 MB, `SPEND_READ`), kept by file and size (`spendKept`, 40 files), as `shared/spend.ts`
+workspace whole (its last 64 MB, `SPEND_READ`) and its subagents' and spawned threads' (`extraFiles`), kept by file and size
+(`spendKept`, 200 files; a codex request's id its `token_count` payload, so a thread's copy of its parent's counts once), as `shared/spend.ts`
 `spendEntries` (claude: your messages, each `tool_use` and its `tool_result` classed by tool: Read a file by its path from
 the worktree, Bash a command by `cmdHead`, Grep/Glob/Web* searches, `mcp__<server>__…`, an answer's `usage` by its id, the
 last one counting; codex: `user_message`, `function_call`/`_output` (a `sed -n`, `cat`, `head` of a file: that file's read;

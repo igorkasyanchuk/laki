@@ -20,7 +20,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--cap 5|"2M tokens"]  its spend cap: past it Laki stops its agents and asks (80%: a notice); only you raise it
             [--template <name>]     the prompt through one of your prompt templates
             [--action <name>]       an agent action of yours (Run ▾) as its prompt, the prompt after it
-            [--group <name>]        under that group of the project in the sidebar (its template and agent too)
+            [--group <name>]        under that group of the project in the sidebar (its template, agent, where, model, effort and mode too)
             [--issue <url|number>]  a GitHub or GitLab (glab) issue's title and text as the prompt
             [--pr <url|number>]     a GitHub PR's branch (gh pr checkout, forks too), named pr-<n>-<title>
             [--link <url|number>]   the PR it's about (a review), not checked out: its PR, named after it; in a
@@ -302,9 +302,10 @@ in another workspace: the user is asked in the app first. For a message that nee
   laki ask @backend "Which endpoint returns the user's teams?"
   laki ask a1b2 --wait 30 "Review my last commit on main and say what you'd change"`,
   wait: `Waits until none of the named workspaces' agent tabs is working (<ws>/<tab>: that tab), a look every 3 seconds,
-then prints a line each: idle with the first line of its last answer, or waiting with what it asks. Exit 0: all idle;
-2: one waits for the user (answer it, or tell the user); 3: --timeout (default 20m: 90s, 20m, 1h) ran out, some still
-run (wait again). Instead of a loop over laki ls --json. MCP's laki_wait does the same, 4.5 minutes a call.
+then prints a line each: idle with the first line of its last answer, waiting with what it asks, or stuck with why and
+the next step (a worker you started: its plan limit, a failed turn, its process gone, silent or retrying for 10 minutes,
+a background task 20 minutes past its turn). Exit 0: all idle; 2: one waits for the user (answer it, or tell the user)
+or is stuck (do its next step); 3: --timeout (default 20m: 90s, 20m, 1h) ran out, some still run (wait again). Instead of a loop over laki ls --json. MCP's laki_wait does the same, 4.5 minutes a call.
 
   laki send a1b2 "Now add tests for it" && laki wait a1b2
   laki wait a1b2 c3d4 --timeout 1h           both workspaces' agents
@@ -413,6 +414,7 @@ folder; Codex's network stays on, Claude Code runs laki outside it. Not with byp
   laki preset add claude-ask --agent claude --perm auto
   laki preset set claude-ask --model opus --effort high
   laki preset set claude-ask --args ''           drop its args
+  laki preset set reviewer --system "Review only: never edit files"   its standing instructions, each new tab
   laki preset off codex                          out of the pickers, its tabs still start`,
   rename: `Names a workspace (the sidebar's row). . is this tab's. A name the user gave it (a rename, or typed as it was
   made) stays: an agent's rename is refused, unless the user asked for it (--asked).

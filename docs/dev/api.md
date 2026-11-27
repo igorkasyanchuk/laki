@@ -364,7 +364,7 @@ newest first), `keptOpen` (`dir`, `file?`, `finder?`), `keptRm` (`dir` or `all`)
   `fileUndo` (`path`: its status from `--name-status -M`, untracked as A; its content first kept by `hash-object -w`;
   `git restore --source=<base> --worktree`, an A removed, an R's old path restored and the new removed), `hunkRedo`
   (`id`: `git apply -R`, or the blobs written back; `undos`, the last 20 per workspace in memory); nothing staged;
-  the side panel's: `files` (also a prompt box's @; T17: an agent lists its own workspace's only, never a project's), `fileNew`, `imageRead` (a picture anywhere on this Mac by its full path, for a terminal link's hover card: an image's extension and bytes, 10 MB; not over remote access), `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads` (each thread's `startLine`, `side`: LEFT when a range starts on the old file's, `hunk`: its first
+  the side panel's: `files` (also a prompt box's @; T17: an agent lists its own workspace's only, never a project's), `fileNew`, `imageRead` (a picture anywhere on this Mac by its full path, for a terminal link's hover card: an image's extension and bytes, 10 MB; not over remote access), `fileSearch { ws, q, case?, word?, regex? }` (the finder's Text: `git grep -n -I --untracked`, what git ignores out; a plain folder's `grep -rnI` without SKIP_DIRS (never git there: noNested); `-F` unless regex (`-E`), `-i` unless case, `-w`; the first 500 matches `{ files: { path, hits: { line, text } }[], total, cut }`, a line cut at 300; 15 s), `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreadReply { ws, thread, body }` and `prThreadResolve { ws, thread, resolved?, body? }` (#1: gh's GraphQL `addPullRequestReviewThreadReply`, `resolveReviewThread` / `unresolveReviewThread` by the thread's node id; a body first as a reply; GitHub's only; the user's: AGENT_NO), `prThreads` (each thread's `id`, `startLine`, `side`: LEFT when a range starts on the old file's, `hunk`: its first
   comment's `diffHunk`; comments hidden on GitHub left out, `prTalk`'s too), `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `prAct` (`act` approve, close, merge or revert, each only where the project's `prAllows` says (`config.pr`:
@@ -952,3 +952,17 @@ group and `laki_more({ group })`, whose description has a line per group; a call
 (`capabilities.tools.listChanged`). `tools/call` takes every tool, listed or not, for a client that never lists again.
 `laki mcp --all`, `LAKI_MCP_ALL=1`, Laki AI's own backends (`LAKI_AI=1`: claude -p, codex exec) and an extension's
 permission server list everything, as before. `ext_*` tools (the user's extensions') stay listed.
+
+
+## #5: shared MCP servers (`POST /mcp/<id>/<tab>`)
+
+`daemon/mcpShare.ts`: an MCP server marked `shared` (a command's) runs once; each agent's config names
+`http://127.0.0.1:<port>/mcp/<id>/<tab>` instead of its command (`sharedFor` in agentCmd), with `Authorization: Bearer
+<key>` (claude's 0600 file's headers, codex's `bearer_token_env_var` from its environment, OpenCode's inline config's
+headers: never argv): `id` the server's command, args and env hashed, `key` an HMAC of the tab's id
+(`<data>/mcp-share.key`, 0600). Its process gets an agent's environment (Hide secrets' filter when on). Before the GET pages and the
+Origin check: any Origin is refused (403), a key that isn't the tab's or a server this tab isn't given is 404, GET is
+405, DELETE 200. A POST's JSON-RPC message or batch: `initialize` answered from the daemon's own initialize of the
+server (once per process), `ping` here, `notifications/initialized` dropped, any other request passed on with an id of
+the daemon's and answered `application/json` (`mcp-session-id: laki-<tab>`), an agent's notification dropped (202: a cancel names the agent's own ids). The
+server's own requests are refused (-32601), its notifications dropped.

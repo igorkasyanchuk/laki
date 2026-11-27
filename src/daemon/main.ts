@@ -36,6 +36,7 @@ import * as gitTidyMod from './gitTidy.ts'
 import * as askStreak from './askStreak.ts'
 import { signIn } from './signin.ts'
 import { mcpAuthTick, mcpSignIn } from './mcpAuth.ts'
+import { mcpShareHttp, mcpShareStop } from './mcpShare.ts'
 import { dir, inRig } from './dir.ts'
 import { safeCrash, safeLeave, safeOn, safeStart, safeStop } from './safe.ts'
 import * as scheduleMod from './schedule.ts'
@@ -138,7 +139,7 @@ safeStart() // safe mode after three young deaths in a row (safe.ts)
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
-if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
+core.adoptLoginPath(!!process.env.LAKI_FROM_APP) // the app's: its login shell's PATH; any: the agents' aliases there
 // the Keychain's values read together, not one sync spawn each as the state loads; the state only parsed here (readJson
 // would set an unreadable one aside before core.load's own handling of it)
 if (keychainOn()) await kcWarm([...envNames((() => { try { return JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')) } catch {} })()), 'openrouter', 'endpoint', 'widget-secrets', 'telegram'])
@@ -713,6 +714,7 @@ const api = {
   files: p => filesMod.files(p.ws, p.project, { ignored: p.ignored === true, ...(typeof p.under === 'string' && { under: p.under }) }),
   fileNew: p => filesMod.fileNew(p),
   fileRead: p => filesMod.fileRead(p),
+  fileSearch: (p: In<typeof filesMod.fileSearch>) => filesMod.fileSearch(p), // the finder's Text: git grep in the worktree
   dbRead: p => filesMod.dbRead(p), // #1: a SQLite database's tables, a table's rows, a read-only query (db.ts)
   mcpImport: p => mcpImport(p), // #6: the agents' own MCP servers, listed, then the picked ones copied into Settings' (sees.ts)
   sourceGuess: p => filesMod.sourceGuess(p), // F5: the Preview's picked element's likely files
@@ -742,6 +744,8 @@ const api = {
   prThreads: (p: { ws: string; all?: boolean }) => prMod.prThreads(p.ws, p.all === true), // all: everyone's comments (the full review's)
   prTalk: (p: { ws: string }) => prMod.prTalk(p.ws), // the PR's conversation and review summaries, everyone's
   prSay: (p: In<typeof prMod.prSay>) => prMod.prSay(p), // a comment on the PR's conversation, as you (the full review's GitHub tab)
+  prThreadReply: (p: In<typeof prMod.prThreadReply>) => prMod.prThreadReply(p), // a reply on a review thread, as you (the side panel's GitHub tab)
+  prThreadResolve: (p: In<typeof prMod.prThreadResolve>) => prMod.prThreadResolve(p), // resolve or unresolve one, a reply first when given
   blame: p => filesMod.blame(p), // the full review's: a file's lines' commits, old (the base's) or new (the worktree's)
   fileWeb: p => filesMod.fileWeb(p), // a file's page on origin's site, at the base or the branch
   prDiff: (p: { ws: string }) => prMod.prDiff(p.ws),
@@ -1048,7 +1052,7 @@ const FROM = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggest
   'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun',
   'widgetAction', 'widgetStore', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRestore', 'widgetToolAnswer',
   'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet', 'memoryCompact', 'projectSet', 'projectTrust', 'memoryAdd',
-  'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo',
+  'queueClear', 'queueSet', 'queueNow', 'queueResume', 'tunnelStart', 'prReview', 'prComment', 'prSay', 'prThreadReply', 'prThreadResolve', 'prThreads', 'prTalk', 'widgetWrite', 'widgetUndo',
   'aiAsk', 'chatRead', 'shutdown', 'checkAgain', 'checkStop', 'proofShot', 'worktreeImport', 'bgSet', 'sideNew', 'uiReset', 'projectArchive', 'projectAdd',
   'wsBase', 'bgOutput', 'mcpAppCall', 'agentUpdate', 'wsRm', 'projectRm', 'scheduleRm', 'shareStart', 'fileWrite', 'fileNew', 'fileUndo', 'hunkUndo', 'hunkRedo',
   'tabClose', 'openIn', 'gateRestart', 'tabUnbox', 'projectNetAllow', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'cliInstall', 'cliRemove', 'remoteStop',
@@ -1067,7 +1071,7 @@ const OPEN = new Set(['keptList', 'agentVersions', 'clientWho', 'voiceModels', '
   'layoutSet', 'layoutMove', 'tabFocus', 'todoAdd', 'todoRm', 'memoryCompactLog', 'cliState', 'reminderAdd', 'reminderSet', 'reminderRm', 'failDismiss',
   'hookList', 'storageInfo', 'apps', 'termShells', 'reorder', 'uiDo', 'imageSave', 'bgGet', 'fileSave', 'prFix', 'prLog', 'logs', 'scriptLogs', 'progress',
   'turnDiff', 'turnList', 'prList', 'prRefresh', 'meme', 'aiHelp', 'aiQuestion', 'aiPermission', 'hook', 'worktreeList', 'diff', 'baseBranches', 'files',
-  'fileRead', 'dbRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame',
+  'fileRead', 'fileSearch', 'dbRead', 'sourceGuess', 'artifactList', 'skills', 'agentCommands', 'issueList', 'usageDays', 'commits', 'commitDiff', 'prLabels', 'ghCard', 'blame',
   'fileWeb', 'prDiff', 'prFile', 'prFiles', 'device', 'sim', 'cloudflared', 'usage', 'accounts', 'resources', 'shareStop', 'tabWake', 'tunnelStop', 'tunnelCheck',
   'resize', 'view', 'detach', 'remoteCheck', 'widgetRender', 'widgetLogs', 'widgetLog', 'widgetLogClear', 'widgetWhat', 'widgetFull', 'widgetTrash',
   'widgetRemix', 'widgetSlug', 'widgetReload', 'widgetFiles', 'widgetPush', 'widgetEvents', 'widgetTools', 'widgetGrantRm', 'widgetRuns', 'widgetAnnotations',
@@ -1580,7 +1584,7 @@ const ANSWER: Record<string, true | ((p: Params) => string)> = {
   reviewNotesGet: true, // R10: the Review tab's comments, read and kept from the phone too
   reviewNotesSet: true,
   voiceText: true, // the mic on the phone's prompt boxes (Reader's too): your words written down, nothing sent; Telegram's Answer has it
-  ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen tabSnooze showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead dbRead sourceGuess \
+  ...Object.fromEntries('voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen tabSnooze showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList diff baseBranches files fileRead fileSearch dbRead sourceGuess \
 artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet planFile noteList noteGet noteFile todoListGet \
 chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin imageSave failDismiss answer aiAnswer widgetToolAnswer flowAnswer secretGive aiAsk aiNew aiStop aiUnqueue aiOpen aiContinue timer reminderAdd reminderSet reminderRm tabDraft'.split(' ').map(k => [k, true] as const)),
   send: sendOk,
@@ -1602,7 +1606,7 @@ const ANSWER_NO = new Set(['safeOff', 'kcWrapper', 'kcWrapped', 'mcpImport', 'su
   'secretsTidy', 'prAttach', 'prDetach', 'phoneTick', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'telegramLog', 'uiReset', 'portKill', 'aiQuestion', 'aiPermission', 'aiChatRm', 'aiTick', 'aiKey',
   'aiEndpointKey', 'aiEndpointTest', 'chatImport', 'queueClear', 'queueSet', 'stopAll', 'queueResume', 'dndSet', 'queueNow', 'hook',
   'worktreeImport', 'wsBase', 'fileNew', 'imageRead', 'linkRm', 'fileWrite', 'hunkUndo', 'fileUndo', 'hunkRedo', 'skillSet', 'prComment', 'prReview', 'prAct',
-  'prDraft', 'prLabel', 'prSay', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount',
+  'prDraft', 'prLabel', 'prSay', 'prThreadReply', 'prThreadResolve', 'prViewed', 'run', 'device', 'sim', 'accountAdd', 'accountSet', 'accountRm', 'accountLogin', 'agentUpdate', 'tabAccount',
   'shareStart', 'shareStop', 'resourceStop', 'sleepTick', 'spareTick', 'archiveIdleTick', 'longTurnTick', 'longStop', 'tabSleep', 'tabWake', 'tunnelStart',
   'tunnelStop', 'tunnelCheck', 'ship', 'shipDraft', 'input', 'watchLimits', 'scheduleSet', 'scheduleRm', 'scheduleRun', 'scheduleTick', 'eventTick',
   'scheduleRelease', 'pendingTick', 'remoteStart', 'stateOwn', 'remoteStop', 'remotePair', 'remoteDeviceRm', 'remoteTick', 'remoteCheck', 'screenLock', 'presence',
@@ -1710,6 +1714,7 @@ function agentNo(method: string, p: Params) {
   else if (method === 'portKill' && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error("an agent can stop what listens in its own workspace only") // S5
   else if (method === 'tabReopen' && core.agentCaller(p.from) && core.agentCaller(p.from) !== core.findWs(String(p.ws ?? '')).id) throw new Error('an agent can reopen a closed tab in its own workspace only')
   else if (method === 'prThreads' && p.all === true) notAgent(p, "read everyone's PR comments (only trusted reviewers' go to agents)")
+  else if (method === 'fileSearch' && core.agentCaller(p.from) && core.findWs(String(p.ws ?? '')).id !== core.agentCaller(p.from)) throw new Error("an agent can search its own workspace's files only") // as files (T17)
   else if ((method === 'wsNew' || method === 'tabNew') && p.sandbox === false) notAgent(p, "start an agent outside its profile's sandbox")
   else if (method === 'ship' && p.allowSecrets !== undefined && p.allowSecrets !== false) notAgent(p, 'ship past the secret check (the user says what is not a secret)')
   else if (method === 'aiAsk' && String(p.chat ?? '').startsWith('widget:')) notAgent(p, "ask in an extension's page chat (what Laki AI changes there stays on)")
@@ -1897,7 +1902,7 @@ const TEST_CLOCK = inRig() && process.env.LAKI_TEST_CLOCK !== '0' // 0: a test's
 // ANSWER is a change. A line names the workspace and tab and what was done: a message's or prompt's first 80
 // characters, never a secret's value; a terminal's keys once a minute per tab ('input')
 const READS = new Set('flowTrustDiff aiCredits wsSpend agentLog agentCalls diskUsage voiceModels ping state agentModels projectFile branches csMachines wsPeek overlapCheck wsStat doctor hooksSeen unread seen showDone tabFocus uiDo memoryCompactLog cliState storageInfo apps termShells bgGet prLog logs scriptLogs progress turnDiff turnList sideState prList prRefresh meme aiState aiChats aiImage worktreeList \
-diff baseBranches files fileRead dbRead sourceGuess artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet \
+diff baseBranches files fileRead fileSearch dbRead sourceGuess artifactList skills agentCommands issueList usageDays commits commitDiff prLabels ghCard prThreads prTalk blame fileWeb prDiff prFile prFiles cloudflared usage limits accounts resources screen view resize detach widgetRender widgetLogs widgetFull widgetWhat studioChats widgetFiles widgetEvents widgetTools widgetRuns widgetAnnotations planList planGet \
 planFile noteList noteGet noteFile todoListGet chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookList passkeyOptions passkeyRegister passkeyChallenge passkeyUnlock passkeyPin failDismiss'.split(' '))
 for (const k of READS) if (!Object.hasOwn(ANSWER, k)) throw new Error(`READS' ${k} isn't one of ANSWER's (D7): D9 logs what it doesn't call a read`)
 const tabWords = (id: unknown) => {
@@ -2085,6 +2090,8 @@ const server = createServer(async (req, res) => {
     res.end(text)
   }
   if (!hostOk(req.headers.host)) return reply(421, { error: 'host not allowed' })
+  // #5: a shared MCP server (mcpShare.ts): an agent's MCP client, its tab's key in the path; never a page's (no Origin)
+  if (req.url?.startsWith('/mcp/')) return req.headers.origin ? reply(403, { error: 'origin not allowed' }) : void mcpShareHttp(req, res, new URL(req.url, 'http://x').pathname).catch(e => !res.headersSent && reply(500, { error: (e as Error).message }))
   if (req.method === 'GET') {
     const u = new URL(req.url ?? '/', 'http://x')
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
@@ -2600,6 +2607,8 @@ function shutdown(keep: unknown = false) {
   hookStop()
   remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
   remoteMod.stopShares()
+  mcpShareStop(true) // #5: the shared MCP servers' processes
+  metersMod.daysWrite() // the Usage page's days, written a moment after each read
   remoteMod.remoteDown() // kept in state.json too (D2)
   flowStopAll() // a run block's command
   aiStop({ quit: true }) // its claude -p or codex would go on, and their laki mcp start a daemon again; what waits is kept for the next start

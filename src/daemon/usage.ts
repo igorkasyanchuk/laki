@@ -1,10 +1,12 @@
 // The agents' plan limits for the status bar's ring (Usage.tsx): Claude's 5-hour and weekly windows, Codex's, Grok's
 // week, Antigravity's per model group. Read the way Superset, CodexBar, Orca and others do: the sign-in the agent
-// already keeps on this Mac (Claude Code's Keychain item or ~/.claude/.credentials.json, Codex's ~/.codex/auth.json,
-// Grok's ~/.grok/auth.json), sent to the endpoint the agent's own /usage screen asks; Antigravity's from agy's own
-// /usage command (agy signs in itself: Laki never reads its token). Read-only: a token is never refreshed (a second
-// client refreshing it can sign the agent out); an expired one waits for the agent's next run.
-import { execFile } from 'node:child_process'
+// already keeps on this Mac (Claude Code's Keychain item or ~/.claude/.credentials.json, Grok's ~/.grok/auth.json; Codex's
+// ~/.codex/auth.json only for an older codex, asked for), sent to the endpoint the agent's own /usage screen asks;
+// Codex's from its own app server and Antigravity's from agy's own /usage command (each signs in itself: Laki reads no
+// token of theirs). Read-only: a token is never refreshed (a second client refreshing it can sign the agent out); an
+// expired one waits for the agent's next run. test/usage.test.ts' guard holds it: turned away (401), no token URL is
+// asked and the Keychain item, ~/.claude/.credentials.json and $CODEX_HOME/auth.json are byte for byte as they were.
+import { execFile, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -33,7 +35,7 @@ export const base = (real: string) => {
 type Got = Omit<AgentUsage, 'agent' | 'at'> & { again?: boolean; busy?: number } // busy: told to slow down, its Retry-After (ms, 0: none)
 // whose limits: an agent's own sign-in (no dir) or an account's folder (accounts.ts)
 export type Who = { agent: string; account: string; name: string; dir?: string; default: boolean }
-const LOADERS: Record<string, (dir?: string) => Promise<Got>> = { claude, codex, grok, gemini }
+const LOADERS: Record<string, (dir?: string, on?: Record<string, boolean>) => Promise<Got>> = { claude, codex, grok, gemini }
 
 // grok and agy have no accounts in Laki: their own sign-in only, listed once it's on this Mac (Grok's auth.json; agy on
 // PATH with its folder), so a Mac without them gets no row (nor a test's temp HOME)
@@ -127,7 +129,40 @@ async function claude(d?: string): Promise<Got> {
   return { plan, windows, error: windows.length ? undefined : 'This plan shows no limits (organization and education plans don’t)' }
 }
 
-// ---------- Codex: chatgpt.com's wham/usage
+// a command spoken to on its stdio (JSON lines: send, stdin kept open: claude ends with it; each line it says given to
+// take until take says something), killed
+// as take has its answer, as it ends, or after ms; what: what it was asked for, in the errors. No shell. accounts.ts'
+// agentModels (codex's model/list, claude's initialize) and codex's limits here
+export function asked<T>(cmd: string, args: string[], env: NodeJS.ProcessEnv, send: object[], take: (m: any) => T | undefined, what = 'its models', ms = 20_000): Promise<T> {
+  return new Promise((ok, no) => {
+    const c = spawn(cmd, args, { env, cwd: homedir(), stdio: ['pipe', 'pipe', 'ignore'] })
+    const end = (f: () => void) => (clearTimeout(t), c.kill(), f())
+    const t = setTimeout(() => end(() => no(Object.assign(new Error(`${cmd} didn't say ${what} in ${ms / 1000} seconds`), { timeout: true }))), ms)
+    let buf = ''
+    c.on('error', e => end(() => no(Object.assign(new Error(`${cmd}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed' : e.message}`), { code: (e as NodeJS.ErrnoException).code }))))
+    c.on('close', () => end(() => no(new Error(`${cmd} ended without ${what}`)))) // close: after its output was read
+    c.stdin.on('error', () => {}) // it went first: exit says so
+    c.stdout.setEncoding('utf8').on('data', (d: string) => {
+      buf += d
+      for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
+        const line = buf.slice(0, i)
+        buf = buf.slice(i + 1)
+        let m: unknown
+        try {
+          m = JSON.parse(line)
+        } catch {
+          continue
+        }
+        const r = take(m)
+        if (r !== undefined) return end(() => ok(r))
+      }
+      if (buf.length > 4 << 20) end(() => no(new Error(`${cmd} said too much`)))
+    })
+    for (const m of send) c.stdin.write(`${JSON.stringify(m)}\n`)
+  })
+}
+
+// ---------- Codex: its own app server, else (asked for: usage.codex true) chatgpt.com's wham/usage
 
 const span = (secs: unknown) => {
   if (typeof secs !== 'number') return 'Limit'
@@ -143,6 +178,26 @@ export function codexRateWindows(rl: any, at: number): UsageWindow[] {
     const resets = typeof w.resets_at === 'number' ? w.resets_at * 1000 : typeof w.resets_in_seconds === 'number' ? at + w.resets_in_seconds * 1000 : undefined
     out.push({ label: span(typeof w.window_minutes === 'number' ? w.window_minutes * 60 : undefined), used: pct(w.used_percent), resets })
   }
+  return out
+}
+
+// codex app-server's account/rateLimits/read: its main limit's windows (rateLimits), each other limit's with its name
+// (rateLimitsByLimitId), as codexRateWindows reads a transcript's (camelCase here, resetsAt in seconds)
+type AppWindow = { usedPercent?: unknown; windowDurationMins?: unknown; resetsAt?: unknown } | null
+type AppLimit = { limitId?: unknown; limitName?: unknown; primary?: AppWindow; secondary?: AppWindow; planType?: unknown } | null
+type AppLimits = { rateLimits?: AppLimit; rateLimitsByLimitId?: unknown } | null | undefined
+export function codexAppWindows(r: AppLimits): UsageWindow[] {
+  const out: UsageWindow[] = []
+  const add = (l: AppLimit | undefined, name?: string) => {
+    for (const w of [l?.primary, l?.secondary]) {
+      if (typeof w?.usedPercent !== 'number') continue
+      const label = span(typeof w.windowDurationMins === 'number' ? w.windowDurationMins * 60 : undefined)
+      out.push({ label: name ? `${label} · ${name}` : label, used: pct(w.usedPercent), resets: typeof w.resetsAt === 'number' ? w.resetsAt * 1000 : undefined })
+    }
+  }
+  const main = r?.rateLimits
+  add(main)
+  for (const [id, l] of Object.entries((r?.rateLimitsByLimitId && typeof r.rateLimitsByLimitId === 'object' ? r.rateLimitsByLimitId : {}) as Record<string, AppLimit>)) if (id !== main?.limitId) add(l, str(l?.limitName) || id)
   return out
 }
 
@@ -162,7 +217,35 @@ export function codexWindows(u: any, now = Date.now()): UsageWindow[] {
   return out
 }
 
-async function codex(d?: string): Promise<Got> {
+// codex app-server (the account's CODEX_HOME): initialize, initialized, account/rateLimits/read, its answer or 15 s;
+// codex reads its own sign-in, Laki none of it. ~0.65 s to its answer, 0.15 s of CPU (3.6 s the first time in a while:
+// docs/dev/scans.md). A codex that doesn't know the method (or isn't installed): chatgpt.com, only when asked for
+const APP_MS = Number(process.env.LAKI_CODEX_APP_MS) || 15_000 // the env: tests'
+const UNKNOWN = /unknown (variant|method)|method not found|not supported|unrecognized/i
+async function codex(d?: string, on: Record<string, boolean> = {}): Promise<Got> {
+  const env = { ...process.env, ...(d && { CODEX_HOME: d }) }
+  const older = () => (on.codex === true ? codexWham(d) : { windows: [], error: 'This Codex doesn’t say its limits: update it, or ask chatgpt.com with your sign-in' })
+  const init = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { clientInfo: { name: 'laki', title: 'Laki', version: '1' } } }
+  let m: { error?: { code?: unknown; message?: unknown }; result?: AppLimits & { rateLimits?: AppLimit } }
+  try {
+    m = await asked('codex', ['app-server'], env, [init, { jsonrpc: '2.0', method: 'initialized' }, { jsonrpc: '2.0', id: 2, method: 'account/rateLimits/read' }], (x: { id?: unknown; error?: unknown }) => (x?.id === 2 || (x?.id === 1 && x.error) ? (x as typeof m) : undefined), 'its limits', APP_MS)
+  } catch (e) {
+    const x = e as { code?: string; timeout?: boolean }
+    if (x.code === 'ENOENT') return on.codex === true ? codexWham(d) : { windows: [], error: 'Codex isn’t installed', again: true }
+    if (!x.timeout) return older() // it ended without an answer: a codex with no app-server
+    return fail(e)
+  }
+  const err = m.error
+  if (err) {
+    const why = String(err.message ?? err.code ?? 'an error')
+    if (err.code === -32601 || UNKNOWN.test(why)) return older()
+    if (/429|too many requests|rate.?limit/i.test(why)) return { windows: [], error: 'OpenAI asked Laki to check less often', busy: 0 }
+    return { windows: [], error: `Codex: ${why.slice(0, 160)}`, again: true }
+  }
+  const windows = codexAppWindows(m.result)
+  return { plan: str(m.result?.rateLimits?.planType), windows, error: windows.length ? undefined : 'This plan shows no limits' }
+}
+async function codexWham(d?: string): Promise<Got> {
   let auth: any
   try {
     auth = JSON.parse(await readFile(join(d ?? (process.env.CODEX_HOME || join(homedir(), '.codex')), 'auth.json'), 'utf8'))
@@ -332,7 +415,7 @@ const SAYS: Record<string, string> = {
   codex: 'No numbers yet: they come with what Codex reports as a tab works',
   grok: 'Laki asks grok.com for these only when you say so: Settings › Layout › Ask grok.com',
 }
-const OWN_CMD: Record<string, true> = { gemini: true }
+const OWN_CMD: Record<string, true> = { gemini: true, codex: true } // asked unless off: the agent's own command, no token of its read
 const asksOf = (on: Record<string, boolean>, agent: string) => (OWN_CMD[agent] ? on[agent] !== false : on[agent] === true)
 export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now(), own?: (w: Who, now: number, any?: boolean) => { windows: UsageWindow[]; at: number } | undefined): Promise<AgentUsage[]> {
   return Promise.all(
@@ -342,11 +425,11 @@ export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = D
       const asks = asksOf(on, w.agent)
       const said = own?.(w, now, !asks)
       if (!said && !asks) return Promise.resolve(mine({ agent: w.agent, windows: [], at: now, error: SAYS[w.agent], source: 'own' }))
-      if (!said) return ask(w, key, now).then(mine) // a rename, another default: now's
+      if (!said) return ask(w, key, now, on).then(mine) // a rename, another default: now's
       // ponytail: the endpoint's other windows (per model, extra usage) and plan as it last read them, under own's time:
       // a 429 can hold them hours with no As of; asked again on its TTL, waited for only while there's no read yet
-      const asked = asks && ask(w, key, now)
-      const wait: Promise<unknown> = asked && !last.has(key) ? asked : Promise.resolve()
+      const got = asks && ask(w, key, now, on)
+      const wait: Promise<unknown> = got && !last.has(key) ? got : Promise.resolve()
       return wait.then(() => {
         const had = asks ? last.get(key) : undefined
         return mine({ agent: w.agent, plan: had?.plan, windows: [...said.windows, ...(had?.windows ?? []).filter(x => !said.windows.some(y => y.label === x.label))], at: said.at, source: 'own' })
@@ -355,11 +438,11 @@ export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = D
   )
 }
 
-function ask(w: Who, key: string, now: number): Promise<AgentUsage> {
+function ask(w: Who, key: string, now: number, on: Record<string, boolean>): Promise<AgentUsage> {
   const c = cache.get(key)
   if (c?.p && now - c.at < c.ttl) return c.p
   const entry: Entry = { at: now, ttl: TTL[w.agent] ?? USAGE_TTL }
-  entry.p = LOADERS[w.agent](w.dir).then(
+  entry.p = LOADERS[w.agent](w.dir, on).then(
     ({ again, busy, ...r }) => {
       if (again) entry.ttl = AGAIN
       if (busy !== undefined) {

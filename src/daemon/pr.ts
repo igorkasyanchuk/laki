@@ -1331,6 +1331,7 @@ export async function prThreads(ref: string, all = false) {
   if (!pr || isLab(pr)) return [] // GitHub's only, for now
   const { threads } = await reviewThreads(ws, pr.number, all)
   return threads.map(t => ({
+    id: t.id, // Reply and Resolve's (prThreadReply, prThreadResolve)
     path: t.path,
     line: t.line ?? undefined,
     startLine: t.startLine ?? undefined,
@@ -1340,6 +1341,44 @@ export async function prThreads(ref: string, all = false) {
     outdated: t.isOutdated,
     comments: t.comments.nodes.map(c => ({ author: c.author?.login ?? 'ghost', body: c.body, at: c.createdAt })),
   }))
+}
+
+// prThreadReply: a reply on a review thread, as you; prThreadResolve: resolves (or unresolves) it, then replies when
+// a reply is given ("Fixed in a1b2c3d"). gh's GraphQL by the thread's node id (prThreads' id); GitHub's only, as threads are
+const THREAD_ID = /^[\w-]{1,200}$/
+const threadMutation = async (ws: Workspace, query: string, fields: Record<string, string>, what: string) => {
+  const { stdout } = await exec(ws, 'gh', ['api', 'graphql', ...Object.entries(fields).flatMap(([k, v]) => ['-f', `${k}=${v}`]), '-f', `query=${query}`], { timeout: 20000 }).catch(e => {
+    throw new Error(`gh couldn't ${what}: ${String(e.stderr || e.stdout || '').trim().split('\n')[0] || 'it failed'}`)
+  })
+  const d = JSON.parse(stdout || '{}')
+  if (d.errors?.length) throw new Error(`gh couldn't ${what}: ${d.errors[0]?.message ?? 'GitHub refused it'}`)
+  return d.data ?? {}
+}
+const threadPr = (ref: string, thread: unknown, what: string) => {
+  const ws = findWs(ref)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  githubOnly(pr, what)
+  if (typeof thread !== 'string' || !THREAD_ID.test(thread)) throw new Error('which thread? (prThreads gives each its id)')
+  return ws
+}
+export async function prThreadReply(o: { ws: string; thread: string; body: string }) {
+  const ws = threadPr(o.ws, o.thread, 'a reply on a review thread')
+  const body = String(o.body ?? '')
+  if (!body.trim()) throw new Error('the reply is empty')
+  if (body.length > 65000) throw new Error('too long for a GitHub comment (65,000 characters at most)')
+  const d = await threadMutation(ws, 'mutation($id: ID!, $body: String!) { addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $id, body: $body }) { comment { url } } }', { id: o.thread, body }, 'reply')
+  return { url: d.addPullRequestReviewThreadReply?.comment?.url as string | undefined }
+}
+export async function prThreadResolve(o: { ws: string; thread: string; resolved?: boolean; body?: string }) {
+  const resolve = o.resolved !== false
+  const ws = threadPr(o.ws, o.thread, resolve ? 'resolving a review thread' : 'unresolving a review thread')
+  const body = typeof o.body === 'string' ? o.body : ''
+  if (body.length > 65000) throw new Error('too long for a GitHub comment (65,000 characters at most)')
+  const op = resolve ? 'resolveReviewThread' : 'unresolveReviewThread'
+  const d = await threadMutation(ws, `mutation($id: ID!) { ${op}(input: { threadId: $id }) { thread { isResolved } } }`, { id: o.thread }, resolve ? 'resolve the thread' : 'unresolve the thread')
+  const said = body.trim() ? await prThreadReply({ ws: ws.id, thread: o.thread, body }) : undefined // after: a failed resolve posts nothing (a retry, no second reply)
+  return { resolved: d[op]?.thread?.isResolved ?? resolve, url: said?.url }
 }
 
 // prSay: a comment on the PR's conversation, as you (the full review's GitHub tab): gh pr comment by the PR's URL

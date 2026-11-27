@@ -509,7 +509,7 @@ own the plan, the order and what counts as done. ${run} Below, \`laki\` stands f
     laki tab <ws> --preset codex --name review --prompt '…'  # a second agent in a workspace that exists (a review of what the first did)
     laki tab <ws> --cmd 'npm run dev'                     # a command in a terminal tab of it (the user allows yours in the app, each time)
     laki screen <ws>[/<tab>] --lines 200                  # read what an agent shows, nothing typed
-    laki wait <ws>… [--timeout 10m]                       # until none of them works: a line each, idle (its answer's start) or waiting (what it asks); exit 0, 2 (one waits), 3 (timed out)
+    laki wait <ws>… [--timeout 10m]                       # until none of them works: a line each, idle (its answer's start), waiting (what it asks) or stuck (why, the next step); exit 0, 2 (one waits or is stuck), 3 (timed out)
     laki send <ws>[/<tab>] '…'                            # a follow-up, queued until its turn ends (--steer: into the turn; --interrupt: stop it, then send)
     laki diff <ws> [--uncommitted]                        # what it changed
     laki limits [--agent claude] [--json]                 # how much of each plan is used and when it resets: before long work, pick the agent or account with room left
@@ -553,7 +553,7 @@ others' work, and that its last answer must end with one of these:
 ## Run and watch
 
 Start every task that's ready before watching any. Then \`laki wait <ws>… --timeout 2m\` on the running ones (exit 3:
-still at work, wait again; 2: one asks something) and, for each tab that's idle or waiting, \`laki screen <ws> --lines
+still at work, wait again; 2: one asks something or is stuck) and, for each tab that's idle or waiting, \`laki screen <ws> --lines
 200\` (its \`last\` has the answer's start): look for the envelope and check
 that what's above it backs it (tests run, files there; \`laki diff <ws>\`). Short passes, not one long blocking loop, so
 you can tell the user how it goes in between. A missing or malformed envelope: read the whole screen and ask the worker
@@ -562,6 +562,11 @@ you can tell the user how it goes in between. A missing or malformed envelope: r
 - DONE and checked: done. Hand its handoff to the tasks that wait on it: in their prompt as they start, or sent to one
   that runs.
 - BLOCKED: give it what it needs, or ask the user, then send it on.
+- STUCK (\`laki wait\` says stuck, or Laki tells you in your chat that a worker stopped): do the next step it names. A
+  plan limit: \`laki send <ws> "continue"\` after the reset, or start the task again on another agent (\`--preset\`) if
+  it can't wait. A failed turn: send it continue once; twice failed: another agent. Its process ended: \`laki tab <ws>\`
+  starts it again with its chat. Silent or retrying for minutes: \`laki screen <ws>\` first, then continue or stop it.
+  A background task past its turn: wait for it, or ask it to check on it. Never sit in \`laki wait\` on a stuck one.
 - A task's turn ended without the envelope, or failed: send it what's missing; start it again only with a changed prompt
   or another agent, and stop after two tries: report it.
 - A task is ready when every task it depends on is done.

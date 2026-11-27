@@ -1,0 +1,15 @@
+/* MediaNotes.tsx' own (#7): out of the window's first load, it loads with the component (npm run size) */
+.mn { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+.mn-stage { position: relative; align-self: center; max-width: 100%; line-height: 0; }
+.mn-stage > :is(img, video) { display: block; max-width: 100%; max-height: 56vh; object-fit: contain; user-select: none; }
+.mn-layer { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
+.mn-mark { position: absolute; pointer-events: none; }
+.mn-mark.box { border: 2px solid var(--accent); border-radius: var(--r-xs); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.mn-mark.spot::after { content: ''; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.mn-mark.draft { border-style: dashed; }
+.mn-mark > .art-n { position: absolute; left: calc(-1 * var(--sp-4)); top: calc(-1 * var(--sp-4)); display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--sp-2); border-radius: var(--r-pill); background: var(--accent); color: var(--accent-fg, #fff); font-size: var(--fs-1); line-height: 1; }
+.mn-bar { display: flex; align-items: center; gap: var(--sp-3); }
+.mn-seek { position: relative; flex: 1; display: flex; align-items: center; }
+.mn-seek > input { flex: 1; width: 100%; }
+.mn-dot { position: absolute; top: -4px; width: 8px; height: 8px; margin-left: -4px; padding: 0; border: 0; border-radius: 50%; background: var(--accent); }
+.mn-time { flex: none; color: var(--muted); }

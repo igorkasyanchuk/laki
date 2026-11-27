@@ -3,16 +3,16 @@
 
 import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { createInterface } from 'node:readline'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
-import { type ChatHit, type Goal, HOME_ACCOUNT, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
+import { type ChatHit, type Goal, HOME_ACCOUNT, priceOf, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, chatFile, findWs, keptChat, keptOnly, openPath, presetOf, state } from './core.ts'
 import { type Spend, type SpendEntry, spendBreakdown, spendEntries } from '../shared/spend.ts'
 import { dir } from './dir.ts'
-import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, type McpCall, type Meter, meterNew, meterOf, num, type Said, transcriptOf } from './share.ts'
+import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, daysRows, isOld, type McpCall, type Meter, meterCost, meterNew, meterOf, num, type Owns, type Row, rowCost, rowMerge, rowsOf, rowTokens, type Said, transcriptOf } from './share.ts'
 export type { McpCall }
 import { claudeWindows } from './usage.ts'
 import { acpChat } from './acp.ts'
@@ -45,20 +45,26 @@ export function tailOf(tab: Tab, t: Tail, fresh: (was?: true) => void): string |
   }
   const file = t.file
   if (!ours(file)) return void (t.file = undefined) // another chat's: none until this one's is found
+  return readOn(file, t, fresh)
+}
+// what a file has past t.pos, whole lines only (the last may be half written); '' nothing new; undefined empty or gone;
+// fresh: it's read from its start again (written anew)
+function readOn(file: string, t: { pos?: number }, fresh: () => void): string | undefined {
   const size = statSync(file, { throwIfNoEntry: false })?.size ?? 0
   if (!size) return
-  if (size < t.pos!) (t.pos = 0), fresh() // written anew
-  if (size - t.pos! > SHARE_READ) t.pos = size - SHARE_READ // the line it lands in is cut off: JSON.parse skips it
+  t.pos ??= 0
+  if (size < t.pos) (t.pos = 0), fresh() // written anew
+  if (size - t.pos > SHARE_READ) t.pos = size - SHARE_READ // the line it lands in is cut off: JSON.parse skips it
   if (size === t.pos) return ''
-  const buf = Buffer.alloc(size - t.pos!)
+  const buf = Buffer.alloc(size - t.pos)
   const fd = openSync(file, 'r')
   try {
-    readSync(fd, buf, 0, buf.length, t.pos!)
+    readSync(fd, buf, 0, buf.length, t.pos)
   } finally {
     closeSync(fd)
   }
   const cut = buf.lastIndexOf(10) + 1
-  t.pos! += cut
+  t.pos += cut
   return buf.subarray(0, cut).toString('utf8')
 }
 
@@ -161,43 +167,157 @@ export function bgOutput(p: { tab: string; id: string }) {
 }
 
 // the meters (share.ts' meterOf): each claude and codex tab's context and what its chat used, its transcript read on
-// every 10 s (main.ts' meterTick) and as a turn ends. Today's by chat in <data>/usage-today.json: a closed tab's stays,
-// and a restart reading each chat anew counts it once (the more of the two)
+// every 10 s (main.ts' meterTick) and as a turn ends, with its chat's other transcripts (extraFiles: claude's
+// subagents, codex's threads it spawned), whose spend is the tab's and never its context. Today's by chat in
+// <data>/usage-today.json: a closed tab's stays, and a restart reading each chat anew counts it once (the more of the two)
 // bg: a claude chat's background tasks (share.ts bgOf), running and ended: the status bar's Background chip. ponytail:
 // read with the meters, so none while both the context meter and costs are off
-type MeterRun = Tail & { m: Meter; big?: boolean; bg: BgRead } // big: claude's own settings run it on a 1M window
+// subs: the other transcripts' meters, by path; sum: its spend and theirs together; keyFile: the file each answer key
+// counted in (a codex thread's copy of its parent's turns counts once); kids: codex's spawned threads, looked for now and then
+type Sub = { pos?: number; m: Meter }
+type Sum = Pick<Meter, 'tokens' | 'by' | 'days'>
+type MeterRun = Tail & { m: Meter; big?: boolean; bg: BgRead; subs: Map<string, Sub>; sum?: Sum; keyFile: Map<string, string>; kids?: { at: number; files: string[] } } // big: claude's own settings run it on a 1M window
 const meters = new Map<string, MeterRun>()
 const todayPath = join(dir, 'usage-today.json')
-// name: its workspace's as it was, so one removed since is still named in Today
-let spent: { day: string; chats: Record<string, { ws: string; name?: string; tokens: number; cost: number }> } | undefined
+// name: its workspace's as it was, so one removed since is still named in Today; models: today's rows (the old one
+// under '': a chat kept before parts, its tokens and cost)
+type TodayChat = { ws: string; name?: string; tokens: number; models: Record<string, Row> }
+let spent: { day: string; chats: Record<string, TodayChat> } | undefined
 // (none for a private one, or one of a private project: Recording mode hides them, never named here)
 const nameOf = (ws: string) => (w => (w && !w.private && !state.projects.find(p => p.id === w.project)?.private ? w.name || w.id : undefined))(state.workspaces.find(x => x.id === ws))
 function spentNow() {
   const day = dayOf(Date.now())
   if (!spent) spent = readJson(todayPath)
   if (spent?.day !== day || typeof spent.chats !== 'object') spent = { day, chats: {} }
+  for (const c of Object.values(spent.chats)) if (!c.models || typeof c.models !== 'object') c.models = { '': { tokens: num(c.tokens) ?? 0, cost: num((c as { cost?: unknown }).cost) ?? 0 } }
   return spent
+}
+function keepToday(id: string, ws: string, models: Record<string, Row>) {
+  const s = spentNow()
+  const c = (s.chats[id] ??= { ws, tokens: 0, models: {} })
+  let moved = false
+  for (const [model, row] of Object.entries(models)) (r => r && ((c.models[model] = r), (moved = true)))(rowMerge(c.models[model], row))
+  const old = c.models['']
+  if (old && Object.entries(c.models).reduce((n, [k, r]) => n + (k ? rowTokens(r) : 0), 0) >= rowTokens(old)) delete c.models[''], (moved = true)
+  if (!moved) return
+  ;(c.ws = ws), (c.name = nameOf(ws)), (c.tokens = Object.values(c.models).reduce((n, r) => n + rowTokens(r), 0))
+  writeAtomic(todayPath, JSON.stringify(s))
 }
 // true: it read something new
 export function meterRead(tab: Tab, look = false) { // look: a turn's end, its transcript looked for now
-  const r = meters.get(tab.id) ?? { m: meterNew(), bg: bgDone() }
+  const r: MeterRun = meters.get(tab.id) ?? { m: meterNew(), bg: bgDone(), subs: new Map(), keyFile: new Map() }
   meters.set(tab.id, r)
   if (look) r.looked = 0
   const big = tab.preset === 'claude' && state.settings?.contextMeter !== false && claudeBig(tab) // read each time: settings change without the transcript
   const was = lines.get(tab.id)
   const moved = big !== r.big || statusOf(tab) !== was // its status line written since
   r.big = big
-  const text = tailOf(tab, r, () => ((r.m = meterNew()), (r.bg = bgDone())))
-  if (!text) return moved
-  meterOf(tab.preset!, text, r.m)
-  if (tab.preset === 'claude') bgOf(text, r.bg)
-  const s = spentNow()
-  if (r.m.today.tokens > (s.chats[tab.resumeId!]?.tokens ?? 0)) {
-    s.chats[tab.resumeId!] = { ws: tab.workspace, name: nameOf(tab.workspace), tokens: r.m.today.tokens, cost: r.m.today.cost }
-    writeAtomic(todayPath, JSON.stringify(s))
+  const text = tailOf(tab, r, () => ((r.m = meterNew()), (r.bg = bgDone()), (r.subs = new Map()), (r.keyFile = new Map()), (r.sum = r.kids = undefined)))
+  if (text === undefined) return moved
+  const now = Date.now()
+  let read = false
+  if (text) {
+    meterOf(tab.preset!, text, r.m, now, ownsOf(tab, r, r.file!))
+    if (tab.preset === 'claude') bgOf(text, r.bg)
+    read = true
   }
-  keepDays(tab, r.m)
+  for (const f of extraFiles(tab, r)) {
+    const sub = r.subs.get(f) ?? (r.subs.set(f, { m: meterNew() }), r.subs.get(f)!)
+    const t = readOn(f, sub, () => (sub.m = meterNew()))
+    if (t) meterOf(tab.preset!, t, sub.m, now, ownsOf(tab, r, f)), (read = true)
+  }
+  if (!read) return moved
+  r.sum = r.subs.size ? meterSum([r.m, ...[...r.subs.values()].map(x => x.m)]) : r.m
+  const today = r.sum.days?.[dayOf(now)]
+  if (today) keepToday(tab.resumeId!, tab.workspace, rowsOf(today))
+  keepDays(tab, Object.fromEntries(Object.entries(r.sum.days ?? {}).map(([d, by]) => [d, rowsOf(by)])))
   return true
+}
+function meterSum(ms: Meter[]): Sum {
+  const sum: Sum = { tokens: 0, by: {}, days: {} }
+  const add = (to: ByModel, by: ByModel) => {
+    for (const [model, p] of Object.entries(by)) for (const [k, v] of Object.entries(p)) ((x => (x[k] = (x[k] ?? 0) + v))((to[model] ??= {})))
+  }
+  for (const m of ms) {
+    sum.tokens += m.tokens
+    add(sum.by, m.by)
+    for (const [d, by] of Object.entries(m.days ?? {})) add((sum.days![d] ??= {}), by)
+  }
+  return sum
+}
+// a chat's other transcripts: claude's subagents (<its file without .jsonl>/subagents/*.jsonl, each read on as it
+// grows), codex's threads it spawned (codexKids, looked for every 30 s). None for Laki's copy of a chat
+const KIDS_LOOK = 30_000
+function extraFiles(tab: Tab, r: Pick<MeterRun, 'file' | 'kept' | 'kids'>): string[] {
+  const f = r.file
+  if (!f || r.kept || !f.endsWith(`${tab.resumeId}.jsonl`)) return []
+  if (tab.preset === 'claude') {
+    const d = join(f.slice(0, -'.jsonl'.length), 'subagents')
+    try {
+      return readdirSync(d).filter(x => x.endsWith('.jsonl')).sort().map(x => join(d, x))
+    } catch {
+      return []
+    }
+  }
+  if (!r.kids || Date.now() - r.kids.at > KIDS_LOOK) r.kids = { at: Date.now(), files: codexKids(f, tab.resumeId!) }
+  return r.kids.files
+}
+// codex's threads a chat spawned (spawn_agent): a rollout whose session_meta names a parent (its source's
+// parent_thread_id) in the chat or one of its threads, each once; looked for in the day folders from the chat's own on
+// (sessions/<y>/<m>/<d>), each file's first line read once (parents)
+const parents = new Map<string, string | null>() // a rollout's parent thread; null: none
+const THREAD = /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i
+const head = Buffer.alloc(1 << 20)
+function parentOf(f: string): string | null | undefined {
+  if (parents.has(f)) return parents.get(f)
+  let fd: number | undefined
+  try {
+    fd = openSync(f, 'r')
+    const n = readSync(fd, head, 0, head.length, 0)
+    const end = head.subarray(0, n).indexOf(10)
+    if (end < 0 && n < head.length) return // its first line not written whole yet: looked at again
+    const line = head.subarray(0, end < 0 ? 0 : end).toString('utf8')
+    const p = /"type"\s*:\s*"session_meta"/.test(line) ? (/"parent_thread_id"\s*:\s*"([0-9a-f-]{36})"/i.exec(line)?.[1]?.toLowerCase() ?? null) : null
+    if (parents.size > 20000) parents.clear()
+    parents.set(f, p)
+    return p
+  } catch {
+    return
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+  }
+}
+export function codexKids(file: string, id: string): string[] {
+  const day = dirname(file)
+  const root = dirname(dirname(dirname(day)))
+  const from = relative(root, day).split(sep).join('/') // 2026/11/27
+  const ls = (d: string) => {
+    try {
+      return readdirSync(d).sort()
+    } catch {
+      return []
+    }
+  }
+  const files: string[] = []
+  for (const y of ls(root))
+    if (/^\d{4}$/.test(y) && y >= from.slice(0, 4))
+      for (const mo of ls(join(root, y)))
+        if (`${y}/${mo}` >= from.slice(0, 7)) for (const d of ls(join(root, y, mo))) if (`${y}/${mo}/${d}` >= from) for (const x of ls(join(root, y, mo, d))) if (x.startsWith('rollout-') && x.endsWith('.jsonl')) files.push(join(root, y, mo, d, x))
+  const ids = new Set([id.toLowerCase()])
+  const out: string[] = []
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const f of files) {
+      if (f === file || out.includes(f)) continue
+      const p = parentOf(f)
+      if (!p || !ids.has(p)) continue
+      out.push(f)
+      const t = THREAD.exec(f)?.[1]
+      if (t) ids.add(t.toLowerCase())
+      grew = true
+    }
+  }
+  return out
 }
 
 // A1: its /goal as its transcript says now (read on at once); a claude or codex tab's. A1b: another agent's is the one
@@ -225,66 +345,103 @@ export function goalSeen(tab: Tab) {
 export function chatCost(tab: Tab, look = false): number | undefined {
   if (meterRead(tab, look)) changed()
   const r = meters.get(tab.id)
-  const m = r?.file?.endsWith(`${tab.resumeId}.jsonl`) ? r.m : undefined
-  return m?.priced ? m.cost : undefined
+  const c = r?.file?.endsWith(`${tab.resumeId}.jsonl`) ? meterCost((r.sum ?? r.m).by) : undefined
+  return c?.priced ? c.cost : undefined
 }
 // what the chat's lines from before since cost (a forked chat's parent's, copied in; a tab whose transcript wasn't found
-// as its turn began), so a turn counts only its own. ponytail: the whole transcript read, once per such turn; by each
-// line's timestamp
+// as its turn began), so a turn counts only its own; its other transcripts' too, and the answers it owns only, as its
+// meter counts. ponytail: the whole transcripts read, once per such turn; by each line's timestamp
 export function chatCostBefore(tab: Tab, since: number): number | undefined {
-  const f = meters.get(tab.id)?.file
+  const r = meters.get(tab.id)
+  const f = r?.file
   if (!f?.endsWith(`${tab.resumeId}.jsonl`) || !tab.preset) return
-  let text: string
-  try {
-    text = readFileSync(f, 'utf8')
-  } catch {
-    return
+  const o = ownersNow()
+  const once = new Set<string>() // a key counted in one of its files only, as keyFile does (a codex thread's copy of its parent's turns)
+  const owns: Owns = key => (o.get(key) ?? tab.resumeId) === tab.resumeId && !once.has(key) && !!once.add(key)
+  let cost = 0
+  for (const file of [f, ...r!.subs.keys()]) {
+    let text: string
+    try {
+      text = readFileSync(file, 'utf8')
+    } catch {
+      if (file === f) return
+      continue
+    }
+    const old = text.split('\n').filter(l => (t => Number.isFinite(t) && t < since)(Date.parse(/"timestamp":"([^"]+)"/.exec(l)?.[1] ?? '')))
+    cost += meterCost(meterOf(tab.preset, old.join('\n'), meterNew(), Date.now(), owns).by).cost
   }
-  const old = text.split('\n').filter(l => (t => Number.isFinite(t) && t < since)(Date.parse(/"timestamp":"([^"]+)"/.exec(l)?.[1] ?? '')))
-  return meterOf(tab.preset, old.join('\n'), meterNew()).cost
+  return cost
 }
 
 // each day's by agent and model, the Usage page's: <data>/usage-days.json by chat, its days USAGE_KEEP back. A chat's
 // day and model: the more of what was kept and what's read now (a restart reads each chat anew), as today's is
 export const USAGE_KEEP = 90
 const daysPath = join(dir, 'usage-days.json')
-type Kept = { chats: Record<string, { ws: string; agent: string; days: Record<string, ByModel> }> }
+// keys: the answers a chat owns (share.ts answerKey's, 11 characters each, run together) by their day, gone with it
+type KeptChat = { ws: string; agent: string; days: Record<string, Record<string, Row>>; keys?: Record<string, string> }
+type Kept = { chats: Record<string, KeptChat> }
 let kept: Kept | undefined
+let owners: Map<string, string> | undefined // an answer's key: the chat that owns it
+let daysT: ReturnType<typeof setTimeout> | undefined
 const keptNow = () => (kept ??= (k => (k && typeof k.chats === 'object' ? k : { chats: {} }))(readJson<Kept>(daysPath)))
+function ownersNow() {
+  if (owners) return owners
+  owners = new Map()
+  for (const [id, c] of Object.entries(keptNow().chats)) for (const s of Object.values(c.keys ?? {})) for (let i = 0; i + 11 <= s.length; i += 11) owners.set(s.slice(i, i + 11), id)
+  return owners
+}
+// a tab's file's answers: one counts if no other chat reported it first (a forked or resumed chat's copied lines are
+// the first one's) and no other file of this tab counted it (a codex thread's copy of its parent's turns); a claim is
+// kept with its day
+const ownsOf = (tab: Tab, r: MeterRun, file: string): Owns => (key, day) => {
+  const o = ownersNow()
+  const by = o.get(key)
+  if (by !== undefined && by !== tab.resumeId) return false
+  const was = r.keyFile.get(key)
+  if (was !== undefined && was !== file) return false
+  r.keyFile.set(key, file)
+  if (by === undefined) {
+    o.set(key, tab.resumeId!)
+    const c = (keptNow().chats[tab.resumeId!] ??= { ws: tab.workspace, agent: tab.preset!, days: {} })
+    ;(c.keys ??= {})[day] = (c.keys[day] ?? '') + key
+    daysLater()
+  }
+  return true
+}
 const timeOf = (day: string) => (([y, m, d]) => new Date(y, m - 1, d).getTime())(day.split('-').map(Number))
-function keepDays(tab: Tab, m: Pick<Meter, 'days'>) {
-  if (!tab.resumeId || !m.days) return
-  const k = keptNow()
-  const c = (k.chats[tab.resumeId] ??= { ws: tab.workspace, agent: tab.preset!, days: {} })
+function keepDays(tab: Tab, days: Record<string, Record<string, Row>>) {
+  if (!tab.resumeId) return
+  const c = (keptNow().chats[tab.resumeId] ??= { ws: tab.workspace, agent: tab.preset!, days: {} })
   let moved = false
-  for (const [day, models] of Object.entries(m.days))
-    for (const [model, v] of Object.entries(models)) {
-      const was = c.days[day]?.[model]
-      if (v.tokens > (was?.tokens ?? 0)) ((c.days[day] ??= {})[model] = { tokens: v.tokens, cost: v.cost }), (moved = true)
-    }
-  if (!moved) return
+  for (const [day, models] of Object.entries(days)) for (const [model, row] of Object.entries(models)) (r => r && (((c.days[day] ??= {})[model] = r), (moved = true)))(rowMerge(c.days[day]?.[model], row))
+  if (moved) daysLater()
+}
+// written a moment later, once for every tab a tick read (and as the daemon stops: main.ts' shutdown)
+function daysLater() {
+  if (daysT) return
+  daysT = setTimeout(daysWrite, 2000)
+  daysT.unref?.()
+}
+export function daysWrite() {
+  clearTimeout(daysT)
+  daysT = undefined
+  const k = kept
+  if (!k) return
   const from = Date.now() - USAGE_KEEP * 864e5
+  let gone = false
   for (const [id, x] of Object.entries(k.chats)) {
     for (const d of Object.keys(x.days)) if (timeOf(d) < from) delete x.days[d]
-    if (!Object.keys(x.days).length) delete k.chats[id]
+    for (const d of Object.keys(x.keys ?? {})) if (timeOf(d) < from) delete x.keys![d], (gone = true)
+    if (!Object.keys(x.days).length) delete k.chats[id], (gone = true)
   }
+  if (gone) owners = undefined // read again from what's kept
   writeAtomic(daysPath, JSON.stringify(k))
 }
 // usageDays: the Usage page's rows, a day, agent and model each (YYYY-MM-DD, this Mac's day), every chat's added up
-// and its workspace's id (ws: the Usage page's Where it went names it, or says it's gone)
-export function usageDays() {
-  const sum = new Map<string, { day: string; agent: string; model: string; ws: string; tokens: number; cost: number }>()
-  for (const c of Object.values(keptNow().chats))
-    for (const [d, models] of Object.entries(c.days))
-      for (const [model, v] of Object.entries(models)) {
-        const day = (([y, m, dd]) => `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`)(d.split('-'))
-        const key = `${day}|${c.agent}|${model}|${c.ws}`
-        const x = sum.get(key) ?? (sum.set(key, { day, agent: c.agent, model, ws: c.ws, tokens: 0, cost: 0 }), sum.get(key)!)
-        x.tokens += v.tokens
-        x.cost += v.cost
-      }
-  return { keep: USAGE_KEEP, rows: [...sum.values()].map(r => ({ ...r, cost: Math.round(r.cost * 1e4) / 1e4 })).sort((a, b) => a.day.localeCompare(b.day)) }
-}
+// and its workspace's id (ws: the Usage page's Where it went names it, or says it's gone), priced by today's table
+// (costOf). priced: false, tokens with no price (none for its model; agy's); old: some kept before parts, at their cost
+// then; read and input: its cache reads of all its input (the cache's share), parts' only
+export const usageDays = () => ({ keep: USAGE_KEEP, rows: daysRows(keptNow().chats) })
 // ponytail: claude's API retries (meterOf's retry: the Reader's line, the tab's Retrying…) come with this read too; both
 // meters off, none show
 export function meterTick() {
@@ -292,23 +449,25 @@ export function meterTick() {
   let any = false
   const archived = new Set(state.workspaces.filter(w => w.archived).map(w => w.id)) // nothing to read until it's back
   for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex') && !archived.has(t.workspace)) any = meterRead(t) || any
-  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'grok' || t.preset === 'gemini') && !archived.has(t.workspace)) otherRead(t)
+  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'grok' || t.preset === 'gemini' || t.preset === 'opencode') && !archived.has(t.workspace)) otherRead(t)
   for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id)
   agentDaysTidy(id => state.tabs.some(t => t.id === id)) // grok's and agy's, closed
   for (const id of lines.keys()) if (!state.tabs.some(t => t.id === id)) lines.delete(id)
   if (any) changed()
 }
-// Grok's and Antigravity's chats (agentUsage.ts): their days for the Usage page, today's for Today. This Mac's only
+// Grok's, Antigravity's and OpenCode's chats (agentUsage.ts): their days for the Usage page, today's for Today (Grok's
+// and OpenCode's at their own price, agy's tokens only). This Mac's only
 function otherRead(t: Tab) {
   const ws = state.workspaces.find(w => w.id === t.workspace)
   if (!ws || ws.host) return
   const r = agentDays(t, ws.path)
   if (!r) return
   const { id, days } = r
-  keepDays({ ...t, resumeId: id }, { days })
-  const today = Object.values(days[dayOf(Date.now())] ?? {}).reduce((a, v) => ({ tokens: a.tokens + v.tokens, cost: a.cost + v.cost }), { tokens: 0, cost: 0 })
-  const s = spentNow()
-  if (today.tokens > (s.chats[id]?.tokens ?? 0)) (s.chats[id] = { ws: t.workspace, name: nameOf(t.workspace), ...today }), writeAtomic(todayPath, JSON.stringify(s))
+  const priced = t.preset !== 'gemini' // agy's: tokens only
+  const rows = (by: Record<string, { tokens: number; cost: number }>) => Object.fromEntries(Object.entries(by).map(([m, v]): [string, Row] => [m, { tokens: v.tokens, ...(priced && { cost: v.cost }), own: true }]))
+  keepDays({ ...t, resumeId: id }, Object.fromEntries(Object.entries(days).map(([d, by]) => [d, rows(by)])))
+  const today = days[dayOf(Date.now())]
+  if (today) keepToday(id, t.workspace, rows(today))
 }
 const WINDOW = 200e3 // claude's context unless its model says [1m] (its transcript doesn't say)
 // claude's own settings, as it reads them (the workspace's local, then its project's, then yours: its account's folder):
@@ -348,9 +507,12 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 
   const used = live ?? m?.used
   const bg = m && r!.bg
   const now = bg ? [...bg.bg.values()].filter(x => !t.bgTold?.includes(x.id)) : [] // not the ones a restart stopped (restoreNow told it)
-  const cost = m && m.tokens > 0 && m.priced ? Math.round(m.cost * 1e4) / 1e4 : undefined
+  const sum = m && (r!.sum ?? m) // its subagents' and spawned threads' spend too
+  const c = sum && sum.tokens > 0 ? meterCost(sum.by) : undefined
+  const cost = c?.priced ? Math.round(c.cost * 1e4) / 1e4 : undefined
+  const none = c && Object.keys(c.none)
   const goal = t.goalRun ? ownGoal(t, cost) : m?.goal // A1b: Laki's
-  return { ...(goal && { goal }), ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(m && m.tokens > 0 && { usage: { tokens: m.tokens, ...(cost !== undefined && { cost }) } }) }
+  return { ...(goal && { goal }), ...(m?.skills?.length && { skills: m.skills }), ...(m?.retry && { retry: m.retry }), ...(bg && (now.length || bg.done?.n) && { background: { now, done: bg.done?.n ?? 0, last: bg.done?.last ?? [], ...(bg.done?.at && { at: bg.done.at }) } }), ...(m?.plan && !(m.plan.stale && planDone(m.plan)) && state.settings?.livePlan !== false && { plan: m.plan }), ...(used !== undefined && max && { context: { used, max } }), ...(sum && sum.tokens > 0 && { usage: { tokens: sum.tokens, ...(cost !== undefined && { cost }), ...(none?.length && { unpriced: none }) } }) }
 }
 
 // ---------- Claude's status line (settings.statusBridge, on unless false): claude pipes a JSON of its own numbers to
@@ -387,22 +549,28 @@ export function statusOf(t: Tab): Line | undefined {
   lines.set(t.id, line)
   return line
 }
-// usage.ts' own: an account's limits from its tabs' newest status line (claude's) or transcript's rate_limits (codex's,
-// R4); fresh ones only, unless any (the endpoint isn't asked: the newest of any age, its at says how old)
+// usage.ts' own: an account's limits from its tabs' status lines (claude's) or transcripts' rate_limits (codex's, R4),
+// chosen window by window: an idle claude rewrites its status line with the numbers it had, so the newest file can be
+// behind. Of a label's readings the one with the later reset wins (a newer window); with the same reset, the higher
+// percent (usage never falls inside a window), then the newer. One past its reset counts as 0, as the window shows it
+// (Usage.tsx live). Fresh readings only, unless any (the endpoint isn't asked: of any age); at: the oldest reading chosen
 export function statusLimits(w: { agent: string; account: string }, now = Date.now(), any = false) {
-  let best: { windows: UsageWindow[]; at: number } | undefined
-  const ok = (at: number) => (any || now - at < STATUS_FRESH) && at > (best?.at ?? 0)
+  const best = new Map<string, { w: UsageWindow; at: number }>()
+  const take = (windows: UsageWindow[], at: number) => {
+    if (!any && now - at >= STATUS_FRESH) return
+    for (const x of windows) {
+      const b = best.get(x.label)
+      const [r, rb] = [x.resets ?? 0, b?.w.resets ?? 0]
+      if (!b || r > rb || (r === rb && (x.used > b.w.used || (x.used === b.w.used && at > b.at)))) best.set(x.label, { w: x, at })
+    }
+  }
   for (const t of state.tabs)
     if (t.preset === w.agent && (t.account ?? HOME_ACCOUNT) === w.account) {
-      if (w.agent === 'claude') {
-        const s = statusOf(t)
-        if (s?.limits.length && ok(s.mtime)) best = { windows: s.limits, at: s.mtime }
-      } else if (w.agent === 'codex') {
-        const l = meters.get(t.id)?.m.limits
-        if (l && ok(l.at)) best = l
-      }
+      if (w.agent === 'claude') (s => s?.limits.length && take(s.limits, s.mtime))(statusOf(t))
+      else if (w.agent === 'codex') (l => l && take(l.windows, l.at))(meters.get(t.id)?.m.limits)
     }
-  return best
+  if (!best.size) return
+  return { windows: [...best.values()].map(x => x.w), at: Math.min(...[...best.values()].map(x => x.at)) }
 }
 // your own status line, as claude reads it (the project's local settings, its committed ones, the account's, yours): the
 // first command, resolved at the tab's start (a change waits for its restart). Never Laki's own: it would run itself.
@@ -423,20 +591,27 @@ export function statusTidy() {
   for (const f of existsSync(statusDir) ? readdirSync(statusDir) : []) if (!live.has(f.replace(/(\.\d+)?\.(json|tmp)$/, ''))) rmSync(join(statusDir, f), { force: true })
 }
 
-// today's, the workspaces that used most first (5)
+// today's, the workspaces that used most first (5); unpriced: the models with no price, their tokens
 export function todayView(): Today | undefined {
   const chats = Object.values(spentNow().chats)
   if (!chats.length) return
   const ws = new Map<string, { ws: string; name?: string; tokens: number; cost: number }>()
+  const none = new Map<string, number>()
+  let tokens = 0
+  let cost = 0
   for (const c of chats) {
     const w = ws.get(c.ws) ?? { ws: c.ws, tokens: 0, cost: 0 }
     ws.set(c.ws, w)
     w.name = state.workspaces.some(x => x.id === c.ws) ? nameOf(c.ws) : (c.name ?? w.name) // its name now (none if private), a removed one's as it was kept
-    w.tokens += c.tokens
-    w.cost += c.cost
+    for (const [model, r] of Object.entries(c.models)) {
+      const n = rowTokens(r)
+      const usd = rowCost(model, r)
+      ;(w.tokens += n), (tokens += n)
+      if (usd === undefined || (model && isOld(r) && !usd && !priceOf(model))) none.set(model, (none.get(model) ?? 0) + n)
+      else (w.cost += usd), (cost += usd)
+    }
   }
-  const sum = (k: 'tokens' | 'cost') => chats.reduce((n, c) => n + c[k], 0)
-  return { tokens: sum('tokens'), cost: Math.round(sum('cost') * 100) / 100, ws: [...ws.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5).map(w => ({ ...w, cost: Math.round(w.cost * 100) / 100 })) }
+  return { tokens, cost: Math.round(cost * 100) / 100, ws: [...ws.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5).map(w => ({ ...w, cost: Math.round(w.cost * 100) / 100 })), ...(none.size && { unpriced: [...none].map(([model, tokens]) => ({ model, tokens })).sort((a, b) => b.tokens - a.tokens) }) }
 }
 
 // Search chats (⇧⌘F, ⌘K): every claude and codex chat Laki knows: its workspaces' agent tabs (an archived one's too) and
@@ -534,8 +709,8 @@ function saidIn(agent: string, line: string, tools: boolean): { who: 'you' | 'ag
   return out.filter(s => s.text)
 }
 
-// ---------- where a workspace's tokens went (shared/spend.ts): its claude and codex tabs' transcripts as entries, kept by
-// file and size (a transcript read again only once it grew), then one breakdown over them all. wsSpend: the user's, an
+// ---------- where a workspace's tokens went (shared/spend.ts): its claude and codex tabs' transcripts as entries (their
+// subagents' and spawned threads' too: extraFiles), kept by file and size (a transcript read again only once it grew), then one breakdown over them all. wsSpend: the user's, an
 // agent's for its own workspace (main.ts' agentNo); laki spend, Info's and the Proof card's Where it went
 const spendKept = new Map<string, { size: number; at: number; entries: SpendEntry[] }>()
 const SPEND_AGAIN = 30_000 // a transcript that grew (an agent at work) read again at most this often: an estimate needn't be live
@@ -545,25 +720,29 @@ export function wsSpend(p: { ws?: unknown }): Spend & { tabs: number } {
   const entries: SpendEntry[] = []
   let tabs = 0
   for (const t of state.tabs.filter(t => t.workspace === ws.id && (t.preset === 'claude' || t.preset === 'codex'))) {
-    const f = !ws.host && t.resumeId ? chatFile(t)?.file : undefined
-    const size = f ? (statSync(f, { throwIfNoEntry: false })?.size ?? 0) : 0
-    if (!f || !size) continue
-    let kept = spendKept.get(f)
-    if (kept?.size !== size && !(kept && Date.now() - kept.at < SPEND_AGAIN)) {
-      const fd = openSync(f, 'r')
-      const buf = Buffer.alloc(Math.min(size, SPEND_READ))
-      try {
-        readSync(fd, buf, 0, buf.length, size - buf.length)
-      } finally {
-        closeSync(fd)
-      }
-      kept = { size, at: Date.now(), entries: spendEntries(t.preset!, buf.toString('utf8'), ws.path) }
-      spendKept.delete(f)
-      spendKept.set(f, kept)
-      if (spendKept.size > 40) spendKept.delete(spendKept.keys().next().value!)
-    }
-    entries.push(...kept.entries)
+    const c = !ws.host && t.resumeId ? chatFile(t) : undefined
+    if (!c?.file || !statSync(c.file, { throwIfNoEntry: false })?.size) continue
+    for (const f of [c.file, ...extraFiles(t, { file: c.file, kept: c.kept, kids: meters.get(t.id)?.kids })]) entries.push(...spendOf(t, f, ws.path))
     tabs++
   }
   return { ...spendBreakdown(entries), tabs }
+}
+function spendOf(t: Tab, f: string, cwd: string): SpendEntry[] {
+  const size = statSync(f, { throwIfNoEntry: false })?.size ?? 0
+  if (!size) return []
+  let kept = spendKept.get(f)
+  if (kept?.size !== size && !(kept && Date.now() - kept.at < SPEND_AGAIN)) {
+    const fd = openSync(f, 'r')
+    const buf = Buffer.alloc(Math.min(size, SPEND_READ))
+    try {
+      readSync(fd, buf, 0, buf.length, size - buf.length)
+    } finally {
+      closeSync(fd)
+    }
+    kept = { size, at: Date.now(), entries: spendEntries(t.preset!, buf.toString('utf8'), cwd) }
+    spendKept.delete(f)
+    spendKept.set(f, kept)
+    if (spendKept.size > 200) spendKept.delete(spendKept.keys().next().value!)
+  }
+  return kept.entries
 }

@@ -5,6 +5,7 @@ import type { TabPlan } from './todos.ts'
 import type { Layout, SavedLayout } from './layout.ts'
 import { type Rule, stamp } from './when.ts'
 import type { FlowRun, FlowStats, FlowView } from './workflow.ts'
+import PRICE_TABLE from './prices.json' with { type: 'json' }
 
 // the coding agents Laki starts by name (a preset's agent; the command is the id), and what they're called
 export const AGENTS = ['claude', 'codex', 'gemini', 'grok', 'opencode'] as const
@@ -57,9 +58,26 @@ export const claudeMode = (screen: string): string | undefined => (m => (m ? MOD
 export const permArgs = (agent?: string, perm?: string) => (perm && PERMS[agent as Agent]?.find(p => p[0] === perm)?.[3]) || []
 // a profile's flags that set how freely it acts already: then no mode of Laki's goes in (agentCmd), and one that never
 // asks counts as bypassPermissions
-const PERM_FLAGS: Partial<Record<Agent, RegExp>> = { claude: /(^|\s)--(permission-mode|dangerously-skip-permissions)\b/, gemini: /(^|\s)--(mode|dangerously-skip-permissions)\b/, codex: /(^|\s)(-s|--sandbox|-a|--ask-for-approval|--full-auto|--approve-for-me|--dangerously-bypass-approvals-and-sandbox)(?=[\s=]|$)|\b(sandbox_mode|approval_policy)=/ }
+const PERM_FLAGS: Partial<Record<Agent, RegExp>> = { claude: /(^|\s)--(permission-mode|dangerously-skip-permissions)\b/, gemini: /(^|\s)--(mode|dangerously-skip-permissions)\b/, codex: /(^|\s)(-s|--sandbox|-a|--ask-for-approval|--full-auto|--approve-for-me|--dangerously-bypass-approvals-and-sandbox|--yolo)(?=[\s=]|$)|\b(sandbox_mode|approval_policy)=/ }
 export const permInArgs = (agent?: string, args?: string) => !!args && !!PERM_FLAGS[agent as Agent]?.test(args)
-export const bypassArgs = (args?: string) => !!args && /(^|\s)(--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--permission-mode[\s=]+['"]?bypassPermissions)\b/.test(args)
+// the flags your shell's alias for an agent's command (agentBin) adds after it (its `alias` list: zsh's name='value',
+// bash's alias name='value', fish's alias name 'value'): alias codex='codex --dangerously-bypass-approvals-and-sandbox'.
+// By agent; an alias to another command (npx …), or with no flags, adds none (core.ts aliasOf)
+export function aliasFlags(out: string): Record<string, string> {
+  const bins = new Map<string, Agent>(AGENTS.map(a => [agentBin(a), a]))
+  const got: Record<string, string> = {}
+  for (const line of out.split('\n')) {
+    const m = /^(?:alias\s+)?([\w.-]+)(?:=|\s+)(.+)$/.exec(line.trim())
+    if (!m || !bins.has(m[1])) continue
+    let v = m[2].trim()
+    if (v.length > 1 && v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1).replace(/'\\''/g, "'")
+    else if (v.length > 1 && v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1)
+    const [cmd, ...rest] = v.split(/\s+/)
+    if (cmd?.split('/').pop() === m[1] && rest.length) got[bins.get(m[1])!] = rest.join(' ')
+  }
+  return got
+}
+export const bypassArgs = (args?: string) => !!args && /(^|\s)(--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--yolo|--permission-mode[\s=]+['"]?bypassPermissions)\b/.test(args)
 // codex's approvals off: -a / --ask-for-approval never, -c approval_policy=never
 const NO_APPROVALS = /(^|\s)(-a|--ask-for-approval)[\s=]+['"]?never\b|\bapproval_policy\s*=\s*['"]?never\b/
 // #3: an agent that never asks before it acts, by its mode (perm: bypass permissions, or codex's with approvals off) or
@@ -124,29 +142,76 @@ export function sandboxStop(pl: { hook_event_name?: unknown; tool_name?: unknown
   return { cmd, why: line.trim().slice(0, 200), ...(host && NET_HOST.test(host) && { host }) }
 }
 export const sandboxOff = (agent?: string, perm?: string, args?: string) => bypassArgs(args) || /\bdanger-full-access\b/.test(args ?? '') || (!permInArgs(agent, args) && perm === 'bypassPermissions')
-// API list prices, USD per million tokens: input, output, cache write (5 minutes), cache read; the first that matches a
-// transcript's model (claude's message.model, codex's turn_context) prices a tab's tokens (meters.ts).
-// ponytail: dated 2026-10, edited by hand; a long prompt's higher rate, 1-hour cache writes, fast mode and batch left
-// out; a model not here: tokens only
-export const PRICES: [RegExp, [input: number, output: number, write: number, read: number]][] = [
-  [/fable-5-1|mythos-5-1/, [10, 50, 12.5, 0.25]],
-  [/fable-5|mythos-5/, [10, 50, 12.5, 1]],
-  [/opus-5-5/, [4, 20, 5, 0.2]],
-  [/opus-(5|4-[5-8])/, [5, 25, 6.25, 0.5]],
-  [/opus-4/, [15, 75, 18.75, 1.5]], // 4 and 4.1
-  [/sonnet-5/, [2, 10, 2.5, 0.2]],
-  [/sonnet-(4|3-7)/, [3, 15, 3.75, 0.3]],
-  [/haiku-5-5/, [0.1, 0.5, 0.125, 0.01]],
-  [/haiku-4-5/, [1, 5, 1.25, 0.1]],
-  [/haiku-3-5/, [0.8, 4, 1, 0.08]],
-  [/^gpt-5\.2/, [1.75, 14, 0, 0.175]],
-  [/^gpt-5(\.1)?(-codex)?-mini/, [0.25, 2, 0, 0.025]],
-  [/^gpt-5(\.1)?(-codex(-max)?)?$/, [1.25, 10, 0, 0.125]],
-]
-// what tokens cost at those prices (write, read: cache; input: the rest); undefined: a model not in PRICES
-export function costOf(model: string | undefined, n: { input: number; output: number; write?: number; read?: number }) {
-  const p = model && PRICES.find(([re]) => re.test(model))?.[1]
-  return p ? (n.input * p[0] + n.output * p[1] + (n.write ?? 0) * p[2] + (n.read ?? 0) * p[3]) / 1e6 : undefined
+// API list prices, USD per million tokens, by a transcript's exact model id (claude's message.model, codex's
+// turn_context): src/shared/prices.json (scripts/prices.ts, LiteLLM's table; dated), then PRICE_OWN over it, field by
+// field. Never a family guess: a model with no row is unpriced (costOf: undefined), its tokens counted, no dollars.
+// A row's rates: input, output, cache read, cache writes (5 minutes, 1 hour; none said: 1.25x and 2x input), a long
+// prompt's (long: past its above, a request's whole input, cache too, the request's every token at those) and fast mode
+// (fast: claude's usage.speed "fast", times every rate). Batch and priority tiers are left out (agents run neither).
+export type Rates = { in: number; out: number; rd?: number; w5?: number; w1?: number }
+export type Price = Rates & { long?: Partial<Rates> & { above: number }; fast?: number }
+export const pricesDate = (): string => PRICE_TABLE.date // read when asked: a top-level read would keep the table in the window's first load
+// Laki's own: what LiteLLM lacks (retired ids old chats name, a long prompt's rates it leaves out) or doesn't say
+// (fast mode: 2x on the models that have it, per the API's pricing). ponytail: by hand, 2026-11
+const SONNET4_LONG = { above: 200e3, in: 6, out: 22.5, w5: 7.5, w1: 12, rd: 0.6 }
+const OPUS4 = { in: 15, out: 75, w5: 18.75, w1: 30, rd: 1.5 }
+export const PRICE_OWN: Record<string, Partial<Price>> = {
+  'claude-opus-4-20250514': OPUS4,
+  'claude-opus-4-1-20250805': OPUS4,
+  'claude-sonnet-4-20250514': { in: 3, out: 15, w5: 3.75, w1: 6, rd: 0.3, long: SONNET4_LONG },
+  'claude-sonnet-4-5': { long: SONNET4_LONG },
+  'claude-sonnet-4-5-20250929': { long: SONNET4_LONG },
+  'claude-3-7-sonnet-20250219': { in: 3, out: 15, w5: 3.75, w1: 6, rd: 0.3 },
+  'claude-3-5-haiku-20241022': { in: 0.8, out: 4, w5: 1, w1: 1.6, rd: 0.08 },
+  'claude-opus-5-5': { fast: 2 },
+  'claude-opus-5': { fast: 2 },
+  'claude-opus-4-8': { fast: 2 },
+  'claude-fable-5-2': { fast: 2 },
+  'claude-mythos-5-2': { fast: 2 },
+}
+export function priceOf(model: string | undefined): Price | undefined {
+  if (!model) return
+  const TABLE = PRICE_TABLE.models as Record<string, Price>
+  const row = Object.hasOwn(TABLE, model) ? TABLE[model] : undefined
+  const own = Object.hasOwn(PRICE_OWN, model) ? PRICE_OWN[model] : undefined
+  const p = { ...row, ...own }
+  return typeof p.in === 'number' && typeof p.out === 'number' ? (p as Price) : undefined
+}
+// a model's tokens by how they're priced (usage-days.json keeps these, costOf prices them now): in (input not from the
+// cache), out, w5 and w1 (cache writes: 5 minutes, 1 hour), rd (cache reads); L: past its long line, F: fast mode
+export type Parts = Record<string, number>
+const PART = /^(in|out|w5|w1|rd)(L?)(F?)$/
+const rate = (p: Price, k: string, long: boolean) => {
+  const r = long && p.long ? p.long : undefined
+  const at = (x: Partial<Rates> | undefined, f: keyof Rates) => x?.[f]
+  const v = (f: keyof Rates) => at(r, f) ?? at(p, f)
+  return k === 'rd' ? (v('rd') ?? v('in')!) : k === 'w5' ? (v('w5') ?? 1.25 * v('in')!) : k === 'w1' ? (v('w1') ?? 2 * v('in')!) : v(k as keyof Rates)!
+}
+// one answer's tokens as parts: its prompt's whole size (input and cache) past the row's long line prices all of them
+// long; fast mode only where the row has it
+export function partsOf(model: string | undefined, n: { in?: number; out?: number; w5?: number; w1?: number; rd?: number }, fast = false): Parts {
+  const p = priceOf(model)
+  const size = (n.in ?? 0) + (n.w5 ?? 0) + (n.w1 ?? 0) + (n.rd ?? 0)
+  const tag = `${p?.long && size > p.long.above ? 'L' : ''}${fast && p?.fast ? 'F' : ''}`
+  const out: Parts = {}
+  for (const k of ['in', 'out', 'w5', 'w1', 'rd'] as const) if (n[k]) out[k + tag] = n[k]!
+  return out
+}
+export const partsTokens = (p: Parts) => Object.values(p).reduce((a, b) => a + b, 0)
+export function partsAdd(to: Parts, p: Parts, by = 1) {
+  for (const [k, v] of Object.entries(p)) (to[k] = (to[k] ?? 0) + by * v), to[k] === 0 && delete to[k]
+  return to
+}
+// what tokens cost at those prices; undefined: a model with no row
+export function costOf(model: string | undefined, n: Parts): number | undefined {
+  const p = priceOf(model)
+  if (!p) return
+  let usd = 0
+  for (const [k, v] of Object.entries(n)) {
+    const m = PART.exec(k)
+    if (m && v) usd += v * rate(p, m[1], !!m[2]) * (m[3] ? (p.fast ?? 1) : 1)
+  }
+  return usd / 1e6
 }
 
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
@@ -586,6 +651,7 @@ export type Tab = {
   sandbox?: boolean // the agent's own sandbox (SANDBOX; unset: its profile's), kept for restarts
   wrap?: false // restarted without its profile's wrapper sandbox (tabUnbox), kept for restarts
   bgTold?: string[] // the background tasks a restart's note named (core's bgGone): their ends never come, so not named again
+  stuckTold?: string // #3: the last stuck stretch told to its lead (daemon/stuck.ts' key: its kind and turn), never twice
   account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
@@ -631,7 +697,7 @@ export function taskTitle(prompt: string, words = 6) {
 // a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
 // Laki at its starts (unset: told); model, effort, perm (PERMS' id), fast (FAST): its tabs' unless a workspace picks its
 // own; account: an Account's id or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
-export type Preset = { name: string; agent: Agent | 'command'; cap?: Cap /* its workspaces' spend cap, unless the workspace has its own (cap.ts) */; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; wrap?: 'macos' /* the macOS wrapper sandbox (shared/wrap.ts): its tabs under sandbox-exec, where its own sandbox is off or none */; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[]; mcpOnly?: boolean } // mcpOnly (#6): claude's --strict-mcp-config, only Laki's MCP servers (Settings' and the project's, and Laki's own) // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
+export type Preset = { name: string; agent: Agent | 'command'; cap?: Cap /* its workspaces' spend cap, unless the workspace has its own (cap.ts) */; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; perm?: string; fast?: boolean; sandbox?: boolean; wrap?: 'macos' /* the macOS wrapper sandbox (shared/wrap.ts): its tabs under sandbox-exec, where its own sandbox is off or none */; account?: string; steer?: boolean; acp?: boolean; net?: Net; envAllow?: string[]; mcpOnly?: boolean; system?: string /* its standing instructions, added to what each new tab of it is told at the start (core's agentCmd), the project's memory too */ } // mcpOnly (#6): claude's --strict-mcp-config, only Laki's MCP servers (Settings' and the project's, and Laki's own) // envAllow: names hideSecrets lets through to its agent (src/shared/env.ts), the user's alone; // net: its sandbox's network (NET_OK), unset: all; acp: a command profile that speaks ACP on its stdio (Labs: daemon/acp.ts), its tabs no terminal; steer: claude's and codex's (on unless false), a message sent while it works goes into the running turn, not the queue (core's send)
 
 // another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
 // settings, skills and chats shared with the agent's own (links), its sign-in not
@@ -1227,7 +1293,7 @@ export type RunState = 'running' | 'done' | 'waiting' | 'failed' | 'stopped'
 export type Cap = { usd?: number; tokens?: number }
 // cap: the one that holds (its own, its profile's, its project's); usd, tokens: what its tabs' meters say; measured: none of
 // its agents is priced or counts tokens (a command profile): the cap shows not measured
-export type CapView = { cap: Cap; usd?: number; tokens?: number; measured: boolean; share?: number }
+export type CapView = { cap: Cap; usd?: number; tokens?: number; measured: boolean; share?: number; unpriced?: string[] /* models its agents used with no price: their tokens are in neither */ }
 // #3: a workspace's cost warning (cap.ts costTick): past yellow its cost turns yellow, past red red, each told once;
 // Settings' (on: off unless true) or a project's own amounts. COST_WARN: what Settings fills in
 // #5: a task an agent suggested (laki suggest): its title, why, the prompt for a workspace of its own; tab: the agent's;
@@ -1243,7 +1309,8 @@ const capBig = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : n >= 1e3
 const capMoney = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`
 export const capText = (c: Cap) => [c.usd && capMoney(c.usd), c.tokens && `${capBig(c.tokens)} tokens`].filter(Boolean).join(' or ') || 'none'
 // what a workspace spent against its cap, in words: $4.10, 1.2M tokens, not measured
-export const capSpent = (v: CapView) => (v.measured ? [v.usd !== undefined && capMoney(v.usd), v.tokens !== undefined && `${capBig(v.tokens)} tokens`].filter(Boolean).join(' and ') : 'not measured')
+// unpriced: its tokens counted in neither, said so (cap.ts capView)
+export const capSpent = (v: CapView) => `${v.measured ? [v.usd !== undefined && capMoney(v.usd), v.tokens !== undefined && `${capBig(v.tokens)} tokens`].filter(Boolean).join(' and ') : 'not measured'}${v.unpriced?.length ? ` (no price for ${v.unpriced.join(', ')})` : ''}`
 export type TaskEvent = 'ci.failed' | 'pr.opened' | 'pr.review' | 'issue.opened' | 'push' | 'webhook' | 'comment'
 // webhook: hook, one of Settings › Webhooks (inbound.ts) by its name; hookEvent, only that event of it (X-GitHub-Event, a body's type or action)
 export type TaskTrigger = { event: TaskEvent; branch?: string; label?: string; by?: 'others' | 'me' | 'any'; gap?: number; perDay?: number; hook?: string; hookEvent?: string; logins?: string[]; word?: string; reply?: boolean } // comment's: logins who may start it besides your gh login, word the one after /laki that picks it (/laki fix), reply: its agent's last answer posted back as a comment as the turn ends
@@ -1323,8 +1390,10 @@ export type Card = { id: string; title?: string; text: string; open: { label: st
 export type BgTaskView = { id: string; kind: 'agent' | 'shell'; name: string; out?: string; cmd?: string } // share.ts BgTask: out, the file its output goes to; cmd, a shell's command
 // claude waiting out an API error (a rate limit, an overloaded server, a lost connection): its try (n of max), when the
 // next one goes (until), when it said so (at: a turn that started after has none), why in its own words (share.ts meterOf)
+// #3: a worker that can't go on (daemon/stuck.ts): why, the next step for its lead, since when
+export type TabStuck = { kind: 'limit' | 'failed' | 'exited' | 'retrying' | 'silent' | 'background'; why: string; next: string; at: number }
 export type Retry = { n?: number; max?: number; until: number; at: number; why?: string }
-export type TabView = Tab & { held?: string /* F15: the always-ask glob this waiting ask touches: no rule answers it */; mcpAuth?: { names: string[]; login?: string } /* its MCP servers that need a sign-in, the one whose login runs (mcpAuth.ts) */; goal?: Goal /* A1: its /goal (meters.ts) */; signedOut?: SignedOutView /* A2, C6: its agent is signed out (daemon/signin.ts): the band over its box */; skills?: { name: string; path?: string }[] /* B7: the skills its chat loaded, in that order (share.ts skillsIn): the context meter's menu */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop): its card offers tabUnbox */; usual?: number /* a running agent's project's and profile's usual turn, in seconds (nextStep.ts usual) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered Allow, the last 20 */; failed?: string /* its turn ended on an API error: the error, a line (Continue, Dismiss) */; loop?: TabLoop /* it keeps failing the same command this turn (shared/loop.ts): Needs you's Nudge, Stop, Let it work */; drafted?: boolean; ungated?: boolean /* S8: a claude tab started before any tool gate was on: not covered until it restarts */; mode?: string; modeUnknown?: boolean; bypassNo?: string /* mode: a running claude's, read off its screen (modeUnknown: its footer isn't on screen now, mode is the last one seen); bypassNo: why it can't be switched to Bypass */; hookless?: { why: string; detail?: string } /* hooks not heard (core's hookTick): the likely why, what to look at */; changes?: TurnChanges; marks?: TurnMark[] /* P5: its turns' chips from turn place extensions, the last 20 turns */; compacting?: boolean; suggest?: string; secret?: { id: string; label: string; fields?: { name: string; plain?: boolean }[] /* #7: one card, a field each */; saved?: 'project' | 'all'; last?: { at: number; name: string } /* the kept one's newest give: when, to which workspace (your own window's: masked drops it) */; first?: boolean /* none of its gives went to this workspace */ }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number }; retry?: Retry; background?: { now: BgTaskView[]; done: number; last: BgTaskView[]; at?: number } } // retry: claude waits out an API error (a rate limit…): its try, when the next goes, when it said so, why (meters.ts' meterOf; a turn started after it: stale); background: its chat's background shells and subagents, running now, how many ended, the newest of those and when the last did (claude's: meters.ts); changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
+export type TabView = Tab & { held?: string /* F15: the always-ask glob this waiting ask touches: no rule answers it */; mcpAuth?: { names: string[]; login?: string } /* its MCP servers that need a sign-in, the one whose login runs (mcpAuth.ts) */; goal?: Goal /* A1: its /goal (meters.ts) */; signedOut?: SignedOutView /* A2, C6: its agent is signed out (daemon/signin.ts): the band over its box */; skills?: { name: string; path?: string }[] /* B7: the skills its chat loaded, in that order (share.ts skillsIn): the context meter's menu */; boxed?: Boxed /* a command its sandbox stopped this turn (sandboxStop): its card offers tabUnbox */; usual?: number /* a running agent's project's and profile's usual turn, in seconds (nextStep.ts usual) */; allowed?: { at: number; tool: string; what: string; rule: string }[] /* F14: asks a project rule answered Allow, the last 20 */; failed?: string /* its turn ended on an API error: the error, a line (Continue, Dismiss) */; loop?: TabLoop /* it keeps failing the same command this turn (shared/loop.ts): Needs you's Nudge, Stop, Let it work */; drafted?: boolean; ungated?: boolean /* S8: a claude tab started before any tool gate was on: not covered until it restarts */; mode?: string; modeUnknown?: boolean; bypassNo?: string /* mode: a running claude's, read off its screen (modeUnknown: its footer isn't on screen now, mode is the last one seen); bypassNo: why it can't be switched to Bypass */; hookless?: { why: string; detail?: string } /* hooks not heard (core's hookTick): the likely why, what to look at */; changes?: TurnChanges; marks?: TurnMark[] /* P5: its turns' chips from turn place extensions, the last 20 turns */; compacting?: boolean; suggest?: string; secret?: { id: string; label: string; fields?: { name: string; plain?: boolean }[] /* #7: one card, a field each */; saved?: 'project' | 'all'; last?: { at: number; name: string } /* the kept one's newest give: when, to which workspace (your own window's: masked drops it) */; first?: boolean /* none of its gives went to this workspace */ }; card?: Card; plan?: TabPlan; planAsk?: string; status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; needAt?: number; ask?: Ask; asleep?: boolean; queued?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number }; context?: { used: number; max: number }; usage?: { tokens: number; cost?: number; unpriced?: string[] /* models it used with no price: their tokens have no cost */ }; retry?: Retry; background?: { now: BgTaskView[]; done: number; last: BgTaskView[]; at?: number }; stuck?: TabStuck /* #3: a worker that can't go on: laki wait's stuck line, the workers dock */ } // retry: claude waits out an API error (a rate limit…): its try, when the next goes, when it said so, why (meters.ts' meterOf; a turn started after it: stale); background: its chat's background shells and subagents, running now, how many ended, the newest of those and when the last did (claude's: meters.ts); changes: what its last turn changed in the worktree (turns.ts: Reader's card, Changes' This turn, Undo); compacting: claude sums up its chat (PreCompact) while it runs; suggest: the next prompt Laki AI guessed (settings.nextPrompt) while it's idle; secret: a secret it asks you for (laki secret: the card's masked field); needAt: since when it needs you (waiting, or done and idle: the Needs you list's order); queued: asleep until its turn after a daemon restart (core's restoreAll); runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when; context: what its chat's context holds of its window, usage: what the chat used since it began, cost at API prices (unknown model: none) (claude's and codex's transcripts: meters.ts)
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -1590,7 +1659,7 @@ export function unmasked<T extends Record<string, any>>(p: T, now: Settings): T 
   return Object.fromEntries(Object.entries(p ?? {}).filter(([k, v]) => !(k in m && m[k] !== real[k] && JSON.stringify(v) === JSON.stringify(m[k])))) as T
 }
 // today's tokens and ≈ cost at API prices (meters.ts, <data>/usage-today.json), the workspaces that used most first
-export type Today = { tokens: number; cost: number; ws: { ws: string; name?: string /* its name as kept: a removed one's too */; tokens: number; cost: number }[] }
+export type Today = { tokens: number; cost: number; ws: { ws: string; name?: string /* its name as kept: a removed one's too */; tokens: number; cost: number }[]; unpriced?: { model: string; tokens: number }[] /* models with no price: tokens, no cost */ }
 
 // specs and brainstorms (settings.specs, specsOn; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
@@ -1609,7 +1678,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 233
+export const API = 234
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -1,4 +1,4 @@
-import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, lazy, type MouseEvent, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { type ArtBlocked, artHostOk, artSay } from '../../shared/artHosts'
 import { type ArtMark, artNotes, pickOf } from '../../shared/artPick'
 import { keyFor, keyMap, keyShow } from '../../shared/keys'
@@ -21,6 +21,7 @@ import type { Snap, SnapRow } from './snapshot'
 import { type Complete, completeOf, type Img, type Inserted, type Inserts, PromptInput, useComplete, withImages } from './PromptInput'
 import { clock, groupNew, laterText, nameOf, parseDuration, parseLater, prRef, replyText, templated, templatesFor, withPaths } from './text'
 import { AGENT_COLORS, closeTo, colorVar, copyImage, escapes, type FileAct, FileCard, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, openFrom, Page, ProjectMark, Switch, useMenu, act } from './ui'
+const MediaNotes = lazy(() => import('./MediaNotes').then(m => ({ default: m.MediaNotes }))) // #7: loads as Comment is pressed (npm run size)
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -1565,6 +1566,99 @@ export function Prompt({ title, hint, placeholder, initial = '', picks = [], bus
   )
 }
 
+// Edit group / New group: its name and what a new workspace in it starts with. With its agent picked, that agent's own
+// choices: the models it says it has (agentModels: their ids, each name beside it; a name typed is taken as its id),
+// the efforts the model takes (none said: the agent's), its permission modes; another agent clears them. No agent:
+// every agent's, as typed. A model it doesn't list goes as typed (a gateway's), said so
+export type GroupPicks = { template: string; preset: string; where: string; perm: string; model: string; effort: string; base: string }
+export function GroupEdit({ title, hint, name: name0 = '', picks, templates, presets, git, onClose, onSubmit }: { title: string; hint?: string; name?: string; picks: Partial<GroupPicks>; templates: string[]; presets: { name: string; agent: string }[]; git: boolean; onClose: () => void; onSubmit: (name: string, picks: GroupPicks) => Promise<void> }) {
+  const [name, setName] = useState(name0)
+  const [g, setG] = useState<GroupPicks>(() => ({ template: '', preset: '', where: '', perm: '', model: '', effort: '', base: '', ...Object.fromEntries(Object.entries(picks).filter(([, v]) => typeof v === 'string')) })) // unset: '', never undefined
+  const [told, setTold] = useState<Record<string, AgentModel[]>>({})
+  const set = (o: Partial<GroupPicks>) => setG(x => ({ ...x, ...o }))
+  const agentOf = (preset: string) => presets.find(x => x.name === preset)?.agent
+  const agent = agentOf(g.preset)
+  const ag = isAgent(agent) ? agent : undefined
+  useEffect(() => {
+    if ((agent !== 'claude' && agent !== 'codex') || told[g.preset]) return
+    void api.call<AgentModel[]>('agentModels', { agent, preset: g.preset }).then(l => setTold(x => ({ ...x, [g.preset]: l })), () => setTold(x => ({ ...x, [g.preset]: [] })))
+  }, [g.preset])
+  const said = told[g.preset]?.length ? told[g.preset] : undefined
+  const typed = g.model.trim()
+  const model = said?.find(m => m.id === typed || m.name.toLowerCase() === typed.toLowerCase())
+  const models = said ?? ((ag ? MODELS[ag] : [...new Set(Object.values(MODELS).flat())]) ?? []).map(id => ({ id, name: id }) as AgentModel)
+  const efforts = (model?.efforts ?? (ag ? EFFORTS[ag] : [...new Set(Object.values(EFFORTS).flat())])) ?? []
+  const perms: [string, string, string][] = [['ask', 'Ask first', "The agent's own: it asks before it acts"], ...(ag ? (PERMS[ag] ?? []) : [...new Map(Object.values(PERMS).flatMap(m => m!.map(x => [x[0], x] as const))).values()]).map(x => [x[0], x[1], x[2]] as [string, string, string])]
+  const sel = (label: string, k: keyof GroupPicks, none: string, opts: [string, string, string?][], o: { off?: boolean; tip?: string } = {}) => (
+    <label>
+      {label}
+      <select value={g[k]} disabled={o.off} data-tip={o.tip} onChange={e => set({ [k]: e.target.value })}>
+        <option value="">{none}</option>
+        {[...opts, ...(g[k] && !opts.some(x => x[0] === g[k]) ? [[g[k], `${g[k]} (not one ${ag ? AGENT_NAMES[ag] : 'it'} takes)`] as [string, string]] : [])].map(([v, l, tip]) => (
+          <option key={v} value={v} title={tip}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+  return (
+    <Modal title={title} onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={e => {
+          e.preventDefault()
+          if (name.trim()) onSubmit(name.trim(), { ...g, model: model?.id ?? typed, effort: efforts.includes(g.effort) || !ag ? g.effort : '' }).catch(() => {})
+        }}
+      >
+        <input value={name} autoFocus onFocus={e => e.target.select()} onChange={e => setName(e.target.value)} />
+        {hint && <div className="muted small">{hint}</div>}
+        {(templates.length > 0 || g.template) && sel('Default prompt template: a new workspace here starts with it', 'template', 'None: the last one used', templates.map(t => [t, t]))}
+        <label>
+          Default agent: a new workspace here starts it
+          <select value={g.preset} onChange={e => set({ preset: e.target.value, ...(agentOf(e.target.value) !== agent && { model: '', effort: '', perm: '' }) })}>
+            <option value="">None: the last one used</option>
+            {[...presets.map(x => x.name), ...(g.preset && !presets.some(x => x.name === g.preset) ? [g.preset] : [])].map(n => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        {git && sel('Where: a new workspace here is made', 'where', 'As last picked', [['worktree', 'New worktree'], ['bare', 'New worktree, no setup'], ['local', "Local: the project's folder"]])}
+        {!ag && <div className="muted small">Pick its agent to choose from that agent's own models, efforts and permission modes.</div>}
+        {sel('Permission mode', 'perm', "The agent profile's", perms)}
+        <label>
+          Model
+          <input value={g.model} placeholder="The agent profile's" list="group-models" spellCheck={false} onChange={e => set({ model: e.target.value, ...(g.effort && (m => m?.efforts && !m.efforts.includes(g.effort))(said?.find(m => m.id === e.target.value.trim())) && { effort: '' }) })} />
+          <datalist id="group-models">
+            {models.map(m => (
+              <option key={m.id} value={m.id} label={m.name !== m.id ? m.name : undefined} />
+            ))}
+          </datalist>
+          {typed && (model ? model.id !== typed || model.sub ? <span className="muted small">{model.name}{model.id !== typed ? ` (${model.id})` : ''}{model.sub ? ` · ${model.sub}` : ''}</span> : null : said && <span className="warn small">Not one {ag ? AGENT_NAMES[ag] : 'the agent'} lists: it goes as typed</span>)}
+        </label>
+        {sel('Effort', 'effort', "The agent profile's", efforts.map(x => [x, x]), model?.efforts?.length === 0 ? { off: true, tip: `${model.name} takes no effort` } : {})}
+        {git && (
+          <label>
+            Base branch for new worktrees
+            <input value={g.base} placeholder="The repo's main branch" spellCheck={false} onChange={e => set({ base: e.target.value })} />
+          </label>
+        )}
+        <div className="buttons">
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={!name.trim()}>
+            OK
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 // a new timer: how long, a message (what it's for: Go out; on its bar and as it ends) and, with its switch, a command it
 // runs as it ends (in the workspace in front: where, its name)
 export function TimerDialog({ where, important: first = false, onClose, onStart }: { where?: string; important?: boolean; onClose: () => void; onStart: (ms: number, cmd?: string, note?: string, important?: boolean) => void }) {
@@ -2055,7 +2149,7 @@ export function Welcome({ onOpen, onSsh, onClone, onNew, check, onRun, onSample 
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
 // menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
-export type ArtifactsApi = { comment?: (text: string) => Promise<unknown> /* #3: notes on an HTML one's parts, into the agent's prompt */; list: () => Promise<Artifact[]>; stat?: (path: string) => Promise<{ size: number; at?: number }>; read: (path: string, media?: boolean) => Promise<{ size: number; text?: string; image?: string; media?: string; src?: string }>; open?: (path: string) => void; editor?: (path: string) => void; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown>; drag?: (path: string) => void } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
+export type ArtifactsApi = { comment?: (text: string) => Promise<unknown> /* #3: notes on an HTML one's parts, into the agent's prompt */; shot?: (png: string) => Promise<string> /* #7: a frame with its marks, saved: its path */; list: () => Promise<Artifact[]>; stat?: (path: string) => Promise<{ size: number; at?: number }>; read: (path: string, media?: boolean) => Promise<{ size: number; text?: string; image?: string; media?: string; src?: string }>; open?: (path: string) => void; editor?: (path: string) => void; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void; unlink?: (url: string) => Promise<unknown>; drag?: (path: string) => void } // unlink: a kept link taken off; page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
 const host = (url: string) => (fileOf(url) ? fileOf(url).split('/').pop()! : url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]) // a file:/// link: its file's name
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string; media?: string } | { error: string }
@@ -2280,6 +2374,9 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   const at = here && i >= 0 ? here[i] : null
   const step = (d: number) => here?.length && i >= 0 && setBig(here[(i + d + here.length) % here.length].path)
   const cm = useArtComment(at?.path ?? '', at && HTML.test(at.path) && !linkOf(at.path) ? a.page?.(at.path) : undefined, a.comment) // #3
+  // #7: Comment on a picture or a video (MediaNotes): its marks over it instead of the plain view, until sent or stopped
+  const [mc, setMc] = useState<{ src: string; video: boolean } | null>(null) // its source as Comment was pressed: a rewrite meanwhile keeps the notes
+  useEffect(() => setMc(null), [at?.path])
   useEffect(() => void (at && !linkOf(at.path) && need(at)), [at])
   // audio or video shown big: its data URL, asked for then (the strip's previews never carry it); one at a time
   const [play, setPlay] = useState<{ key: string; src?: string; done?: boolean; err?: string } | null>(null)
@@ -2310,6 +2407,8 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     e.preventDefault()
     openMenu(e, items)
   }
+  // #7: a picture's or a video's source, once read (a video's whole: play's), for MediaNotes; else none
+  const mediaOf = (f: Artifact) => (c => (!c || 'error' in c || linkOf(f.path) ? undefined : c.image ? { src: c.image, video: false } : c.media === 'video' && play?.key === key(f) && play.src ? { src: play.src, video: true } : undefined))(seen[key(f)])
   // shown big as a FileCard (audio, video, a kind it can't draw): the card has Show in Finder
   const card = (f: Artifact) => (c => !!c && !('error' in c) && c.text === undefined && !c.image && !(HTML.test(f.path) && a.page?.(f.path)))(seen[key(f)])
   const look = (f: Artifact, full = false) => {
@@ -2428,9 +2527,15 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
       </div>
       {at && here && (
         <Modal title={`${linkOf(at.path)?.title ?? at.path} · ${i + 1} of ${here.length}`} onClose={() => closeTo(() => setBig(null))} wide loose>
-          <div className="art-big" data-zoom onContextMenu={e => rightClick(e, at)}>
-            {look(at, true)}
-          </div>
+          {mc ? (
+            <Suspense fallback={<span className="muted small">Loading…</span>}>
+              <MediaNotes key={at.path} path={at.path} src={mc.src} video={mc.video} shot={a.shot} onSend={t => a.comment!(t)} onStop={() => setMc(null)} />
+            </Suspense>
+          ) : (
+            <div className="art-big" data-zoom onContextMenu={e => rightClick(e, at)}>
+              {look(at, true)}
+            </div>
+          )}
           {cm.notes}
           <div className="buttons">
             {(l =>
@@ -2443,6 +2548,11 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
               ) : (
                 <>
                   {cm.buttons}
+                  {a.comment && mediaOf(at) && !mc && (
+                    <button onClick={() => setMc(mediaOf(at)!)} data-tip={mediaOf(at)!.video ? 'Pause it, mark a spot or a box on the frame and write a note on each: one message to the agent with the times, places and frames' : 'Mark spots or boxes on the picture and write a note on each: one message to the agent with where each one is'}>
+                      Comment
+                    </button>
+                  )}
                   <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
                   {/\.(md|markdown)$/i.test(at.path) && <button data-tip="Go to heading…" onClick={e => openMenu(e, outlineItems(e.currentTarget.closest('.modal')))}>Outline</button>}
                   {a.external && VIEWED.test(at.path) && <button onClick={() => a.external!(at.path)}>Open in the browser</button>}

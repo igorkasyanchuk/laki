@@ -3,7 +3,7 @@
 // sign-in links to its own folder (SHARED: settings, skills, plugins, chats), so a chat resumes on any account. The
 // agent's own sign-in is HOME_ACCOUNT: no env at all (CLAUDE_CONFIG_DIR set to ~/.claude would read another Keychain
 // item).
-import { execFile, spawn } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { readJson } from '../shared/conn.ts'
@@ -13,7 +13,7 @@ import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type 
 import { changed, presetNamed, q, save, state } from './core.ts'
 import { dir } from './dir.ts'
 import { isLive } from './resources.ts'
-import { claudeCred, keychainService, othersWho, type Who } from './usage.ts'
+import { asked, claudeCred, keychainService, othersWho, type Who } from './usage.ts'
 import { older, tooOld } from './limits.ts'
 import { ACP_VERSION, acpModels } from './acp.ts'
 
@@ -255,32 +255,3 @@ export function modelRefused(model: string | undefined, text: string): string | 
 // (its version not looked at yet since the daemon started: asked now, so a claude updated meanwhile drops the warning)
 export const modelNeedsView = () => (state.modelNeeds && Object.keys(state.modelNeeds).length ? (!has.at && void claudeHas(), Object.fromEntries(Object.entries(state.modelNeeds).filter(([m]) => needsNewer(m)))) : undefined)
 export const claudeVersion = () => has.v
-// a JSON-lines exchange: the lines sent (stdin kept open: claude ends with it), each line read through `take` until
-// it gives something; 20 s at most, then the process goes
-function asked<T>(cmd: string, args: string[], env: NodeJS.ProcessEnv, send: object[], take: (m: any) => T | undefined): Promise<T> {
-  return new Promise((ok, no) => {
-    const c = spawn(cmd, args, { env, cwd: homedir(), stdio: ['pipe', 'pipe', 'ignore'] })
-    const end = (f: () => void) => (clearTimeout(t), c.kill(), f())
-    const t = setTimeout(() => end(() => no(new Error(`${cmd} didn't say its models`))), 20_000)
-    let buf = ''
-    c.on('error', e => end(() => no(new Error(`${cmd}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed' : e.message}`))))
-    c.on('close', () => end(() => no(new Error(`${cmd} ended without its models`)))) // close: after its output was read
-    c.stdin.on('error', () => {}) // it went first: exit says so
-    c.stdout.setEncoding('utf8').on('data', (d: string) => {
-      buf += d
-      for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
-        const line = buf.slice(0, i)
-        buf = buf.slice(i + 1)
-        let m: unknown
-        try {
-          m = JSON.parse(line)
-        } catch {
-          continue
-        }
-        const r = take(m)
-        if (r !== undefined) return end(() => ok(r))
-      }
-    })
-    for (const m of send) c.stdin.write(`${JSON.stringify(m)}\n`)
-  })
-}

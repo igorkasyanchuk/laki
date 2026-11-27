@@ -8,13 +8,13 @@ import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, sp
 import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
-import { type ChatHit, type Schedule, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView, SEP_WHERE, PERMS, MODELS, EFFORTS } from '../../shared/types'
+import { type ChatHit, type Schedule, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView } from '../../shared/types'
 import { type AgentUsage, UsagePage, type UsageAi, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
-import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList } from './SidePanel'
+import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList, type TextFound } from './SidePanel'
 import { DigestCard, NoticeCard, ShownDialog, ShownPops } from './Shown'
 import { SharePop } from './Tunnel'
-import { ReplyPop, About, Onboarding, moreOf, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
+import { ReplyPop, About, Onboarding, moreOf, ScriptLogs, Logs, Fun, type Meme, NewWorkspace, ArtifactsBar, type Artifact, ArtifactView, AddProject, Prompt, GroupEdit, Modal, TimerDialog, RemindDialog, SendLaterDialog, ProjectNotes, ImportChats, ImportWorktrees, CiLog } from './panels'
 import { xterms } from './Term'
 import { LayoutBar, WidgetDialog, WidgetModal, WidgetPeek } from './Widgets'
 import { Picker } from './Picker'
@@ -667,6 +667,7 @@ export function Pages({ app }: { app: AppCtx }) {
             copy,
             page: path => (inViewer(path) ? artPage(ws, path) : undefined),
             comment: text => panelApi(ws).toPrompt(text).then(() => setGallery(null), e => (fail(e), Promise.reject(e))), // #3: its notes into the agent's prompt
+            shot: png => panelApi(ws).saveImage(png), // #7: a frame with its marks: its path, named in the notes
             unlink: url => api.call('linkRm', { ws: ws.id, url }),
             external: bridge?.openPath && (path => inBrowser(ws, path)), // HTML as the sandboxed page (L11), as the right click's
             drag: bridge?.dragOut && !ws.host ? path => bridge!.dragOut!(`${ws.storage}/${path}`, ws.storage!) : undefined,
@@ -757,7 +758,7 @@ export function Dialogs({ app }: { app: AppCtx }) {
           }}
         />
       )}
-      {dialog === 'files' && ws && <FileFinder files={() => api.call<FileList>('files', { ws: ws.id })} onPick={path => panelApi(ws).preview(path)} onClose={() => setDialog(null)} />}
+      {(dialog === 'files' || dialog === 'search') && ws && <FileFinder key={dialog} text={dialog === 'search'} where={ws.name || ws.id} files={() => api.call<FileList>('files', { ws: ws.id })} search={o => api.call<TextFound>('fileSearch', { ws: ws.id, ...o })} onPick={(path, line) => panelApi(ws).preview(path, line)} onClose={() => setDialog(null)} />}
       {dialog === 'chats' && (
         <ChatSearch
           search={q => call('chatSearch', { q })}
@@ -961,24 +962,18 @@ export function Dialogs({ app }: { app: AppCtx }) {
         const p = view.projects.find(p => p.id === dialog.sep)
         const s = p?.seps?.find(x => x.id === dialog.id)
         const tpls = templatesFor(settings.templates, p?.config?.templates, p?.repoTemplates)
-        const keys: string[] = [] // each pick's field, in order
         return (
-        <Prompt
+        <GroupEdit
           title={dialog.id ? 'Edit group' : 'New group'}
           hint={dialog.id ? undefined : 'A named line between workspaces. Drag it, or them, to sort.'}
-          initial={s?.name}
-          picks={([
-            ...(tpls.length || s?.template ? [{ key: 'template', label: 'Default prompt template: a new workspace here starts with it', none: 'None: the last one used', options: tpls.map(t => t.name), value: s?.template }] : []),
-            { key: 'preset', label: 'Default agent: a new workspace here starts it', none: 'None: the last one used', options: view.presets.filter(x => !x.off).map(x => x.name), value: s?.preset },
-            ...(p?.git === false ? [] : [{ key: 'where', label: 'Where: a new workspace here is made', none: 'As last picked', options: [...SEP_WHERE], names: { worktree: 'New worktree', bare: 'New worktree, no setup', local: "Local: the project's folder" }, value: s?.where }]),
-            { key: 'perm', label: 'Permission mode', none: "The agent profile's", options: ['ask', ...new Set(Object.values(PERMS).flatMap(m => m!.map(x => x[0])))], names: { ask: 'Ask first', ...Object.fromEntries(Object.values(PERMS).flatMap(m => m!.map(x => [x[0], x[1]]))) }, value: s?.perm },
-            { key: 'model', label: 'Model', none: "The agent profile's", options: Object.values(MODELS).flat(), value: s?.model, free: true },
-            { key: 'effort', label: 'Effort', none: "The agent profile's", options: [...new Set(Object.values(EFFORTS).flat())], value: s?.effort },
-            ...(p?.git === false ? [] : [{ key: 'base', label: 'Base branch for new worktrees', none: "The repo's main branch", options: [], value: s?.base, free: true }]),
-          ] as ({ key: string; label: string; none: string; options: string[]; value?: string; names?: Record<string, string>; free?: boolean })[]).map(({ key, ...x }) => (keys.push(key), x))}
+          name={s?.name}
+          picks={{ template: s?.template, preset: s?.preset, where: s?.where, perm: s?.perm, model: s?.model, effort: s?.effort, base: s?.base }}
+          templates={tpls.map(t => t.name)}
+          presets={view.presets.filter(x => !x.off).map(x => ({ name: x.name, agent: x.agent }))}
+          git={p?.git !== false}
           onClose={() => setDialog(null)}
           onSubmit={async (name, picked) => {
-            await sepName(dialog, name, Object.fromEntries(keys.map((k, i) => [k, picked[i]?.trim() ?? ''])))
+            await sepName(dialog, name, Object.fromEntries(Object.entries(picked).map(([k, v]) => [k, v.trim()])) as Partial<Sep>)
             setDialog(null)
           }}
         />

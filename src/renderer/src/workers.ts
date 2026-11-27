@@ -21,7 +21,7 @@ export function dockRows(workers: Worker[], cleared: string[], roll: (tabs: TabV
       const agents = w.tabs.filter(t => t.kind === 'agent')
       const asks = agents.filter(t => t.status === 'waiting') // each one's question in the dock
       const ask = asks[0]
-      const failed = w.failed ?? agents.find(t => t.failed)?.failed ?? (agents.length && agents.every(t => t.status === 'exited') ? 'its agent ended' : undefined)
+      const failed = w.failed ?? (s => s && `stuck: ${s.why}`)(agents.find(t => t.stuck && t.status !== 'waiting')?.stuck) ?? agents.find(t => t.failed)?.failed ?? (agents.length && agents.every(t => t.status === 'exited') ? 'its agent ended' : undefined) // #3: why it can't go on (daemon/stuck.ts)
       const state = ask ? 'waiting' : failed ? 'exited' : roll(agents.length ? agents : w.tabs)
       const pct = Math.max(-1, ...agents.map(t => t.progress?.pct ?? -1))
       const line = (agents.find(t => t.progress?.note)?.progress?.note ?? agents.find(t => t.last)?.last ?? '').trim().split('\n').at(-1)?.slice(0, 140)

@@ -1,0 +1,1150 @@
+{
+ "date": "2026-11-27",
+ "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+ "models": {
+  "claude-fable-5": {
+   "in": 10,
+   "out": 50,
+   "rd": 1,
+   "w5": 12.5,
+   "w1": 20
+  },
+  "claude-fable-5-1": {
+   "in": 10,
+   "out": 50,
+   "rd": 0.25,
+   "w5": 12.5,
+   "w1": 20
+  },
+  "claude-fable-5-2": {
+   "in": 8,
+   "out": 40,
+   "rd": 0.2,
+   "w5": 10,
+   "w1": 16
+  },
+  "claude-haiku-4-5": {
+   "in": 1,
+   "out": 5,
+   "rd": 0.1,
+   "w5": 1.25,
+   "w1": 2
+  },
+  "claude-haiku-4-5-20251001": {
+   "in": 1,
+   "out": 5,
+   "rd": 0.1,
+   "w5": 1.25,
+   "w1": 2
+  },
+  "claude-haiku-5-5": {
+   "in": 0.1,
+   "out": 0.5,
+   "rd": 0.01,
+   "w5": 0.125,
+   "w1": 0.2,
+   "long": {
+    "above": 100000,
+    "in": 0.5,
+    "out": 2.5,
+    "rd": 0.05,
+    "w5": 0.625,
+    "w1": 1
+   }
+  },
+  "claude-mythos-5": {
+   "in": 10,
+   "out": 50,
+   "rd": 1,
+   "w5": 12.5,
+   "w1": 20
+  },
+  "claude-mythos-5-1": {
+   "in": 10,
+   "out": 50,
+   "rd": 0.25,
+   "w5": 12.5,
+   "w1": 20
+  },
+  "claude-mythos-5-2": {
+   "in": 8,
+   "out": 40,
+   "rd": 0.2,
+   "w5": 10,
+   "w1": 16
+  },
+  "claude-mythos-preview": {
+   "in": 10,
+   "out": 50,
+   "rd": 1,
+   "w5": 12.5,
+   "w1": 20
+  },
+  "claude-opus-4-5": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-4-5-20251101": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-4-6": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-4-6-20260205": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-4-7": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-4-7-20260416": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-4-8": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-5": {
+   "in": 5,
+   "out": 25,
+   "rd": 0.5,
+   "w5": 6.25,
+   "w1": 10
+  },
+  "claude-opus-5-5": {
+   "in": 4,
+   "out": 20,
+   "rd": 0.2,
+   "w5": 5,
+   "w1": 8
+  },
+  "claude-sonnet-4-5": {
+   "in": 3,
+   "out": 15,
+   "rd": 0.3,
+   "w5": 3.75,
+   "w1": 6
+  },
+  "claude-sonnet-4-5-20250929": {
+   "in": 3,
+   "out": 15,
+   "rd": 0.3,
+   "w5": 3.75,
+   "w1": 6
+  },
+  "claude-sonnet-4-5-20250929-v1:0": {
+   "in": 3,
+   "out": 15,
+   "rd": 0.3,
+   "w5": 3.75,
+   "w1": 6,
+   "long": {
+    "above": 200000,
+    "in": 6,
+    "out": 22.5,
+    "rd": 0.6,
+    "w5": 7.5,
+    "w1": 12
+   }
+  },
+  "claude-sonnet-4-6": {
+   "in": 3,
+   "out": 15,
+   "rd": 0.3,
+   "w5": 3.75,
+   "w1": 6
+  },
+  "claude-sonnet-5": {
+   "in": 2,
+   "out": 10,
+   "rd": 0.2,
+   "w5": 2.5,
+   "w1": 4
+  },
+  "claude-sonnet-5-5": {
+   "in": 2,
+   "out": 10,
+   "rd": 0.1,
+   "w5": 2.5,
+   "w1": 4
+  },
+  "gemini-2.5-computer-use-preview-10-2025": {
+   "in": 1.25,
+   "out": 10,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 15
+   }
+  },
+  "gemini-2.5-flash": {
+   "in": 0.3,
+   "out": 2.5,
+   "rd": 0.03
+  },
+  "gemini-2.5-flash-lite": {
+   "in": 0.1,
+   "out": 0.4,
+   "rd": 0.01
+  },
+  "gemini-2.5-flash-lite-preview-09-2025": {
+   "in": 0.1,
+   "out": 0.4,
+   "rd": 0.01
+  },
+  "gemini-2.5-flash-preview-09-2025": {
+   "in": 0.3,
+   "out": 2.5,
+   "rd": 0.03
+  },
+  "gemini-2.5-pro": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 15,
+    "rd": 0.25
+   }
+  },
+  "gemini-2.5-pro-preview-tts": {
+   "in": 1,
+   "out": 20,
+   "rd": 0.125
+  },
+  "gemini-3-flash-preview": {
+   "in": 0.5,
+   "out": 3,
+   "rd": 0.05
+  },
+  "gemini-3.1-flash-lite": {
+   "in": 0.25,
+   "out": 1.5,
+   "rd": 0.025
+  },
+  "gemini-3.1-flash-lite-preview": {
+   "in": 0.25,
+   "out": 1.5,
+   "rd": 0.025
+  },
+  "gemini-3.1-pro-preview": {
+   "in": 2,
+   "out": 12,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 18,
+    "rd": 0.4
+   }
+  },
+  "gemini-3.1-pro-preview-customtools": {
+   "in": 2,
+   "out": 12,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 18,
+    "rd": 0.4
+   }
+  },
+  "gemini-3.5-flash": {
+   "in": 1.5,
+   "out": 9,
+   "rd": 0.15
+  },
+  "gemini-3.5-flash-lite": {
+   "in": 0.3,
+   "out": 2.5,
+   "rd": 0.03
+  },
+  "gemini-3.6-flash": {
+   "in": 0.75,
+   "out": 3.75,
+   "rd": 0.075
+  },
+  "gemini-3.7-flash": {
+   "in": 0.75,
+   "out": 3.75,
+   "rd": 0.075
+  },
+  "gemini-3.8-flash": {
+   "in": 0.75,
+   "out": 3.75,
+   "rd": 0.075
+  },
+  "gemini-3.8-flash-cyber": {
+   "in": 1.5,
+   "out": 7.5,
+   "rd": 0.15
+  },
+  "gemini-exp-1206": {
+   "in": 0.3,
+   "out": 2.5,
+   "rd": 0.03
+  },
+  "gemini-flash-latest": {
+   "in": 0.75,
+   "out": 3.75,
+   "rd": 0.075
+  },
+  "gemini-flash-lite-latest": {
+   "in": 0.3,
+   "out": 2.5,
+   "rd": 0.03
+  },
+  "gemini-omni-flash-preview": {
+   "in": 1.5,
+   "out": 9
+  },
+  "gemini-pro-latest": {
+   "in": 2,
+   "out": 12,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 18,
+    "rd": 0.4
+   }
+  },
+  "gemini-robotics-er-1.5-preview": {
+   "in": 0.3,
+   "out": 2.5,
+   "rd": 0
+  },
+  "gemini-robotics-er-2-preview": {
+   "in": 1,
+   "out": 5,
+   "rd": 0.1
+  },
+  "gpt-5": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5-2025-08-07": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5-chat": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5-chat-latest": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5-codex": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5-mini": {
+   "in": 0.25,
+   "out": 2,
+   "rd": 0.025
+  },
+  "gpt-5-mini-2025-08-07": {
+   "in": 0.25,
+   "out": 2,
+   "rd": 0.025
+  },
+  "gpt-5-nano": {
+   "in": 0.05,
+   "out": 0.4,
+   "rd": 0.005
+  },
+  "gpt-5-nano-2025-08-07": {
+   "in": 0.05,
+   "out": 0.4,
+   "rd": 0.005
+  },
+  "gpt-5-pro": {
+   "in": 15,
+   "out": 120
+  },
+  "gpt-5-pro-2025-10-06": {
+   "in": 15,
+   "out": 120
+  },
+  "gpt-5-search-api": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5-search-api-2025-10-14": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5.1": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5.1-2025-11-13": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5.1-chat-latest": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5.1-codex": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5.1-codex-max": {
+   "in": 1.25,
+   "out": 10,
+   "rd": 0.125
+  },
+  "gpt-5.1-codex-mini": {
+   "in": 0.25,
+   "out": 2,
+   "rd": 0.025
+  },
+  "gpt-5.2": {
+   "in": 1.75,
+   "out": 14,
+   "rd": 0.175
+  },
+  "gpt-5.2-2025-12-11": {
+   "in": 1.75,
+   "out": 14,
+   "rd": 0.175
+  },
+  "gpt-5.2-chat-latest": {
+   "in": 1.75,
+   "out": 14,
+   "rd": 0.175
+  },
+  "gpt-5.2-codex": {
+   "in": 1.75,
+   "out": 14,
+   "rd": 0.175
+  },
+  "gpt-5.2-pro": {
+   "in": 21,
+   "out": 168
+  },
+  "gpt-5.2-pro-2025-12-11": {
+   "in": 21,
+   "out": 168
+  },
+  "gpt-5.3-chat-latest": {
+   "in": 1.75,
+   "out": 14,
+   "rd": 0.175
+  },
+  "gpt-5.3-codex": {
+   "in": 1.75,
+   "out": 14,
+   "rd": 0.175
+  },
+  "gpt-5.4": {
+   "in": 2.5,
+   "out": 15,
+   "rd": 0.25,
+   "long": {
+    "above": 272000,
+    "in": 5,
+    "out": 22.5,
+    "rd": 0.5
+   }
+  },
+  "gpt-5.4-2026-03-05": {
+   "in": 2.5,
+   "out": 15,
+   "rd": 0.25,
+   "long": {
+    "above": 272000,
+    "in": 5,
+    "out": 22.5,
+    "rd": 0.5
+   }
+  },
+  "gpt-5.4-mini": {
+   "in": 0.75,
+   "out": 4.5,
+   "rd": 0.075
+  },
+  "gpt-5.4-mini-2026-03-17": {
+   "in": 0.75,
+   "out": 4.5,
+   "rd": 0.075
+  },
+  "gpt-5.4-nano": {
+   "in": 0.2,
+   "out": 1.25,
+   "rd": 0.02
+  },
+  "gpt-5.4-nano-2026-03-17": {
+   "in": 0.2,
+   "out": 1.25,
+   "rd": 0.02
+  },
+  "gpt-5.4-pro": {
+   "in": 30,
+   "out": 180,
+   "long": {
+    "above": 272000,
+    "in": 60,
+    "out": 270
+   }
+  },
+  "gpt-5.4-pro-2026-03-05": {
+   "in": 30,
+   "out": 180,
+   "long": {
+    "above": 272000,
+    "in": 60,
+    "out": 270
+   }
+  },
+  "gpt-5.5": {
+   "in": 5,
+   "out": 30,
+   "rd": 0.5,
+   "long": {
+    "above": 272000,
+    "in": 10,
+    "out": 45,
+    "rd": 1
+   }
+  },
+  "gpt-5.5-2026-04-23": {
+   "in": 5,
+   "out": 30,
+   "rd": 0.5,
+   "long": {
+    "above": 272000,
+    "in": 10,
+    "out": 45,
+    "rd": 1
+   }
+  },
+  "gpt-5.5-cyber": {
+   "in": 12.5,
+   "out": 75,
+   "rd": 1.25
+  },
+  "gpt-5.5-cyber-preview": {
+   "in": 12.5,
+   "out": 75,
+   "rd": 1.25
+  },
+  "gpt-5.5-pro": {
+   "in": 30,
+   "out": 180,
+   "long": {
+    "above": 272000,
+    "in": 60,
+    "out": 270
+   }
+  },
+  "gpt-5.5-pro-2026-04-23": {
+   "in": 30,
+   "out": 180,
+   "long": {
+    "above": 272000,
+    "in": 60,
+    "out": 270
+   }
+  },
+  "gpt-5.6": {
+   "in": 4,
+   "out": 20,
+   "rd": 0.4,
+   "w5": 5,
+   "long": {
+    "above": 272000,
+    "in": 8,
+    "out": 30,
+    "rd": 0.8,
+    "w5": 10
+   }
+  },
+  "gpt-5.6-cyber": {
+   "in": 12.5,
+   "out": 75,
+   "rd": 1.25,
+   "w5": 15.625,
+   "long": {
+    "above": 272000,
+    "in": 25,
+    "out": 112.5,
+    "rd": 2.5,
+    "w5": 31.25
+   }
+  },
+  "gpt-5.6-luna": {
+   "in": 0.2,
+   "out": 1.2,
+   "rd": 0.02,
+   "w5": 0.25,
+   "long": {
+    "above": 272000,
+    "in": 0.4,
+    "out": 1.8,
+    "rd": 0.04,
+    "w5": 0.5
+   }
+  },
+  "gpt-5.6-sol": {
+   "in": 4,
+   "out": 20,
+   "rd": 0.4,
+   "w5": 5,
+   "long": {
+    "above": 272000,
+    "in": 8,
+    "out": 30,
+    "rd": 0.8,
+    "w5": 10
+   }
+  },
+  "gpt-5.6-terra": {
+   "in": 2,
+   "out": 12,
+   "rd": 0.2,
+   "w5": 2.5,
+   "long": {
+    "above": 272000,
+    "in": 4,
+    "out": 18,
+    "rd": 0.4,
+    "w5": 5
+   }
+  },
+  "grok-4.20": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-0309": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-0309-non-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-0309-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-0309": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-0309-non-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-0309-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-latest-non-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-latest-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-non-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-beta-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-experimental-beta-0304": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-experimental-beta-0304-non-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-experimental-beta-0304-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-experimental-beta-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-experimental-beta-non-reasoning-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-experimental-beta-reasoning-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-multi-agent": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-multi-agent-0309": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-multi-agent-beta-0309": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-multi-agent-beta-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-multi-agent-experimental-beta-0304": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-multi-agent-experimental-beta-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-multi-agent-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-non-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-non-reasoning-gv2": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-non-reasoning-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-reasoning": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-reasoning-gv2": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.20-reasoning-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.3": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.3-latest": {
+   "in": 1.25,
+   "out": 2.5,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2.5,
+    "out": 5,
+    "rd": 0.4
+   }
+  },
+  "grok-4.5": {
+   "in": 2,
+   "out": 6,
+   "rd": 0.3,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 12,
+    "rd": 0.6
+   }
+  },
+  "grok-4.5-latest": {
+   "in": 2,
+   "out": 6,
+   "rd": 0.3,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 12,
+    "rd": 0.6
+   }
+  },
+  "grok-4.6": {
+   "in": 2,
+   "out": 6,
+   "rd": 0.5,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 12,
+    "rd": 1
+   }
+  },
+  "grok-4.6-latest": {
+   "in": 2,
+   "out": 6,
+   "rd": 0.5,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 12,
+    "rd": 1
+   }
+  },
+  "grok-4.7": {
+   "in": 2,
+   "out": 6,
+   "rd": 0.5,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 12,
+    "rd": 1
+   }
+  },
+  "grok-4.7-latest": {
+   "in": 2,
+   "out": 6,
+   "rd": 0.5,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 12,
+    "rd": 1
+   }
+  },
+  "grok-build-0.1": {
+   "in": 1,
+   "out": 2,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2,
+    "out": 4,
+    "rd": 0.4
+   }
+  },
+  "grok-build-latest": {
+   "in": 2,
+   "out": 6,
+   "rd": 0.3,
+   "long": {
+    "above": 200000,
+    "in": 4,
+    "out": 12,
+    "rd": 0.6
+   }
+  },
+  "grok-code-fast": {
+   "in": 1,
+   "out": 2,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2,
+    "out": 4,
+    "rd": 0.4
+   }
+  },
+  "grok-code-fast-1": {
+   "in": 1,
+   "out": 2,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2,
+    "out": 4,
+    "rd": 0.4
+   }
+  },
+  "grok-code-fast-1-0825": {
+   "in": 1,
+   "out": 2,
+   "rd": 0.2,
+   "long": {
+    "above": 200000,
+    "in": 2,
+    "out": 4,
+    "rd": 0.4
+   }
+  }
+ }
+}

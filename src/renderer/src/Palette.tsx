@@ -223,6 +223,7 @@ export function paletteItems(app: AppCtx): PaletteItem[] {
   const rq = settings.fullReview !== false ? reviewQueue(view!, ws?.id) : []
   if (rq[0]) a({ label: `Review next: ${wsName(rq[0])}${rq.length > 1 ? ` (${rq.length - 1} more)` : ''}`, icon: 'review', hint: kh('reviewNext'), run: () => reviewGo(rq[0]) })
   if (ws) a({ label: 'Find files…', icon: 'search', hint: kh('files'), run: () => setDialog('files') })
+  if (ws) a({ label: 'Search in files…', icon: 'search', tip: "The text of the workspace's files", hint: kh('searchText'), run: () => setDialog('search') })
   for (const w of order) items.push({ kind: 'ws', ws: w.id, acts: { changes: () => (setWsId(w.id), showPanel('changes')), ship: () => (setWsId(w.id), setDialog('ship')) }, more: () => wsMenu(w), label: wsName(w), hint: [(f => f.kind !== 'branch' && f.text)(rowFact(w, view!.tabs.filter(t => t.workspace === w.id))), w.branch || 'folder', prNum(w)].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), mark: <ProjectMark p={projOf(w)} />, find: [w.pr?.url, w.prUrl, w.issue?.url, ...(w.related ?? [])].filter((u): u is string => !!u), run: () => setWsId(w.id) })
   for (const t of view?.tabs ?? []) {
     const w = live.find(w => w.id === t.workspace)

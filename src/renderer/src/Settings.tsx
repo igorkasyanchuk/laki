@@ -2643,8 +2643,8 @@ export function SettingsPage(p: {
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
-                  <Switch key={a} className="switch-row" on={a === 'gemini' ? s.usage?.[a] !== false : s.usage?.[a] === true} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
-                    <Says title={`Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={USAGE_HINTS[a] ?? `Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`} />
+                  <Switch key={a} className="switch-row" on={a === 'gemini' || a === 'codex' ? s.usage?.[a] !== false : s.usage?.[a] === true} onChange={v => set({ usage: Object.fromEntries(Object.entries({ ...s.usage, [a]: v }).filter(([k, x]) => !(k === 'codex' && x === true && a === 'codex'))) })}>
+                    <Says title={a === 'codex' ? 'Ask Codex for its plan limits' : `Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={USAGE_HINTS[a] ?? `Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`} />
                   </Switch>
                 ))}
                 <label className="switch-row">
@@ -3386,6 +3386,13 @@ export function SettingsPage(p: {
                           </Switch>
                         )}
                         <VarChips vars={ENV_VARS} value={(pr.agent === 'command' ? pr.cmd : pr.args) ?? ''} onChange={v => setPreset(i, pr.agent === 'command' ? { cmd: v } : { args: v })} />
+                        {pr.agent !== 'command' && (
+                          // its standing instructions (core's agentCmd): on blur, as Let through, so a keystroke isn't a save
+                          <label className="switch-row preset-system">
+                            <Says title="System prompt" hint="Applies to new tabs: standing instructions on top of the project's memory, at each start" />
+                            <textarea key={pr.system ?? ''} defaultValue={pr.system ?? ''} rows={2} maxLength={20000} placeholder="Review only: never edit files" aria-label="System prompt" onBlur={e => e.target.value.trim() !== (pr.system ?? '') && setPreset(i, { system: e.target.value.trim() || undefined })} />
+                          </label>
+                        )}
                         <EnvField value={pr.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
                         {s.hideSecrets && ( // a command profile's tabs are held back too, with no sign-in key of their own (shared/env.ts)
                           <label className="switch-row">

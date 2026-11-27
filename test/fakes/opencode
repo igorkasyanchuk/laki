@@ -8,6 +8,8 @@ if (args[0] === 'models') process.stdout.write(['opencode/beam-free', 'openroute
 // a TUI that refuses -m, as some versions do ("Unrecognized flag"): the model goes in OPENCODE_CONFIG_CONTENT
 if (args.includes('-m')) process.stdout.write('Unrecognized flag: -m in command opencode\r\n'), process.exit(1)
 fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'opencode', tab: process.env.LAKI_TAB, args, config: process.env.OPENCODE_CONFIG_CONTENT }) + '\n')
+// opencode debug paths (agentUsage.ts ocDb): its folders, data where its opencode.db is
+if (args[0] === 'debug' && args[1] === 'paths') process.stdout.write(`home       ${process.env.HOME}\ndata       ${path.join(process.env.XDG_DATA_HOME || path.join(process.env.HOME, '.local/share'), 'opencode')}\nconfig     ${path.join(process.env.HOME, '.config/opencode')}\n`), process.exit(0)
 const val = f => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined)
 const session = val('--session') ?? 'ses_' + Math.random().toString(36).slice(2, 8)
 if (session.startsWith('gone-')) {

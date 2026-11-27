@@ -601,7 +601,8 @@ selected workspace's PR is in the status bar.
   put it first in this group), *Edit…* (its name and a default prompt template: *New workspace here…* starts
   with it; a group without one starts with no template, never the last one used; and its defaults for a new workspace
   there: the agent, where it's made (a new worktree, one without the setup script, or the project's own folder), the
-  permission mode, model, effort and base branch) and *Remove group* (its workspaces stay).
+  permission mode, model, effort and base branch: with its agent picked, that agent's own models (each by its name, its
+  id kept), the efforts the model takes and the agent's permission modes; `laki new --group` starts them too) and *Remove group* (its workspaces stay).
 - A workspace with a PR shows its author's GitHub picture before the PR mark (yours on your own). Settings ›
   Appearance › *GitHub pictures* off: none are loaded.
 
@@ -1051,10 +1052,13 @@ default) turned off hides the money on the AI page: asks and tokens only.
 are, how you name things, what it should know. It can't lift what Laki AI may not do.
 
 **Scheduled tasks** (*Schedule* on the rail, or the clock at the start of the status bar without it, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
-times you write in plain English. *New task* opens the form: the prompt, with the agent under it, then *When*, then
-the project, where it runs and a name as chips, the way the new-workspace page has them. A form you leave (Esc, a click elsewhere) is there when the page opens again;
-*Cancel* asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't). It's a page of
-its own: Esc doesn't close it (its ✕, or another page, does). The agent picker's *Extension* picks one of your
+times you write in plain English. *New task* opens the form in a panel at the right of the page, the list beside it
+(over the list on a narrow window), in parts: *What* (the prompt, with the agent under it), *When* (or *On* an event,
+or *After* a task), *Where* (the project, where it runs, its base branch), *Options* (only if, kept workspaces, time
+limit, notifications) and *Name*. A click on a task's row opens it there to edit, the row marked; another row switches
+to it. A form you leave (another page, the window) is there when the page opens again; *Cancel*, its ✕ or Esc (in the
+panel) asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't). It's a page of its
+own: Esc outside the panel doesn't close it (its ✕, or another page, does). The agent picker's *Extension* picks one of your
 extensions instead: *Fetch it* (its data now, on top of its own schedule) or one of its actions (the prompt, optional,
 is its `$WIDGET_ARG`); a per-workspace one runs in a workspace you pick. Only one that's turned on runs: an off one's
 run fails, saying so.
@@ -1156,10 +1160,13 @@ its error color past 90%, filled to
 the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
 the week per model (Fable's) and extra usage (those two only from Anthropic, below); Codex's 5-hour and weekly windows. Each shows when it resets. They come from what the agents report
 themselves: Claude Code's status line (*Read Claude's status line*, on) and what Codex writes as it works, so they show
-once a tab of that agent has run. Older than 20 minutes, they're dimmed with *As of* and how old (what the agent used
+once a tab of that agent has run; with several tabs on one account, each window shows the newest reading of it (an idle
+tab's older numbers never win). Codex's also come from Codex itself as the popup reads them (its own app server: it
+reads its own sign-in, takes no turn), unless you turn off *Ask Codex for its plan limits* in Settings › Layout; a
+Codex too old to say them says so, with *Ask chatgpt.com*. Older than 20 minutes, they're dimmed with *As of* and how old (what the agent used
 since, outside Laki too, isn't in them) and *Ask api.anthropic.com* (chatgpt.com for Codex) beside them, which turns
 that switch on and reads them again. Laki asks no server for them unless
-you turn on *Ask api.anthropic.com for Claude Code's plan limits* (or chatgpt.com's for Codex, grok.com's for Grok) in Settings › Layout: undocumented endpoints that may break. Antigravity's come from agy's own `/usage` (it takes no turn and uses no quota; agy 1.1.11 or newer), each model group's 5-hour and weekly windows, unless you turn off *Ask agy for Antigravity's plan limits*. Then the daemon
+you turn on *Ask api.anthropic.com for Claude Code's plan limits* (or grok.com's for Grok; chatgpt.com for an older Codex, from its row) in Settings › Layout: undocumented endpoints that may break. Antigravity's come from agy's own `/usage` (it takes no turn and uses no quota; agy 1.1.11 or newer), each model group's 5-hour and weekly windows, unless you turn off *Ask agy for Antigravity's plan limits*. Then the daemon
 reads them with the sign-in the agent already keeps on this Mac (Claude Code's Keychain item or
 `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the agent's own `/usage` screen
 asks: Claude's every 7.5 minutes, Codex's every 5. While a Claude Code tab on that account redrew its status line in
@@ -1171,8 +1178,11 @@ until the agent's next run renews it. As a
 limit reaches 90% (Settings › General › *Plan limit at*: 75, 90 or 95), Laki tells you once per reset: a message, and
 a notification when you're in another app (*Plan limit nearly used* turns it off). Only while Laki is open.
 until the agent's next run renews it. Under the
-agents, *Today*: the tokens your Claude Code and Codex chats used today and ≈ what they'd cost at the API's list
-prices (*≈ API price*: your plan bills its own way), with the workspaces that used most. A restart keeps it.
+agents, *Today*: the tokens your Claude Code and Codex chats used today (their subagents' and spawned threads' too) and
+≈ what they'd cost at the API's list prices (*≈ API price*: your plan bills its own way; a model Laki has no price for:
+*no price for <model>*, tokens only), with the workspaces that used most. A restart keeps it, and an answer a forked or
+resumed chat copied counts once. Prices follow each model's own: cache writes kept an hour, a long prompt's higher
+rate, fast mode.
 
 **Context and tokens** (Claude Code and Codex tabs): Laki reads each chat's transcript as it grows (every 10 seconds
 while it works, and as a turn ends), never on an SSH host. A line along the tab's bottom edge is as long as the chat's
@@ -1247,6 +1257,9 @@ line, after the tab restarts.
   with *Send to the agent* (that check only), *Copy* and *Open on GitHub* (Info's PR has it too); *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
   there's something to send. Then the review threads as cards (from reviewers with write access and bots: what the
   agent would get; a comment someone hid on GitHub stays out, here and in the full review), the resolved ones folded under *N resolved*. Click a thread's file to preview it at that line.
+  Each open thread has *Reply…* (a box: *Reply*, ⌘↩, or *Reply and resolve*), *Resolve*, and *Fixed in <commit>*: one
+  click replies with the PR's head commit and resolves it; a resolved one has *Unresolve*. They post as you, through
+  your `gh` (an agent can't: they're yours, as a comment is); a thread GitHub marks outdated says *outdated*. GitHub only.
   A reviewer's suggestion (a ```` ```suggestion ```` block) shows as a small diff, the file's lines now and the
   suggested ones, with *Apply*: it writes them into the file in the workspace, only while those lines are still what
   the review saw (else *changed since the review*, and nothing is written); *Apply all* does each of a file's open
@@ -1313,6 +1326,11 @@ seed did while the agent works.
 
 **Find files** (*Find files…*, first in ⌘K; or ⌘P): type parts of a path (`crt` finds `src/cart.ts`); names match
 before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
+
+**Search in files** (⇧⌘P, *Search in files…* in ⌘K, or Tab in ⌘P): the text of the workspace's files, by `git grep`
+(tracked and new files, not what git ignores; a plain folder's by `grep -r`, its dependencies' folders left out). Matches
+group by file with the line and its number; *Aa* matches case, *ab* whole words, *.\** a regular expression (kept for
+next time). ↑↓ and Enter open the file at that line. The first 500 matches show; Tab goes back to finding a file by name.
 
 **Info** (the side panel's first tab; ⓘ or ⌘I): its name (the pencil renames it), then a card of the workspace's
 facts, a line each (rest on one for all of it; a copy button on hover): its id, branch, path, storage folder, `$PORT`
@@ -1563,6 +1581,12 @@ also says what their agents spent (*· $1.75*, at API prices) and, when there ar
 first: *Allow N safe* (their plain permission asks: none risky, none outside the worktree without a sandbox, none
 whose first choice would always allow; it names each), *Archive N done* (the finished ones with nothing uncommitted:
 one with changes stays and is named; Undo brings them back) and *Stop all (N)* (Esc to each turn under way).
+A worker that can't go on tells its lead once, in the lead's own chat (queued for its turn's end), what happened and
+the next step: its plan limit (`laki send <ws> "continue"` after the reset, or another agent), a failed turn (when
+*Continue after an error* won't send continue itself), its process gone mid-turn, silent or retrying an API error for
+10 minutes, or a background task still running 20 minutes after its turn ended. The worker's dock row says *stuck:*
+and why, and `laki wait` on it ends with a *stuck* line (exit 2), so the lead doesn't wait for nothing. A Stop you
+pressed, a clean end or a tab you closed never counts; a restart doesn't say it again.
 
 With *Progress on tabs* on (Settings › Terminal), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
@@ -2473,6 +2497,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | ⌘⇧⏎ | full screen: just the tab's content (no rail, sidebar, tab bar, panels or status bar), the window full screen too; again (or the faint ⤡ in the corner) brings it all back. Also the tab bar's ⋯ › *Full screen* |
 | ⌘K | palette |
 | ⌘P | find a file in the workspace |
+| ⇧⌘P | search the text of the workspace's files |
 | ⌘⇧O | a Markdown file's outline (*Go to heading…*), while its preview has the keyboard |
 | ⌘D | changes (the side panel) |
 | ⌥⌘B | side panel: info, files, changes, review, preview |
@@ -2829,6 +2854,10 @@ title large at the top and small in the glass head once you scroll.
   cursor: the line goes through the shell, so they work there. Every tab also gets `LAKI_APP=true` (a program or
   skill can tell it runs in Laki), and an agent's `FORCE_HYPERLINK=1` (Claude Code's links show as their text, a click
   opens them; set it to 0 in an env to see the URLs).
+  *System prompt* (an agent's profile): your standing instructions for it (a "Reviewer" that never edits, a "Terse"
+  one), added at each new tab's start on top of the project's memory, the same way as the note below (Claude Code's
+  `--append-system-prompt`, Codex's `developer_instructions`, Grok's `--rules`, OpenCode's instructions, Antigravity's
+  first message); `laki preset set <name> --system "…"` (`''` drops it).
   *Tell it about Laki* (on by default; Claude Code and Codex): each start adds a short note to the agent's system
   prompt (`--append-system-prompt`, Codex's `developer_instructions`; a preset whose arguments set their own keeps
   those, and so does Codex with `developer_instructions` in its `config.toml`: no note then): it runs in Laki, and how to name its workspace (`laki rename . "…"`), attach a PR (`laki pr . <n>`), show you something to open (`laki show … --open <folder|file|url>`: a card
@@ -3148,7 +3177,11 @@ tab). Saved as you type:
   can't add or change one. *Import from your agents…* (Settings' list) shows the servers Claude Code, Codex, Antigravity
   and OpenCode have in their own configs: the ones you tick are copied in, theirs left as they are; a secret's value is
   kept in the Keychain. A Claude Code profile's *Only Laki's MCP servers* starts it with `--strict-mcp-config`: none
-  from its own config, only Laki's (and Laki's own tools).
+  from its own config, only Laki's (and Laki's own tools). *One process for every agent* (a command's, off by
+  default): Laki starts that server once, as the first agent calls it, and every agent talks to it over HTTP on Laki's
+  daemon (each tab with a key of its own), instead of each agent starting its own copy; it stops when you turn it off
+  or change it. A server that keeps state per session (a browser with its tabs, a login) may not suit sharing; the
+  macOS wrapper sandbox's *Listed hosts* network doesn't reach it.
 - *Notes*: yours, in Markdown (links, how to run it, who to ask). ⋯ on the project › *Notes* shows them rendered, with
   *Edit*; agents never see them (not in `laki ls --json` or MCP).
 - *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:
@@ -3237,7 +3270,7 @@ laki new app --prompt "…" --tab codex --tab "npm run dev"  # more tabs there: 
 laki new app --preset opencode --model openrouter/moonshotai/kimi-k3  # opencode's model as `opencode models` lists it
 laki new app --perm acceptEdits --fast --prompt "…"     # its permission mode (auto, acceptEdits, plan, bypassPermissions) and fast mode
 laki new app --sandbox --prompt "…"                    # the agent's own sandbox (Claude Code, Codex): writes in the worktree only
-laki new app --template review --group Reviews --prompt "#57"  # through a prompt template, under a sidebar group (its template and agent too)
+laki new app --template review --group Reviews --prompt "#57"  # through a prompt template, under a sidebar group (its template, agent, model, effort and mode too)
 laki new app --action "PR+audit" --prompt "the login page"     # an agent action's prompt, then these words
 laki new app --at "tomorrow 9am" --prompt "…"            # made now, its agent starts at 9 (Laki must be running then)
 laki new app --after-limit --prompt "…"                 # its agent once the plan limit resets (claude, codex)
@@ -3253,7 +3286,7 @@ laki suggest "Fix the flaky test" --why "…" --prompt "…"  # (in an agent's t
 laki name backend                                       # in an agent's tab: other agents reach it as @backend, in any workspace
 laki agents                                             # the named agents: where, which agent, what they're doing
 laki ask @backend "which endpoint lists teams?"         # typed in when its turn ends, its reply printed (laki send @backend: no wait)
-laki wait fix-the-login dark --timeout 20m              # until neither's agent works: a line each; exit 0 idle, 2 one asks, 3 timed out
+laki wait fix-the-login dark --timeout 20m              # until neither's agent works: a line each; exit 0 idle, 2 one asks or is stuck, 3 timed out
 laki wait-on "CI on main"                                # (in an agent's tab) its workspace waits on that: out of Needs you till it asks or starts again; --done: over
 laki --version                                          # this CLI's version, and the daemon's when it runs
 laki doctor                                             # git, gh, the agents, hooks: ✓ ● ✗ and a fix each; exit 1 on a ✗
@@ -3285,7 +3318,7 @@ laki pr . 42                                            # attach a PR (URL or nu
 laki pr . --detach                                      # its PR only related, kept off this workspace
 laki pr . --draft                                       # its PR back to a draft (--ready: ready for review)
 laki show "Smoke test evidence" --open "$LAKI_STORAGE_FOLDER/smoke"   # in a tab: a card under it, a button opens it
-laki preset ls | preset add claude-ask --perm auto | preset set claude-ask --model opus | preset off codex | preset rm …
+laki preset ls | preset add claude-ask --perm auto | preset set claude-ask --model opus | preset set reviewer --system "Review only" | preset off codex | preset rm …
 laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the project's memory (Project memory)
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
