@@ -36,7 +36,7 @@ test("T4: on an event: CI red on main runs once; again within the gap, none; a f
   const fail = (id: number, title = 'Fix the build') => ({ databaseId: id, status: 'completed', conclusion: 'failure', event: 'push', displayTitle: title, url: `https://github.com/o/repo/actions/runs/${id}` })
   const runs = (list: object[]) => writeFileSync(join(gh, 'runlist.json'), JSON.stringify(list))
   runs([fail(1), { databaseId: 2, status: 'in_progress', conclusion: '' }])
-  const t0 = Date.now()
+  const t0 = Math.min(Date.now(), new Date().setHours(24, 0, 0, 0) - 10 * 60e3) // runs a day count by the local day: every tick (to t0 + 7 min) on one
   await rig.rpc('eventTick', { now: t0 }) // the first read: what's there is old news
   assert.equal((await runsOf(rig, ci.id)).length, 0)
   // red on main: one run, its event in the log, its title fenced in the prompt
@@ -201,7 +201,7 @@ test('T4 comment: /laki fix by you starts one run, its text fenced; not twice af
   const comments = () => writeFileSync(join(gh, 'comments.json'), JSON.stringify([...list].reverse()))
   writeFileSync(join(gh, 'issue.json'), JSON.stringify({ title: 'Login breaks', url: 'https://github.com/o/repo/issues/5' }))
   comments()
-  const t0 = Date.now()
+  const t0 = Math.min(Date.now(), new Date().setHours(24, 0, 0, 0) - 10 * 60e3) // runs a day count by the local day: every tick (to t0 + 7 min) on one
   await rig.rpc('eventTick', { now: t0 }) // the first read: what's there is old news
   assert.equal((await runsOf(rig, fix.id)).length, 0)
   // yours: one run, the rest of the comment fenced as data; someone else's and another word's: nothing
