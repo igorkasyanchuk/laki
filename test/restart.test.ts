@@ -373,6 +373,13 @@ test('R4: a full disk: the state stays in memory and the view says so; saved onc
   await rig.rpc('settingsSet', { prScan: 8 }) // the next save
   assert.equal((await rig.rpc('state')).diskFull, undefined)
   assert.equal(saved().settings.prScan, 8)
+  // each save's temp copy is its own and gone after; ones a killed daemon left go as the next one starts
+  assert.deepEqual(readdirSync(rig.data).filter(f => f.startsWith('state.json') && f.endsWith('.tmp')), [])
+  await rig.stop()
+  for (const f of ['state.json.tmp', 'state.json.1.0123abcd.tmp']) writeFileSync(join(rig.data, f), '{}')
+  await rig.start()
+  assert.deepEqual(readdirSync(rig.data).filter(f => f.endsWith('.tmp') && f.startsWith('state.json')), [])
+  assert.equal(saved().settings.prScan, 8)
 })
 
 test("R12: an agent that isn't installed ends its tab with 127 (the strip's sign); installed, Enter starts it", async t => {

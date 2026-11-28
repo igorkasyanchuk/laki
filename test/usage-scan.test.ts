@@ -97,12 +97,14 @@ test('scan + tabs: a tab’s chat, its fork, its resume and a codex spawned thre
   const wsPath = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).path
   write(join(dir, 'in-folder.jsonl'), ans('i1', 4, 1, { cwd: join(wsPath, 'src') }) )
   write(join(dir, 'no-cwd.jsonl'), line({ type: 'assistant', timestamp: now(), requestId: 'r_n1', message: { id: 'n1', model: 'claude-opus-5-5', usage: { input_tokens: 2, output_tokens: 1 } } }))
-  const named = await until(async () => (r => (r.length === 4 ? r : undefined))([...new Set((await rows(rig)).filter(r => !r.ws).map(r => r.where))].sort()), 'each outside chat named')
+  await rig.rpc('quickNew', { kind: 'shells' }) // the sidebar's Terminals: your home folder, never a chat's name
+  write(join(dir, 'home-chat.jsonl'), ans('h1', 1, 1, { cwd: join(rig.home, 'code', 'foo') }))
+  const named = await until(async () => (r => (r.length === 5 ? r : undefined))([...new Set((await rows(rig)).filter(r => !r.ws).map(r => r.where))].sort()), 'each outside chat named')
   const w0 = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)
   const tmp = realpathSync('/tmp').split('/').filter(Boolean).slice(-2).join('/')
-  assert.deepEqual(named, [`${(await rig.rpc('state')).projects[0].name} · ${w0.name || w0.id}`, 'Outside Laki · elsewhere/proj', `Outside Laki · ${tmp}`, 'Unknown folder'].sort(), 'a Laki worktree’s folder names it; else its last two folders; none: unknown')
+  assert.deepEqual(named, [`${(await rig.rpc('state')).projects[0].name} · ${w0.name || w0.id}`, 'Outside Laki · elsewhere/proj', `Outside Laki · ${tmp}`, 'Outside Laki · code/foo', 'Unknown folder'].sort(), 'a Laki worktree’s folder names it (never Terminals’ home folder); else its last two folders; none: unknown')
   const today = (await rig.rpc('state')).today
-  assert.deepEqual(today.out, { tokens: 2 + 10 + 5 + 3, cost: today.out.cost })
+  assert.deepEqual(today.out, { tokens: 2 + 10 + 5 + 3 + 2, cost: today.out.cost })
   assert.deepEqual(today.ws.map((w: any) => w.ws), [ws.id], 'Today’s workspaces: Laki’s')
   // the outside chat resumed in a tab: one chat, its rows move to that workspace
   const t2 = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
@@ -121,11 +123,14 @@ test('scan + tabs: a tab’s chat, its fork, its resume and a codex spawned thre
   write(join(d, `rollout-2026-11-28T10-01-00-${kid}.jsonl`), meta(kid, id) + tc(1000) + tc(1300)) // its copy of its parent's turn, then its own
   await rig.rpc('hook', { tab: cx.id, state: 'start', payload: { session_id: id } })
   await until(async () => total((await rows(rig)).filter(r => r.agent === 'codex')) === 1300, 'the parent’s and the thread’s own, once', 20000)
-  // Laki AI's own claude -p chat (its session kept in skip): its transcript isn't counted
+  // Laki AI's own claude -p chat (its session kept in skip): its transcript isn't counted, even one the scan read first
+  const before = total(await rows(rig))
+  write(join(dir, 'sess-p1.jsonl'), ans('lk', 500, 50))
+  await until(async () => total(await rows(rig)) === before + 550, 'read before Laki AI says it is its own')
   await rig.rpc('settingsSet', { ai: { on: true, backend: 'claude' } })
   await rig.rpc('aiAsk', { text: 'hi' })
-  write(join(dir, 'sess-p1.jsonl'), ans('lk', 500, 50))
-  const before = total(await rows(rig))
+  await until(async () => total(await rows(rig)) === before, 'its rows gone with it')
+  appendFileSync(join(dir, 'sess-p1.jsonl'), ans('lk2', 5, 5))
   await new Promise(r => setTimeout(r, 1500))
   await rows(rig)
   await new Promise(r => setTimeout(r, 1500))

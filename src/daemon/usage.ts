@@ -484,15 +484,16 @@ async function quotaGet(s: QuotaSource, token: string): Promise<AgentUsage[]> {
     const headers: Record<string, string> = { Accept: 'application/json', ...(token && { Authorization: `Bearer ${token}` }) }
     let status: number
     let body: AsyncIterable<Uint8Array> | Iterable<Uint8Array>
+    let drop: () => void // an answer not read: its socket let go at once
     if (localUrl(s.url)) {
       const r = await fetch(s.url, { signal, headers, redirect: 'error' })
-      ;[status, body] = [r.status, r.body ?? []]
+      ;[status, body, drop] = [r.status, r.body ?? [], () => void r.body?.cancel().catch(() => {})]
     } else {
       const r = await getFollow(s.url, signal, headers)
-      ;[status, body] = [r.statusCode ?? 0, r]
+      ;[status, body, drop] = [r.statusCode ?? 0, r, () => r.destroy()]
     }
-    if (status === 401 || status === 403) return [row({ error: 'Turned away: check its token (Settings › Usage)' })]
-    if (status < 200 || status > 299) return [row({ error: `HTTP ${status}` })]
+    if (status === 401 || status === 403) return drop(), [row({ error: 'Turned away: check its token (Settings › Usage)' })]
+    if (status < 200 || status > 299) return drop(), [row({ error: `HTTP ${status}` })]
     const parts: Buffer[] = []
     let size = 0
     for await (const b of body) {

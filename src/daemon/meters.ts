@@ -201,7 +201,10 @@ function todayFlush() {
   for (const id of todo) {
     const c = keptNow().chats[id]
     const models = { ...c?.pre?.[day], ...c?.days[day] }
-    if (!c || !Object.keys(models).length) continue
+    if (!c || !Object.keys(models).length) {
+      delete s.chats[id] // none of today's in the ledger (its rows dropped, or moved): none in Today either
+      continue
+    }
     s.chats[id] = { ws: c.ws, name: nameOf(c.ws) ?? s.chats[id]?.name, tokens: Object.values(models).reduce((n, r) => n + rowTokens(r), 0), models }
   }
   todo.clear()
@@ -444,7 +447,7 @@ export function ledger(r: UseRec, ws?: string): boolean {
     o.set(r.key, r.chat)
     ;(c.keys ??= {})[r.day] = (c.keys[r.day] ?? '') + r.key
     rowAdd(r.chat, c, r.day, r.model, r)
-    if (r.p) (k.grow ??= {})[r.key] = [r.chat, Date.now(), r.day, r.model, r.p]
+    if (r.p && r.day >= dayOf(Date.now() - GROW_MS)) (k.grow ??= {})[r.key] = [r.chat, Date.now(), r.day, r.model, r.p] // today's (an old answer grows no more: a cold scan's thousands stay out)
     return true
   }
   const g = k.grow?.[r.key]
@@ -469,7 +472,9 @@ function rowAdd(id: string, c: KeptChat, day: string, model: string, r: Pick<Use
 // Laki's own runs' chats (Laki AI's, a side chat's fork): never counted here, its call log has them
 export function usageSkip(id: string | undefined) {
   if (!id) return
-  ;(keptNow().skip ??= {})[id] = Date.now()
+  const k = keptNow()
+  ;(k.skip ??= {})[id] = Date.now()
+  if (k.chats[id] && !k.chats[id].made) delete k.chats[id], (owners = undefined), todo.add(id) // one the scan counted first: its rows and keys go (the call log has it)
   daysLater()
 }
 // a chat Laki ran outside a tab (a side chat's fork): its workspace's, wherever the scan finds it
@@ -533,8 +538,9 @@ export function whereOf(): (dir?: string) => string {
   }
   const hid = (p?: { private?: boolean }) => veil && !!p?.private
   const places: [string, string][] = []
-  for (const p of state.projects) places.push([real(p.path), hid(p) ? 'A private project' : p.name])
-  for (const w of state.workspaces) if (!w.host) (p => places.push([real(w.path), hid(p) || hid(w) ? 'A private workspace' : `${p?.name ? `${p.name} · ` : ''}${w.name || w.id}`]))(state.projects.find(p => p.id === w.project))
+  const mac = state.projects.filter(p => !p.kind && !p.host) // never the sidebar's Terminals or Browsers (your home folder) or an SSH host's
+  for (const p of mac) places.push([real(p.path), hid(p) ? 'A private project' : p.name])
+  for (const w of state.workspaces) if (!w.host && mac.some(p => p.id === w.project)) (p => places.push([real(w.path), hid(p) || hid(w) ? 'A private workspace' : `${p?.name ? `${p.name} · ` : ''}${w.name || w.id}`]))(state.projects.find(p => p.id === w.project))
   places.sort((a, b) => b[0].length - a[0].length)
   return dir => {
     if (!dir) return 'Unknown folder'

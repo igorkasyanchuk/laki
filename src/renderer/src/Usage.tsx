@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, Icon, IconButton, Page, act } from './ui'
 import { ago as agoOf } from './Info'
 
-import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type OwnPrice, type QuotaSource, type Today, type UsageWindow, usageOld } from '../../shared/types'
+import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type OwnPrice, ownPriceOk, type QuotaSource, type Today, type UsageWindow, usageOld } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
@@ -341,8 +341,13 @@ export function PriceForm({ model, models, onSave, onCancel }: { model?: string;
   const save = () => {
     const m = v.model.trim()
     if (!m) return setErr('Which model?')
-    const num = (x: string) => (x.trim() === '' ? undefined : Number(x))
-    onSave(m, v.as.trim() ? { as: v.as.trim() } : { in: num(v.in)!, out: num(v.out)!, ...(num(v.rd) !== undefined && { rd: num(v.rd)! }) }).then(() => setErr(''), e => setErr(String(e?.message ?? e)))
+    let p: OwnPrice
+    try {
+      p = ownPriceOk(m, v.as.trim() ? { as: v.as } : { in: v.in, out: v.out, rd: v.rd }) // the daemon's own check: one it refuses never reaches Settings' save
+    } catch (e) {
+      return setErr((e as Error).message)
+    }
+    onSave(m, p).then(() => setErr(''), e => setErr(String(e?.message ?? e)))
   }
   return (
     <form className="usage-price" onSubmit={e => (e.preventDefault(), save())}>

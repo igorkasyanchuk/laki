@@ -252,6 +252,11 @@ function scrubCopies() {
 const today = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 export function load() {
   mkdirSync(runDir, { recursive: true, mode: 0o700 })
+  // save()'s temp copies a killed daemon left (each save names its own; the one before 0.69 always state.json.tmp)
+  for (const f of (() => { try { return readdirSync(dir) } catch { return [] } })()) {
+    const m = /^state\.json(?:\.(\d+)\.[0-9a-f]{8})?\.tmp$/.exec(f)
+    if (m && Number(m[1]) !== process.pid) rmSync(join(dir, f), { force: true })
+  }
   const had = existsSync(statePath) || existsSync(statePath + '.bak') || backups().length > 0
   let from = statePath
   if (existsSync(statePath)) {
