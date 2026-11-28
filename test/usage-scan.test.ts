@@ -144,6 +144,8 @@ test('scan: lines appended after a restart count once; 0.68.0’s old rows recou
   delete k.v
   const y = dayOf(Date.now() - 864e5)
   k.chats.o1.days[y] = { 'claude-opus-5-5': { tokens: 999, cost: 2 } }
+  k.chats.o1.days[dayOf(Date.now())] = { 'claude-opus-5-5': { tokens: 9, cost: 2 } } // an old row 0.68.0 kept over x1's parts (its key claimed)
+  rmSync(join(rig.data, 'usage-scan-v1.json')) // as an upgrade finds it: no scan yet
   k.chats.gone = { ws: '', agent: 'claude', days: { [y]: { 'claude-opus-5-5': { tokens: 500, cost: 1 } } } }
   writeFileSync(f, JSON.stringify(k))
   await rig.start()

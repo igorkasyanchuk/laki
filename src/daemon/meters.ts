@@ -424,8 +424,20 @@ export function ledger(r: UseRec, ws?: string): boolean {
   const c = (k.chats[r.chat] ??= { ws: ws ?? '', agent: r.agent, days: {} })
   if (ws !== undefined && c.ws !== ws) (c.ws = ws), delete c.dir, todo.add(r.chat), daysLater()
   else if (ws === undefined && !c.ws && r.cwd && c.dir !== r.cwd) (c.dir = r.cwd), daysLater()
-  if (c.pre) delete c.pre, todo.add(r.chat), daysLater() // read again: the recount replaces what was kept before keys
   const o = ownersNow()
+  if (c.pre) {
+    // read again: the recount replaces what was kept before keys outright; those days' answers 0.68.0 claimed (its parts
+    // under an old row that was bigger) are let go, so the recount claims them again
+    for (const d of Object.keys(c.pre)) {
+      const ks = c.keys?.[d] ?? ''
+      for (let i = 0; i + 11 <= ks.length; i += 11) if (o.get(ks.slice(i, i + 11)) === r.chat) o.delete(ks.slice(i, i + 11))
+      delete c.keys?.[d]
+      delete c.days[d]
+    }
+    delete c.pre
+    todo.add(r.chat)
+    daysLater()
+  }
   const by = o.get(r.key)
   if (by !== undefined && by !== r.chat) return false
   if (by === undefined) {

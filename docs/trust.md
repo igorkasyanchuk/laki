@@ -28,7 +28,9 @@ What Laki itself connects to. The agents you run (Claude Code, Codex, Antigravit
 providers on their own; Laki starts them and reads their screens, it doesn't relay their traffic. For Antigravity's
 plan limits Laki runs agy's own `agy -p /usage` every 5 minutes (it takes no turn and uses no quota; agy asks Google
 itself, with its own sign-in, and Laki never reads that token): Settings › Layout › *Ask agy for Antigravity's plan
-limits* turns it off.
+limits* turns it off. Claude's and Codex's the same way: Laki asks Claude Code itself (`claude -p`'s `get_usage`, no
+prompt, no chat kept) and `codex app-server` every 5 minutes; each reads its own sign-in and asks its own provider.
+Counting every agent chat on this Mac (Settings › Usage) reads their files here only: nothing of them leaves the Mac.
 
 ### With nothing set up
 
@@ -46,7 +48,8 @@ limits* turns it off.
 |---|---|---|---|
 | `openrouter.ai` | Laki AI's chat, an AI call or decision block's prompt, Voice's recording, a project's agent-learned memories for compaction, the last answer for *Guess my next prompt*; Usage's credits left and the key's spend (`/key`, `/credits`, read every 5 minutes while the status bar's ring shows) | Once you add an OpenRouter key (Settings › AI), as each of those runs | Remove the key; Laki AI off; each feature's own switch (Voice, *On its own* compaction, *Guess my next prompt*) |
 | Your own endpoint (Settings › AI › Your endpoint) | Laki AI's chat, an AI call block's prompt, memories for compaction, *Guess my next prompt*'s last answer: what goes to OpenRouter otherwise (Voice and decision blocks stay OpenRouter's) | Only with *Runs with: Your endpoint*, as each of those runs; https, or http on this Mac only | Pick another backend; Laki AI off; each feature's own switch |
-| `api.anthropic.com` | Claude Code's own sign-in token, asking for your plan's limits (an undocumented endpoint) | At most every 7.5 minutes, only with *Ask api.anthropic.com for Claude Code's plan limits* on (Settings › Appearance) | That switch (off unless you turn it on) |
+| `api.anthropic.com` | Claude Code's own sign-in token, asking for your plan's limits (an undocumented endpoint) | At most every 7.5 minutes, only with *Ask api.anthropic.com* turned on from the plan limits' popup and only when Claude Code itself gave none | That switch (off unless you turn it on) |
+| A quota source's URL (yours) | Its token, as `Authorization: Bearer`, asking for that provider's or hub's plan limits | Every 5 minutes, only for the sources you add (Settings › Usage › Quota sources); https, a public address, each redirect checked again; http only to this Mac | Remove the source |
 | `chatgpt.com` | Codex's own sign-in token, asking for your plan's limits (an undocumented endpoint); `api.openai.com` is only a claim name read from that token, never contacted | At most every 5 minutes, only with *Ask chatgpt.com for Codex's plan limits* on | That switch |
 | `cli-chat-proxy.grok.com` | Grok's own sign-in token (`~/.grok/auth.json`), asking for your plan's limits (an undocumented endpoint, the one Grok's CLI asks); `auth.x.ai` is only the issuer's name in that file, never contacted | At most every 5 minutes, only with *Ask grok.com for Grok's plan limits* on | That switch |
 | Your phone push URL: `ntfy.sh` (or your own ntfy server), `hooks.slack.com`, any JSON webhook | A push's title, its workspace's name, the question and its choices (secrets masked); ntfy is also read for your answer taps | When an agent or a workflow needs you, a run ends, a reminder is due (Settings › Phone pushes) | Clear the webhook |

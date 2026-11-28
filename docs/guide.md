@@ -1141,13 +1141,22 @@ run fails, saying so.
   (⇧-click a run of them): the bar under the list turns them on or off or moves them. The Workflows page has the same.
 
 **Usage** (the ring's popup › *By day and model*, or ⌘K): tokens and ≈ cost at the API's list prices a day, for the
-last 7, 30 or 90 days, from each Claude Code and Codex tab's transcript in Laki and Laki AI's own calls: a bar a day
+last 7, 30 or 90 days, from every Claude Code, Codex, Grok, OpenCode and Antigravity chat on this Mac (Settings › Usage ›
+*Count every agent chat on this Mac*, on by default: the ones you ran outside Laki too, read from their own files, each
+answer counted once however many chats copied it; off: Laki's own tabs only; nothing leaves the Mac) and Laki AI's own
+calls. A Laki tab's chat shows under its workspace; any other under the Laki project or worktree whose folder it ran
+in, else *Outside Laki · <its last two folders>*. *In Laki*, *Outside Laki* or *All* (the default), one agent or all.
+A model with no price says *no price for <model>* with *Set price*: its rates (USD per million tokens) or *the same
+as* a priced model; Settings › Usage › *Model prices* lists yours, and the days kept re-price at once. A bar a day
 (*$* or *Tokens*) stacked by agent, each in its color with a legend (Laki AI is one); the total, a day's average, and
 what used the most; *Where it went*: each workspace (its project, or *archived*, or *A deleted workspace*) and each of
 Laki AI's sources (its chats, Specs & Brainstorms, agents' `laki ai`, extensions, workflows, memory compaction, Done
 check reviews, next prompt guesses, side chats, *Ask me first*, *Explain an ask*), its bar split by agent; and each model's share. *All*
 or one agent, *All models* or one (a row's click too). Kept 90 days in `usage-days.json` and Laki AI's call log; your
-plan bills its own way.
+plan bills its own way. The popup's *Today* counts every chat too, its *Outside Laki* row apart (*Today*'s tip: In Laki
+and Outside); a workspace's cap and a workflow's budget count only Laki's tabs. Claude's advisor calls count at their own
+model's prices. `npm run usage:check` recounts every Claude and Codex chat kept from its transcripts and says how far
+the two are apart.
 
 **OpenRouter credits**: with an OpenRouter key for Laki AI (Settings › AI), the plan limits' popup shows the
 account's credits left and what the key spent today, this week and this month (and its own limit, if it has one),
@@ -1158,7 +1167,11 @@ line. Laki AI's own call log (Settings › AI) stays as it is.
 **Plan limits** (the ring at the start of the status bar): the theme's accent color, its waiting color past 70%,
 its error color past 90%, filled to
 the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
-the week per model (Fable's) and extra usage (those two only from Anthropic, below); Codex's 5-hour and weekly windows. Each shows when it resets. They come from what the agents report
+the week per model (Fable's) and extra usage; Codex's 5-hour and weekly windows. Claude's come from Claude Code itself
+every 5 minutes (its own `/usage` numbers: it reads its own sign-in, takes no turn and keeps no chat), unless you turn
+off *Ask Claude Code for its plan limits* in Settings › Layout; a sign-in with no plan (an API key, Bedrock) says *No
+plan limits for this sign-in*, an error keeps the last numbers. Any other provider's or hub's: Settings › Usage › *Quota
+sources* (a name, a URL that answers in T3 Code's quota format, a token kept in the Keychain), each account a row here. Each shows when it resets. They come from what the agents report
 themselves: Claude Code's status line (*Read Claude's status line*, on) and what Codex writes as it works, so they show
 once a tab of that agent has run; with several tabs on one account, each window shows the newest reading of it (an idle
 tab's older numbers never win). Codex's also come from Codex itself as the popup reads them (its own app server: it
@@ -2577,6 +2590,10 @@ title large at the top and small in the glass head once you scroll.
   the night, not for good), *Each turn's changes* (on: the Reader's card of what each turn changed, [Reader
   view](#reader-view)), *Done check* (on: each project's own, [above](#done-check)), *Collision radar* (off: worktrees whose changes meet, checked on their own, [above](#collision-radar)), *Delete archived workspaces* (Never, or after a day to a month:
   the workspace goes, its branch stays), *Archive workspace when its PR merges* (off) and *Archive workspaces untouched for* (off).
+- *Usage*: *Count every agent chat on this Mac* (on: Claude Code, Codex, Grok, OpenCode and Antigravity chats you ran
+  outside Laki too, read from their own files, the last 90 days; off: Laki's own tabs only), *Model prices* (your own
+  price for a model, or the same as another's: over Laki's, the days kept re-priced at once), *Quota sources* (another
+  provider's or hub's plan limits from a URL in T3 Code's quota format, its token in the Keychain).
 - *Appearance*: what the window shows (*Ask Anthropic for Claude's plan limits*, OpenAI's for Codex's: off by default, the agents' own numbers then; *Context meter*: how full each chat's context is, in the status bar and on its tab as a line (the default) or a ring, or the status bar only, or off; *Read Claude's status line*: Claude Code's own context and plan limits numbers, on by default; *Tokens
   and cost*: what each chat used, on its tab's tooltip, and today's in the plan limits' popup, on by default; *Turn timers*, off by default),
   *Sidebar rows* (what a row shows after its name, each on or off, as a right click › *Show ›* does: *Next step* (off

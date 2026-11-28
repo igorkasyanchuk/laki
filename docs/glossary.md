@@ -24,5 +24,7 @@ out of Help and Settings.
 | **My Desk** | the page of extension tiles | the Desk |
 | **Collision radar** | where two worktrees (or the base) change the same lines; *Check overlaps* opens it | Overlaps (as a title) |
 | **Inbox** | the panel the menu bar icon's click opens (Menu bar click: Inbox) | popover, tray panel |
+| **Outside Laki** | a chat no Laki tab ran, counted on the Usage page by the folder it ran in | external, unmanaged |
+| **Quota source** | a URL that says another provider's or hub's plan limits (Settings › Usage) | quota provider, usage hub |
 | **Your endpoint** | Laki AI's own OpenAI-compatible server (Settings › AI) | custom provider, BYO endpoint |
 | **End to end** | remote access sealed between the page and the Mac (S14) | E2E, encrypted tunnel |

@@ -60,6 +60,7 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 | Any CLI agent | Claude Code, Codex, Antigravity, Grok, OpenCode, any command | Any |
 | A second agent checks the work | Done check, as each turn ends | No |
 | Conflicts between parallel tasks | Collision radar, while they work | At merge |
+| What the agents cost | Every agent chat on this Mac, each answer once, at API prices; each plan's limits | Each agent's own `/usage` |
 | Account needed | None | None |
 | Platforms | macOS 13+ on Apple silicon; Intel, Linux and Windows (WSL 2): build it yourself | Any |
 

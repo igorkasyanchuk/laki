@@ -845,7 +845,22 @@ ledger first, so the state is never past what it kept): a quit mid-scan picks up
 the same inode and bigger: read on from `pos`; any other change (same size and a new mtime, a new inode, smaller): read
 again from 0, the ledger's keys counting nothing twice; a DB: its rows past `pos` (a rowid). 4 files at a time, paced to
 32 MB/s on average (Orca's `UsageScanReadBudget`: a debt past 5 s forgiven, under 50 ms not waited: a small scan never
-waits), 8 MB reads of whole lines (a longer line: a bigger read, past 128 MB skipped). Laki's own claude -p chats: the
+waits), 1 MB reads of whole lines (one buffer a file; a longer line: a bigger read, past 128 MB skipped; 8 MB reads took
+the process to 510 MB at its peak, 1 MB to 345 MB, the same CPU).
+
+Measured on this Mac (M-series, 2026-11-28; 447 files, 1.3 GB of Claude transcripts, Antigravity's 59 MB and OpenCode's
+7 MB; read only: `npm run usage:check -- --scan`, and an isolated daemon of this build with the chats linked in): the
+first scan 42 s in the daemon (37 s in the worker alone: the 32 MB/s pacing), 11.5 s of CPU, the worker's heap at most
+61 MB, the process 345 MB at its peak; a later scan with nothing changed 0.04 to 0.1 s and as much CPU. Its ledger
+against `npm run usage:check`'s recount, 131 Claude chats: 0.001% apart in tokens, 0.035% in cost (the 0.68.0 ledger it
+started from: 3.2% under, a 67 MB transcript of which 0.68.0's tab read kept only the last 32 MB, `SHARE_READ`). Claude
+Code's `get_usage` (`-- --limits`, claude 2.1.332): 2.7 s to its answer, 1.8 s of CPU, its process 266 MB.
+
+`npm run usage:check` (scripts/usage-check.ts; not in check, test or dmg; it only reads): every Claude and Codex chat
+in the ledger recounted from its transcripts (the scan's state names each file's chat; else where its agent keeps
+them) with `meterOf` and the ledger's owners (one nobody owns: this chat's), over the days it keeps; kept against
+recount per chat and in all, failing past 1% in all or for a chat of 10K tokens or more; rows from before parts listed,
+not failed; `--scan` and `--limits` time the scan and get_usage, `--no-check` the timings alone. Laki's own claude -p chats: the
 ledger's `skip` (above). Where each chat shows: a Laki tab's under its workspace (`ws`), as before; any other (`ws` '') by its folder (`dir`):
 meters.ts `whereOf`, the Laki project or worktree with the longest folder that holds it (both resolved; a folder gone
 since: its nearest one still there, the rest as said) names it (`<project> · <workspace>`, Recording mode: a private one

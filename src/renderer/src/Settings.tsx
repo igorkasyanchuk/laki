@@ -2681,7 +2681,7 @@ export function SettingsPage(p: {
               <Group title="Model prices" hint="Your own price for a model Laki has none for, or one you pay otherwise: USD per million tokens, or the same as another model's. Yours win over Laki's, and the days kept re-price at once">
                 <div className="setting-box">
                   {Object.entries(s.prices ?? {}).map(([m, p]) => (
-                    <div key={m} className="switch-row">
+                    <div key={m} className="usage-price">
                       <span className="mono">{m}</span>
                       <span className="muted small">{'as' in p ? `as ${p.as}` : `$${p.in} in, $${p.out} out${p.rd !== undefined ? `, $${p.rd} cache read` : ''}`}</span>
                       <button type="button" className="link" onClick={() => set({ prices: Object.fromEntries(Object.entries(s.prices ?? {}).filter(([k]) => k !== m)) })}>

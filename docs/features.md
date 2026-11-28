@@ -63,8 +63,10 @@ time and AI money per run (`budget: 60 min, $5`).
   subagents and spawned threads, 1-hour cache writes, long prompts and fast mode, and a copied answer once; a model with
   no price says so. OpenCode tabs count too, at OpenCode's own price. Numbers older than 20 minutes
   are dimmed and say how old, with *Ask api.anthropic.com* beside them for the current ones.
-- **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from Laki's Claude Code and Codex tabs,
-  beside each plan's limits and Laki AI's OpenRouter credits and spend (*running low* when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
+- **Usage**: tokens and ≈ cost a day by agent and model (7, 30 or 90 days) from every Claude Code, Codex, Grok, OpenCode
+  and Antigravity chat on this Mac, Laki's tabs or not, each answer counted once (In Laki, Outside Laki, All; *Set price*
+  for a model with none; `npm run usage:check` recounts it), beside each plan's limits (Claude's from Claude Code itself;
+  any other provider's from a quota source) and Laki AI's OpenRouter credits and spend (*running low* when low). *Where it went*: a workspace's tokens by file read, command output and the carried chat, with hints (`laki spend`).
 - **Prompt templates**: yours, a project's, and a repo's own in `.laki/prompts/` (Markdown files, reviewed in PRs, trusted
   with its `.laki.json`, tagged *repo*); `/` in a prompt box lists them.
 - **Improve my prompt**: ✨ in a prompt box has Laki AI rewrite your draft with what the chat knows; it stays in the box

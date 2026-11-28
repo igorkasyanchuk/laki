@@ -26,7 +26,7 @@ export type ScanIn = { claude: string[]; codex: string[]; grok?: string; agy?: s
 export type ScanOut = { recs: UseRec[]; files: Record<string, FileState | null> } // null: gone (not seen this scan)
 export const RATE = 32 << 20 // bytes a second, on average
 const BATCH = 4
-const CHUNK = 8 << 20
+const CHUNK = 1 << 20
 const LINE_MAX = 128 << 20 // ponytail: a line past this (a pasted video?) is skipped whole
 
 // Orca's pacing: the bytes read so far at rate, paused for what's ahead; a debt past 5 s forgiven, under 50 ms not waited
@@ -134,9 +134,10 @@ async function jsonl(j: Job, st: { size: number }, from: number, was: FileState 
   const owns = (key: string, day: string, model: string, p: Record<string, number>) => (out.push({ chat, agent: j.agent, key, day, model, p, ...(cwd && { cwd }) }), true)
   try {
     let n = CHUNK
+    let buf = Buffer.allocUnsafe(Math.min(n, st.size - pos)) // one a file, bigger only for a longer line
     while (pos < st.size) {
       const want = Math.min(n, st.size - pos)
-      const buf = Buffer.alloc(want)
+      if (buf.length < want) buf = Buffer.allocUnsafe(want)
       const { bytesRead } = await fh.read(buf, 0, want, pos)
       if (!bytesRead) break
       await budget.take(bytesRead)

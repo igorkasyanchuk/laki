@@ -298,7 +298,7 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
           </section>
         )}
         <p className="muted small usage-foot">
-          {asked.length ? `Read ${ago < 1 ? 'just now' : `${ago} min ago`}; asked with each account's own sign-in where Layout says so${rows.some(r => r.source === 'own') ? "; the others are the agents' own numbers" : ''}.` : "The agents' own numbers: Claude Code's status line, Codex's reports."}{rows.some(r => r.agent === 'claude' && r.windows.length > 0) && asks?.claude !== true && ` Claude's week per model (Fable's) only comes from Anthropic: Settings › Layout › Ask ${USAGE_HOSTS.claude}.`} Settings › Agents & profiles has the accounts.
+          {asked.length ? `Read ${ago < 1 ? 'just now' : `${ago} min ago`}; asked with each account's own sign-in where Layout says so${rows.some(r => r.source === 'own') ? "; the others are the agents' own numbers" : ''}.` : "The agents' own numbers: Claude Code's status line, Codex's reports."} Settings › Agents & profiles has the accounts.
         </p>
       </div>
     </Backdrop>
@@ -384,7 +384,7 @@ export function QuotaSources({ list, call }: { list: QuotaSource[]; call: <T>(me
   return (
     <>
       {rows.map(q => (
-        <div key={q.id} className="switch-row">
+        <div key={q.id} className="usage-price">
           <span>{q.name}</span>
           <span className="muted small mono grow">
             {q.url}

@@ -31,6 +31,7 @@
     "test:cov": "node --experimental-strip-types --no-warnings scripts/cov.ts",
     "debt": "node --experimental-strip-types --no-warnings scripts/debt.ts",
     "prices": "node --experimental-strip-types --no-warnings scripts/prices.ts",
+    "usage:check": "node --experimental-strip-types --no-warnings scripts/usage-check.ts",
     "size": "node --experimental-strip-types --no-warnings scripts/size.ts",
     "mem": "node --experimental-strip-types --no-warnings scripts/mem.ts",
     "audit:deps": "node --experimental-strip-types --no-warnings scripts/audit.ts",
