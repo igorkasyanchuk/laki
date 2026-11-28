@@ -189,6 +189,9 @@ time and AI money per run (`budget: 60 min, $5`).
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new
   workspace's prompt. Agents take their own of the iOS Simulator or any app's window (`laki screen shot`), and with
   idb tap, swipe and type in the simulator to check what they built.
+- **Talk to agents**: a key from any app opens a pill that hears you and sends it to an agent or Laki AI; say yes or
+  no to answer an ask. *Conversation* keeps it going hands-free: it sends when you pause, reads the answer out and
+  listens again until you say "stop" (on headphones you can talk over it).
 - **A video while you work**: a YouTube link plays at the bottom of the sidebar.
 - **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it starts workspaces, reviews
   PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); with Laki's skill it also

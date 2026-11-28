@@ -9,7 +9,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, type OwnPrice, type QuotaSource, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, type OwnPrice, type QuotaSource, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, VOICE_MODEL, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { outLine, RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -36,7 +36,7 @@ import { CssGuide, DesignMini, FontPick, InterfacePreview, SidePreview } from '.
 import type { AllowRule } from '../../shared/ask'
 import type { McpServer } from '../../shared/mcp'
 import { ActionsField, ARGS_EG, ENV_VARS, EnvField, FolderField, KeptSecrets, type McpFound, McpServers, type ProjectConfig, type ProjectInfo, ProjectSection, type Scripts, TemplatesField, VarChips } from './SettingsProject'
-import { type AccountsApi, AccountsBlock, AgentCalls, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, VoiceSection, WhatItSees } from './SettingsAgents'
+import { type AccountsApi, AccountsBlock, AgentCalls, AgentVersions, type AiApi, AiSection, type SkillApi, SkillSection, TalkEngine, useVoicePrice, VoiceSection, WhatItSees } from './SettingsAgents'
 import { hookOf, type RemoteApi, RemoteSection, type SimApi, SimSection, TelegramSection, type TunnelCheck, TunnelsSection, WebhookSection, WebhooksSection } from './SettingsConnect'
 import { ChipsInput, type WidgetsApi, WidgetsSection } from './SettingsExtensions'
 import { type ResourcesApi, ResourcesSection } from './SettingsResources'
@@ -307,6 +307,7 @@ export type AppSettings = Paint & {
   talkOn?: boolean // Q2: the talk key (unset: off)
   tgAi?: TgAi // Settings › AI › From Telegram (types.ts Settings)
   talkCards?: boolean // Settings › Voice › Answer cards (types.ts Settings)
+  talkConvo?: boolean // Settings › Voice › Talk key › Conversation (Q14, types.ts Settings)
   talkKey?: string // its keys (unset: TALK_KEY)
   talkTo?: 'ai' // Q10: who it goes to: Laki AI (unset: an agent, Q2's)
   updateCheck?: boolean // Check for updates at launch, then daily (main's update.ts), on unless false
@@ -3200,6 +3201,7 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={s.voice?.answers !== false} onChange={on => set({ voice: { ...s.voice, answers: on ? undefined : false } })}>
                     <Says title="Answer asks" hint="Say just yes or no (allow, deny, так, ні…) while an agent waits on a permission: the pill shows the ask, and ⏎ answers it. A plain command it answers by itself in 1.5 s; a question, a plan, a secret or a risky command stays for Laki's window. Tab sends your words as a message instead" />
                   </Switch>
+                  <ConvoSwitch s={s} set={set} />
                   <Switch className="switch-row" on={s.talkCards === true} onChange={on => set({ talkCards: on || undefined })}>
                     <Says title="Answer cards" hint="While an ask's card is on screen, the key answers the newest one: say its number or its words, yes, or no and why. The card shows what it heard and answers in 2 s; any key stops it. A choice that holds from now on, a risky command, a secret or a plan: click those" />
                   </Switch>
@@ -3536,5 +3538,19 @@ export function SettingsPage(p: {
       </div>
       {toTop}
     </div>
+  )
+}
+
+// Q14: Settings › Voice › Talk key › Conversation; Cloud's line: each utterance billed, at the Model line's price
+function ConvoSwitch({ s, set }: { s: AppSettings; set: (p: Partial<AppSettings>) => void }) {
+  const cloud = s.voice?.talkEngine !== 'mac'
+  const price = useVoicePrice(s.voice?.model || VOICE_MODEL, cloud && s.talkConvo === true)
+  return (
+    <Switch className="switch-row" on={s.talkConvo === true} onChange={on => set({ talkConvo: on || undefined })}>
+      <Says
+        title="Conversation"
+        hint={`The key opens a conversation instead of one message: talk, and when you stop for a moment it's sent. The answer is read out (Laki AI's when it's on, else the agent's when it finishes) and it listens again; a yes or no answers an ask. The key, Esc, "stop" or "bye" ends it, or a minute of nothing. On headphones you can talk over it. Never in Quiet or Recording mode, and a private workspace's answers aren't read out${cloud ? `. Cloud bills each thing you say as its own recording${price ? ` (${price})` : ''}` : ''}`}
+      />
+    </Switch>
   )
 }

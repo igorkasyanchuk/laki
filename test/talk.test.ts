@@ -1,7 +1,7 @@
 // Q2: the talk key's pill: who a recording goes to by default, Tab's next, the time it shows (shared/talk.ts)
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { AI_TO, routeOf, type RouteTab, talkDefault, talkName, talkNext, talkShot, talkTime, type TalkTo } from '../src/shared/talk.ts'
+import { AI_TO, CONVO_IDLE_MS, convoEnd, endpoint, type Ep, FLAT, routeOf, type RouteTab, talkDefault, talkingOver, talkName, talkNext, talkShot, talkTime, type TalkTo, UTTER_END_MS } from '../src/shared/talk.ts'
 import { voicePrice } from '../src/shared/types.ts'
 import { voiceFix } from '../src/shared/types.ts'
 
@@ -165,3 +165,36 @@ test('Q6: the level meter: silence 0, a tone in between, clipped at 1; the line 
   assert.equal(levelOf(Uint8Array.from({ length: 512 }, (_, i) => (i % 2 ? 0 : 255))), 1)
   assert.equal(quietSay('MacBook Pro Microphone'), "I can't hear you: check the input (MacBook Pro Microphone)")
 })
+
+test('Q14 endpoint: an utterance ends 1.2 s under FLAT after speech; a blip is no speech; silence before it never ends one', () => {
+  const run = (frames: [number, number][]) => {
+    let s: Ep = {}
+    const ends: number[] = []
+    for (const [t, l] of frames) {
+      const [n, end] = endpoint(s, l, t)
+      s = n
+      if (end) ends.push(t)
+    }
+    return { s, ends }
+  }
+  const quiet = (from: number, to: number) => Array.from({ length: Math.floor((to - from) / 60) + 1 }, (_, i): [number, number] => [from + i * 60, FLAT / 2])
+  const loud = (from: number, to: number) => Array.from({ length: Math.floor((to - from) / 60) + 1 }, (_, i): [number, number] => [from + i * 60, 0.2])
+  assert.deepEqual(run(quiet(0, 10_000)).ends, [], 'nothing said: no end (the conversation\'s minute ends it)')
+  const said = run([...quiet(0, 1000), ...loud(1000, 2500), ...quiet(2560, 5000)])
+  assert.equal(said.ends.length, 1)
+  assert.ok(said.ends[0] >= 2500 + UTTER_END_MS && said.ends[0] < 2500 + UTTER_END_MS + 120, String(said.ends[0]))
+  assert.deepEqual(run([...loud(1000, 1600), ...quiet(1660, 2600), ...loud(2660, 3000), ...quiet(3060, 6000)]).ends.length, 1, 'a pause under 1.2 s is the same utterance')
+  assert.deepEqual(run([...loud(1000, 1060), ...quiet(1120, 4000)]).ends, [], 'a click: no utterance')
+  assert.deepEqual(run([...loud(1000, 1060), ...quiet(1120, 4000)]).s, {}, 'and listening goes on from nothing')
+  assert.equal(talkingOver({ from: 1000, loud: 1100 }), false)
+  assert.equal(talkingOver({ from: 1000, loud: 1200 }), true, 'speech under way: Laki stops speaking (headphones)')
+  assert.equal(CONVO_IDLE_MS, 60_000)
+})
+
+test('Q14 convoEnd: stop, that\'s all, bye (Ukrainian and Russian too) end it, as the whole utterance only', () => {
+  for (const t of ['Stop.', "That's all", 'that is all!', 'Bye', 'um, bye', 'Goodbye', 'Стоп', 'Це все', 'Бувай', 'До побачення', 'Это всё', 'Пока', 'до свидания']) assert.ok(convoEnd(t), t)
+  for (const t of ['stop the dev server', "that's all for the tests, now docs", 'bye the way', 'say goodbye to the old API', 'все тести', 'пока не трогай', '']) assert.ok(!convoEnd(t), t)
+  assert.ok(convoEnd('стоп', 'uk-UA') && convoEnd('stop', 'uk-UA'), 'English with any language')
+  assert.ok(!convoEnd('пока', 'uk'), 'its language only, and English')
+})
+

@@ -95,9 +95,9 @@
       #talk { box-sizing: border-box; height: 78px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 39px; }
       .t-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
       .t-rec { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
-      #talk.rec .t-rec { background: #f7768e; animation: t-pulse 1.2s ease-in-out infinite; }
-      @keyframes t-pulse { 50% { opacity: 0.35; } }
       #talk.speaking .t-rec { background: var(--running); animation: t-pulse 1.2s ease-in-out infinite; } /* reading Laki AI's answer out */
+      #talk.rec .t-rec { background: #f7768e; animation: t-pulse 1.2s ease-in-out infinite; } /* the mic open: red, as it speaks too (a conversation on headphones) */
+      @keyframes t-pulse { 50% { opacity: 0.35; } }
       @media (prefers-reduced-motion: reduce) { #talk.speaking .t-rec { animation: none; } }
       /* a Mac's pill over the window's popover material (main's talk(): vibrancy, its corners rounded): the theme's
          background as a tint, a lit top edge, the window's corners; solid under Reduce transparency (main makes it solid too) */
@@ -109,6 +109,9 @@
       .t-time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
       .t-to { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .t-to.moved { color: var(--waiting); }
+      #talk.convo .t-to { flex: 0 1 auto; } /* who gets it first, the last thing heard in what's left */
+      .t-heard { flex: 1 1 0; min-width: 0; color: var(--muted); font-size: 11px; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .t-heard[hidden] { display: none; }
       .t-undo { flex: none; font: inherit; color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; padding: 2px 9px; cursor: pointer; }
       .t-note { flex: 1; min-width: 0; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .t-sel { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; padding: 0 2px 0 7px; }
@@ -235,7 +238,7 @@
       <div class="v-note">Dictation starts by itself · ⏎ sends · ⇧⏎ a new line · Esc closes</div>
     </div>
     <div id="talk" role="dialog" aria-label="Talk to an agent">
-      <div class="t-row"><i class="t-rec" title="Recording"></i><span class="t-level"><i></i></span><span class="t-time">0:00</span><b class="t-to"></b><button class="t-undo" hidden>Undo</button></div>
+      <div class="t-row"><i class="t-rec" title="Recording"></i><span class="t-level"><i></i></span><span class="t-time">0:00</span><b class="t-to"></b><span class="t-heard" title="What it heard last" hidden></span><button class="t-undo" hidden>Undo</button></div>
       <div class="t-row"><span class="t-sel" hidden><span></span><button aria-label="Leave the selection out" title="Leave it out">×</button></span><div class="t-note"></div></div>
     </div>
     <script type="module" src="/src/floater.ts"></script>

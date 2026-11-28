@@ -178,6 +178,33 @@ export const SILENCES: [number, string][] = [[30, '30 seconds'], [60, '1 minute'
 export const silenceEnd = (quietMs: number, after: number | undefined, heard: boolean): 'type' | 'drop' | undefined => (after && SILENCES.some(s => s[0] === after) && quietMs >= after * 1000 ? (heard ? 'type' : 'drop') : undefined)
 export const quietSay = (device?: string) => `I can't hear you: check the input${device ? ` (${device})` : ''}`
 
+// Q14: a conversation (Settings › Voice › Talk key › Conversation, talkConvo): the pill listens, sends each utterance,
+// reads the answer out, listens again. endpoint: an utterance's end, from the level meter's frames (levelOf): speech is
+// a stretch at FLAT or over, VOICE_SHORT_MS at least (shorter: a click, a cough: listened past); UTTER_END_MS under
+// FLAT after it ends it. talkingOver: speech under way (on headphones it stops Laki's voice). Nothing heard for
+// CONVO_IDLE_MS: it ends; VOICE_MAX_MS still caps each utterance
+export const UTTER_END_MS = 1200
+export const CONVO_IDLE_MS = 60_000
+export type Ep = { from?: number; loud?: number } // speech's first loud frame and its last
+export function endpoint(s: Ep, level: number, t: number): [Ep, boolean] {
+  if (level >= FLAT) return [{ from: s.from ?? t, loud: t }, false]
+  if (s.from === undefined || s.loud === undefined || t - s.loud < UTTER_END_MS) return [s, false]
+  return [{}, s.loud - s.from >= VOICE_SHORT_MS] // after a blip too short to be speech: listening on, from nothing
+}
+export const talkingOver = (s: Ep) => s.from !== undefined && s.loud !== undefined && s.loud - s.from >= VOICE_SHORT_MS
+// its end words, the whole utterance (fillers and punctuation aside): stop, that's all, bye, in English, Ukrainian and
+// Russian (the languages SPOKEN's yes and no carry besides the others)
+const ENDS: Record<string, string[]> = {
+  en: ['stop', "that's all", 'that is all', 'bye', 'goodbye', 'bye bye', 'ok bye', 'okay bye'],
+  uk: ['стоп', 'це все', 'на цьому все', 'все', 'усе', 'бувай', 'бувайте', 'па па', 'до побачення'],
+  ru: ['стоп', 'это всё', 'это все', 'на этом всё', 'всё', 'все', 'пока', 'пока пока', 'до свидания'],
+}
+export function convoEnd(text: string, lang?: string): boolean {
+  const said = wordsOf(text).join(' ')
+  const l = lang?.toLowerCase().split(/[-_]/)[0]
+  return !!said && Object.entries(ENDS).some(([k, w]) => (!l || l === k || !Object.hasOwn(ENDS, l) || k === 'en') && w.includes(said))
+}
+
 // The talk key answering a waiting ask: the whole transcript one of a few words for yes or no (fillers and punctuation
 // aside), in English, Ukrainian or a language the filler list knows (German, French, Russian, Japanese, Chinese); never
 // a longer sentence ("yes but use pnpm" is a message). lang: a locale or language ('uk-UA', 'en'); none: every one

@@ -23,6 +23,12 @@ const readOut = () =>
     .then(l => ((outLabel = l.find(d => d.kind === 'audiooutput' && d.deviceId === 'default')?.label ?? ''), told.forEach(f => f())))
     .catch(() => {})
 export const outputLabel = () => outLabel
+// the output read now and as devices change (sayInit's; the talk pill's conversation: on headphones it listens as it speaks)
+let watching = false
+export function watchOutput() {
+  void readOut()
+  if (!watching) (watching = true), navigator.mediaDevices?.addEventListener('devicechange', () => void readOut())
+}
 export const onOutput = (f: () => void) => (told.add(f), () => void told.delete(f))
 
 const waiting: string[] = []
@@ -44,8 +50,7 @@ export function sayQueued(text: string) {
 }
 export function sayInit(on?: (cb: (text: string) => void) => void) {
   on?.(sayQueued)
-  void readOut()
-  navigator.mediaDevices?.addEventListener('devicechange', () => void readOut())
+  watchOutput()
   addEventListener('keydown', e => e.key === 'Escape' && talking && hush(), true)
   addEventListener('pagehide', hush)
 }

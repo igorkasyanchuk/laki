@@ -35,7 +35,9 @@ const mac = process.platform === 'darwin' // index.ts' too: this module's own, r
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string; at?: number; ask?: { options: { n: number; label: string }[]; tool?: string; what?: string; question?: string; steps?: boolean }; held?: boolean; unseen?: boolean } // held: a waiting one's secret or plan (the talk key never answers those) // unseen: done, not looked at (a stale one shows as idle)
-type FloatOpts = { speak?: boolean /* Settings › Voice: Laki AI's answer to a talk-key question read out by the pill (off in Quiet and Recording mode) */; hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; talkCards?: boolean /* Settings › Voice › Answer cards: its words to the newest ask card on screen (cards.ts talk-card) */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg; selection?: boolean /* Q11: the talk key carries the selected text */; islandOn?: IslandOn /* the island's screen (island.ts islandDisplay): unset, the built-in one */
+type FloatOpts = {
+  talkConvo?: boolean /* Q14: Settings › Voice › Talk key › Conversation, on (never in Quiet or Recording mode: the app window says) */
+  speak?: boolean /* Settings › Voice: Laki AI's answer to a talk-key question read out by the pill (off in Quiet and Recording mode) */; hide?: boolean /* 10c: Settings' Hide bubbles and cards from screen recording */; noAnswers?: boolean /* Settings › Voice: the talk key never answers asks */; talkCards?: boolean /* Settings › Voice › Answer cards: its words to the newest ask card on screen (cards.ts talk-card) */; speech?: string /* the talk key's on-device engine's locale (Settings › Voice: On this Mac) */; style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean; at: 'edge' | 'notch'; talk?: Float[]; talkAi?: boolean; aiShow?: boolean; route?: RouteCfg; selection?: boolean /* Q11: the talk key carries the selected text */; islandOn?: IslandOn /* the island's screen (island.ts islandDisplay): unset, the built-in one */
 } // talk: the talk pill's agents, the bubbles' list even with the bubbles off (Q2); talkAi: the talk key goes to Laki AI (Q10, Settings › Voice); route: Q5's Route by first words, on (its projects, Laki AI's word, the word fixes)
 type RouteCfg = { projects: { id: string; name: string }[]; aiWord?: string; fixes?: string; note?: boolean; todo?: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
@@ -217,6 +219,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
   if (e.sender !== win?.webContents) return
   const o = (opts && typeof opts === 'object' ? opts : {}) as Partial<FloatOpts>
   const was = floats.at
+  const convoWas = floats.talkConvo
   floats = {
     items: Array.isArray(items) ? items.slice(0, 12).map(x => (({ started: _s, usual: _u, ...rest }) => ({ ...rest, ...floatTimes(x) }))((x && typeof x === 'object' ? x : {}) as Float & { started?: unknown; usual?: unknown })) : [], // a turn's started and usual: checked (guards.ts)
     colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {},
@@ -235,11 +238,13 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     ...(typeof o.speech === 'string' && /^[\w-]{2,20}$/.test(o.speech) && { speech: o.speech }),
     ...(o.noAnswers === true && { noAnswers: true }),
     ...(o.talkCards === true && { talkCards: true }),
+    ...(o.talkConvo === true && { talkConvo: true }),
     ...(o.speak === true && { speak: true }),
     ...(o.hide === true && { hide: true }),
     ...(o.aiShow === true && { aiShow: true }),
     ...(o.route && typeof o.route === 'object' && Array.isArray(o.route.projects) && { route: { projects: o.route.projects.slice(0, 200), aiWord: typeof o.route.aiWord === 'string' ? o.route.aiWord.slice(0, 40) : undefined, fixes: typeof o.route.fixes === 'string' ? o.route.fixes.slice(0, 20000) : undefined, note: o.route.note !== false, todo: o.route.todo !== false } }),
   }
+  if (convoWas && !floats.talkConvo && talkW && !talkW.isDestroyed()) talkW.webContents.send('talk-note', { tab: '', kind: 'end', text: '', list: [] }) // Q14: Quiet, Recording mode or the switch off: an open conversation ends
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
   if (floats.menu !== 'card' || !floats.add || floats.at === 'notch') menu?.close()
   if (parked && floatState() !== parked) parked = ''
@@ -595,7 +600,8 @@ const TALK = { width: 320, height: 78 }
 // Laki AI asked in the background (its chat has the answer: the AI page); only while it's on. Settings › AI › Show its
 // work (aiShow, on unless off): its window opens with the ask (Q13: what it does, its Yes / No, without the app)
 // spoken: the talk pill's (aiTalk): its answer's first sentences to the pill, read out there while it's open (speakable)
-const aiAsked = (text: string, images?: string[], spoken = false) => (floats.ai ? (void rpc<{ text?: string }>('aiAsk', { text, ...(images && { images }) }).then(r => (typeof r?.text === 'string' ? speakable(r.text) : ''), () => '').then(s => spoken && floats.speak && talkW && !talkW.isDestroyed() && talkW.webContents.send('talk-speak', s)), floats.aiShow && setTimeout(aiWin, 300), { ai: true, ...(spoken && floats.speak && { speak: true }) }) : { error: 'Laki AI is off: Settings › AI' })
+// (Q14: a conversation's always; its asks go one after another to Laki AI's one chat, the AI page's, so it remembers them)
+const aiAsked = (text: string, images?: string[], spoken = false) => (floats.ai ? (void rpc<{ text?: string }>('aiAsk', { text, ...(images && { images }) }).then(r => (typeof r?.text === 'string' ? speakable(r.text) : ''), () => '').then(s => spoken && (floats.speak || floats.talkConvo) && talkW && !talkW.isDestroyed() && talkW.webContents.send('talk-speak', s)), floats.aiShow && !floats.talkConvo && setTimeout(aiWin, 300), { ai: true, ...(spoken && (floats.speak || floats.talkConvo) && { speak: true }) }) : { error: 'Laki AI is off: Settings › AI' })
 // Q10: the talk pill's ask to Laki AI: words that ask for the screen (talkShot) take the screen under the pill with it
 // (the pill and the bubbles out of the picture). No Screen Recording: asked without it, said so
 async function aiTalk(said: string, text = said): Promise<{ ai?: boolean; speak?: boolean; shot?: boolean; noShot?: string; error?: string }> {
@@ -664,7 +670,8 @@ export function talk() {
   // macOS's popover material behind the pill's tint (floater.html's #talk under prefers-reduced-transparency:
   // no-preference), the window's corners rounded as the quick bar's; solid under Reduce transparency and off a Mac
   const glass: BrowserWindowConstructorOptions = mac && !nativeTheme.prefersReducedTransparency ? { backgroundColor: '#00000000', vibrancy: 'popover', visualEffectState: 'active', roundedCorners: true } : {}
-  const w = (talkW = new BrowserWindow({ ...floatOpts(TALK.width, TALK.height), ...glass, x: clamp(p.x + 14, d.x, d.x + d.width - TALK.width), y: clamp(p.y + 18, d.y, d.y + d.height - TALK.height) }))
+  const wide = floats.talkConvo ? 420 : TALK.width // Q14: a conversation's turns and the last thing it heard beside who gets it
+  const w = (talkW = new BrowserWindow({ ...floatOpts(wide, TALK.height), ...glass, x: clamp(p.x + 14, d.x, d.x + d.width - wide), y: clamp(p.y + 18, d.y, d.y + d.height - TALK.height) }))
   const url = pageURL('floater.html', '#talk')
   pin(w, url)
   guardFloat('talk', w)
@@ -675,7 +682,7 @@ export function talk() {
     if (w.isDestroyed()) return
     const list = talkList()
     talkTo = new Set(list.map(f => f.tab))
-    w.webContents.send('talk', { ...(floats.speech && speechBin() && { speech: floats.speech }), answers: !floats.noAnswers, ...(floats.talkCards && { cards: true }), list, to: floats.talkAi && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor(), ...(talkSel && { selection: { label: selLabel(talkSel), head: talkSel.split('\n')[0].slice(0, 120) } }) })
+    w.webContents.send('talk', { ...(floats.speech && speechBin() && { speech: floats.speech }), ...(floats.talkConvo && { convo: true }), answers: !floats.noAnswers, ...(floats.talkCards && { cards: true }), list, to: (floats.talkAi || floats.talkConvo) && floats.ai ? AI_TO : talkDefault(list, talkLast), ai: floats.ai, colors: floats.colors, mic: mac ? systemPreferences.getMediaAccessStatus('microphone') : 'granted', smoke: !!smoke, route: routeFor(), ...(talkSel && { selection: { label: selLabel(talkSel), head: talkSel.split('\n')[0].slice(0, 120) } }) })
     w.show()
     w.focus() // its keys (Tab, ⏎, Esc) without bringing Laki's window forward (a panel)
   })
@@ -757,6 +764,14 @@ ipcMain.handle('talk-undo', async e => {
   )
 })
 ipcMain.on('talk-close', e => fromTalk(e) && talkW!.close())
+// Q14: an agent's finish or ask while a conversation is open (the app window's: shared/speak.ts convoNote, '' when it
+// isn't read out), to the pill with the agents as they are now (an ask that came since may be answered by voice)
+ipcMain.on('talk-note', (e, tab: unknown, kind: unknown, text: unknown) => {
+  if (!from(e) || !floats.talkConvo || !talkW || talkW.isDestroyed() || typeof tab !== 'string' || (kind !== 'done' && kind !== 'ask')) return
+  const list = talkList()
+  for (const f of list) talkTo.add(f.tab)
+  talkW.webContents.send('talk-note', { tab, kind, text: typeof text === 'string' ? text.slice(0, 400) : '', list })
+})
 // the talk key's on-device engine (native/laki-speech.swift, built by after-pack.cjs beside the app's binary): main runs
 // it, so its microphone and speech grants are Laki's; its lines (shared/speech.ts) go on to the pill. None (Linux, a dev
 // run, a build without swiftc): Cloud only

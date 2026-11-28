@@ -739,6 +739,26 @@ are tested in `test/units-more.test.ts`.
   `not-determined`: the pill says why first). ponytail: press to start and to stop: globalShortcut has no key-up, a
   hold mode needs a native helper. `npm run test:ui`'s `talk-pill` opens it (`smoke`: no microphone). Tested in
   `test/talk.test.ts`.
+  Q14, a conversation (Settings › Voice › Talk key's *Conversation*, `settings.talkConvo`, on only if true; the user's
+  alone: AGENT_SETTINGS_NO and REMOTE_KEYS; App's floats `talkConvo`, never in Quiet or Recording mode; Settings'
+  `ConvoSwitch` with Cloud's price, SettingsAgents `useVoicePrice`): main's `talk` payload carries `convo` and its first
+  target is Laki AI (`AI_TO`) while it's on (`talkDefault` else); `aiAsked` sends `talk-speak` and keeps Laki AI's window
+  shut. The loop is `talkPage`'s: `listenNow` (Cloud's `record` or this Mac's `listen`, `mic` so only one at a time),
+  each level through talk.ts `endpoint` (`convoEp`: speech of `VOICE_SHORT_MS` at least, then `UTTER_END_MS` under
+  `FLAT` ends it: `stopRec(true)`, `VOICE_MAX_MS` still caps it), `convoTick` (nothing heard: `CONVO_IDLE_MS` ends it, a
+  queued note stops the listen to be read). `heard` shows the words in `.t-heard`, `convoEnd` (en, uk, ru) ends it, else
+  `turns` goes up and it's sent as before (routes, `spokenAnswer`, cards); then `after(ms)`: `next()` (a queued note,
+  else listen) instead of `close`. Laki AI's answer: `speakOut` (say.ts `utter`); an agent's: phase `agent` until its
+  finish, the app window's useDaemon `convoTell` on a turn's `done` (or `check`) and a `waiting` (800 ms on, still
+  waiting) → preload `talkNote` → main's `talk-note` (only while a conversation's pill is open, with `talkList` as it is
+  now) → the pill's `onTalkNote`: the talked-to tab's finish (`convo.agent`), any tab's ask (its target then, so a yes
+  answers it), the newest three queued while busy. The words: shared/speak.ts `convoNote` (`spokenNote` read whatever
+  Speak asks / Speak when done say: '' in Quiet, Recording mode, a private workspace's, Only on headphones on speakers,
+  and the pill says *finished (not read out)*). `spokenMode`'s `laki` asks are said and left. On headphones
+  (`personalOutput(outputLabel())`, say.ts `watchOutput` once the mic's allowed) it listens while it speaks, and
+  `talkingOver` cancels the speech; else the mic opens after. Esc or the key (but in an `answer`): `endConvo`. Nothing
+  kept: each utterance goes through `talk-text` as the single message's. `test:ui`'s `talk-convo`: one turn (the smoke's
+  utterance ends by itself), counted, sent, listening again. Tested in `test/talk.test.ts` and `test/speak.test.ts`.
 - **Route by first words** (Q5, `settings.voice.route`, unset on; `aiWord`): shared/talk.ts `routeOf` (pure, tested
   in `test/talk.test.ts`). Q5b first, the talk pill's only (`note`, `todo`: `voice.routeNote`, `routeTodo`, unset on;
   the Say it window passes them off): `NOTE_WORD` (note, нотатка, замітка) and `TODO_IN` / `TODO_AT` (to-do, todo,

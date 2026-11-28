@@ -27,6 +27,7 @@ type Bridge = {
   onSpeak?(cb: (text: string) => void): void // notify's speak, back from main unless the talk key is down ('': stop)
   asking?(tabs: string[]): void // the tabs that wait (cards on screen)
   cardGone?(key: string): void // a laki alert over: its card goes
+  talkNote?(tab: string, kind: 'done' | 'ask', text: string): void // Q14: an agent's finish or ask to the talk pill's conversation (main's: only while one is open)
   sound?(name: string): void
   browse?(r: object): Promise<unknown>
   onFocusTab(cb: (tab: string, panel?: string) => void): void

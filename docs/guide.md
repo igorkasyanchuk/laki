@@ -2533,7 +2533,7 @@ rest in a strip at the bottom (any other key, a click or letting go hides it). S
 | hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it; *Send as you stop talking* sends it too) |
 | Fn Fn | (Cloud) the mic locked on: talk hands free, Fn again types it, Esc drops it |
 | ⌥Fn | (Cloud) the last transcripts: type one again, copy it, send it to another agent |
-| the talk key (⌃⌥⌘M, off until set) | from any app: a pill records you; the key again or ⏎ sends it to the agent that asked last (Tab: another), Esc drops it (Settings › Voice on *Cloud*) |
+| the talk key (⌃⌥⌘M, off until set) | from any app: a pill records you; the key again or ⏎ sends it to the agent that asked last (Tab: another), Esc drops it (Settings › Voice on *Cloud*); with *Conversation* on, it opens a hands-free conversation and the key or Esc ends it |
 
 Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
 stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motion* stops its animations.
@@ -3078,6 +3078,18 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   key gets its answer read out by the pill, the first two sentences only, without code, links, paths or anything
   secret-shaped, in a voice of the answer's language when macOS has one; Esc or the key again stops it, and it never
   speaks in Quiet or Recording mode.
+  *Conversation* (off until on): the key opens a conversation instead of one message, to Laki AI when it's on, else
+  as above (Tab still picks who gets it). Talk, and when you stop for about a second what you said is written down
+  and sent; the answer is read out (Laki AI's first sentences, or the agent's *finished: …* line when its turn ends)
+  and the pill listens again. Routing by first words works as ever, and a spoken *yes* or *no* answers a waiting ask;
+  an agent that asks meanwhile is read out, and your next words can answer it (what stays for Laki's window stays
+  there, and the pill says so). Laki AI keeps one chat for the whole conversation. The microphone is shut while Laki
+  speaks; on headphones it stays open and talking over Laki stops it. It ends with the key, Esc, "stop", "that's all"
+  or "bye" (*стоп*, *це все*, *бувай*, *пока*…), or after a minute of nothing heard. The pill says *Conversation · 3*,
+  its red dot whenever the microphone is open, and the last thing it heard. Never in Quiet or Recording mode, never a
+  private workspace's answer read out, and neither an agent nor remote access can turn it on; nothing is kept but
+  what you sent. On *Cloud* each thing you say is a recording of its own, billed at the model's price (Settings shows
+  it as the *Model* line does).
   *Out loud* (Settings › Voice, both off until on): *Speak asks* says "web asks: May I run the tests?" as an agent
   asks, *Speak when done* "web finished: Added the CSV export." as one finishes: the workspace and the first
   sentence, 20 words at most, without code, links, paths or anything secret-shaped. Never in Quiet or Recording mode,

@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
   title: (text: string, hide?: string[]) => ipcRenderer.send('win-title', text, hide), // this window's title (shared/title.ts): Mission Control, the Window menu, a screen share's picker
+  talkNote: (tab: string, kind: 'done' | 'ask', text: string) => ipcRenderer.send('talk-note', tab, kind, text), // Q14: to the talk pill's conversation (main's: only while one is open)
   notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[], card?: { diff?: string; ask?: boolean; alert?: string; tone?: string; origin?: string }, speak?: string) => ipcRenderer.send('notify', title, body, tab, sound, actions, card, speak), // speak: read out (shared/speak.ts spokenNote)
   onSpeak: (cb: (text: string) => void) => ipcRenderer.on('speak', (_e, t) => typeof t === 'string' && cb(t)), // notify's speak, back unless the talk key is down; '': stop
   cardGone: (key: string) => ipcRenderer.send('card-gone', key), // a laki alert over: its card goes
@@ -162,6 +163,7 @@ contextBridge.exposeInMainWorld('laki', {
     onTalk: (cb: (c: object) => void) => ipcRenderer.on('talk', (_e, c) => cb(c)),
     onTalkKey: (cb: () => void) => ipcRenderer.on('talk-key', () => cb()),
     onTalkSpeak: (cb: (text: string) => void) => ipcRenderer.on('talk-speak', (_e, t) => typeof t === 'string' && cb(t)), // Laki AI's answer, to read out ('': none)
+    onTalkNote: (cb: (n: { tab: string; kind: 'done' | 'ask' | 'end'; text: string; list: object[] }) => void) => ipcRenderer.on('talk-note', (_e, n) => cb(n)), // Q14: an agent's finish or ask in a conversation; end: Quiet, Recording mode or the switch off
     talkText: (audio: string): Promise<{ text?: string; error?: string }> => ipcRenderer.invoke('talk-text', audio),
     talkSend: (tab: string, text: string, project?: string, selection?: boolean): Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; speak?: boolean; shot?: boolean; noShot?: string }> => ipcRenderer.invoke('talk-send', tab, text, project, selection), // Q10: shot: the screen went with it to Laki AI; Q11: selection: with the selection main has (the pill's × leaves it out)
     talkUndo: (): Promise<{ error?: string }> => ipcRenderer.invoke('talk-undo'),

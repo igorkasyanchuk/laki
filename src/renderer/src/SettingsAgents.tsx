@@ -209,6 +209,15 @@ export function TalkEngine({ v, onChange }: { v: VoiceSettings; onChange: (v: Vo
   )
 }
 
+// Q14: a model's price as the Model line shows it (OpenRouter's now, its list once a window; else VOICE_MODELS', as of
+// PRICED): the talk key's Conversation bills each utterance
+let priced: Promise<VoiceModel[] | undefined> | undefined
+export function useVoicePrice(id: string, on: boolean) {
+  const [now, setNow] = useState<VoiceModel[]>()
+  useEffect(() => void (on && (priced ??= api.call<{ models: VoiceModel[] }>('voiceModels').then(r => r.models, () => undefined)).then(setNow)), [on])
+  return now?.find(m => m.id === id)?.price ?? VOICE_MODELS.find(m => m[0] === id)?.[2]
+}
+
 export function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi; onChange: (v: VoiceSettings) => void }) {
   const [has, setHas] = useState<boolean>()
   useEffect(() => void keyApi.state().then(st => setHas(st.key), () => {}), [])

@@ -171,6 +171,21 @@ export async function uiSmoke(w: BrowserWindow, dir: string) {
       if (talkW && !talkW.isDestroyed()) writeFileSync(join(dir, 'talk-pill-window.png'), (await talkW.webContents.capturePage()).toPNG())
       await t("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))")
     }, async () => !talkW || talkW.isDestroyed()],
+    // Q14: a conversation's turn, no mic (a smoke run's utterance ends by itself as "smoke test"): listening, heard and
+    // counted, sent (to Laki AI: no key in the demo world, so nothing read out), then listening again; Esc ends it
+    ['talk-convo', async () => {
+      const was = (await rpc<View>('state')).settings
+      await rpc('settingsSet', { talkOn: true, talkKey: '⌃⌥⇧⌘F19', talkConvo: true, voice: { ...was.voice, engine: 'cloud' } }) // the talk key on (a key no one presses), Cloud's pill
+      await waitFor(async () => floats.talkConvo === true, 'the conversation setting in main')
+      talk()
+      const t = <T>(code: string) => (talkW && !talkW.isDestroyed() ? (talkW.webContents.executeJavaScript(code, true) as Promise<T>) : Promise.resolve(undefined))
+      await waitFor(() => t<boolean>("!!document.querySelector('#talk.rec') && document.querySelector('.t-to').textContent.startsWith('Conversation →')"), 'the conversation listening')
+      await waitFor(() => t<boolean>("document.querySelector('.t-to').textContent.startsWith('Conversation · 1 ') && document.querySelector('.t-heard').textContent === '“smoke test”'"), 'its first turn heard')
+      if (talkW && !talkW.isDestroyed()) writeFileSync(join(dir, 'talk-convo-window.png'), (await talkW.webContents.capturePage()).toPNG())
+      await waitFor(() => t<boolean>("!!document.querySelector('#talk.rec') && document.querySelector('.t-note').textContent.startsWith('Listening')"), 'listening again')
+      await t("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))")
+      await rpc('settingsSet', { talkOn: was.talkOn ?? false, talkKey: was.talkKey ?? '', talkConvo: false, voice: was.voice ?? {} })
+    }, async () => !talkW || talkW.isDestroyed()],
     // U3: Get started never opened by itself; its bar opens it: the loop's five steps, the rest folded under Explore more
     ['get-started', async () => (await key('Escape')(), await click('.onboard-bar')()), async () => (await js<number>("document.querySelectorAll('.onboard > .ob-steps > .ob-step').length")) === 5 && (await has('.ob-more-head'))],
     // (a) archive with an uncommitted file: the dialog names it; (b) archived, then Undo brings it back

@@ -19,7 +19,7 @@ import { hasCap } from '../../shared/caps'
 import { noteCut, noteWhole } from './text'
 import { settle } from './motion'
 import { viewShare } from './viewShare'
-import { personalOutput, spokenNote } from '../../shared/speak'
+import { convoNote, personalOutput, spokenNote } from '../../shared/speak'
 import { outputLabel, sayInit } from './say'
 import { toolLine, toolOn } from './AppParts'
 const QUIET = new Set(['turn', 'long', 'loop', 'check', 'reminder', 'started', 'archived', 'tunnel', 'peek', 'flow'])
@@ -135,8 +135,13 @@ export function useDaemon(a: DaemonCtx) {
           const speak = m.kind === 'waiting' || m.kind === 'done' ? spoken(viewRef.current, m.kind === 'waiting' ? 'ask' : 'done', w, (m.kind === 'waiting' && perm?.what) || m.text || '', shown) : undefined
           notify(`${w ? wsName(w) : t.workspace} · ${t.name}${perm ? ` ${permVerb(perm.tool!)}` : ''}`, noteCut(told), t.id, () => selectTab(t.id), s?.notifySound, actions, card, speak)
         }
-        if (m.kind === 'waiting') setTimeout(post, 800)
-        else if (!m.checking) (post(), m.kind === 'done' && offerCheck(m.ws)) // a check follows: its result notifies (the check event)
+        // Q14: to the talk pill's conversation too (main passes it on only while one is open), mutes and notify aside
+        const tell = () => {
+          const t = viewRef.current?.tabs.find(t => t.id === m.tab)
+          if (t && (m.kind === 'done' || t.status === 'waiting')) convoTell(viewRef.current, m.kind === 'done' ? 'done' : 'ask', t, (m.kind === 'waiting' && t.ask?.tool && t.ask.what) || m.text || '')
+        }
+        if (m.kind === 'waiting') setTimeout(() => (post(), tell()), 800)
+        else if (!m.checking) (post(), m.kind === 'done' && (offerCheck(m.ws), tell())) // a check follows: its result notifies (the check event)
       } else if (m.ev === 'proof') {
         window.dispatchEvent(new CustomEvent('laki-proof', { detail: m })) // a checked turn: its Preview's screenshot (SidePanel's)
       } else if (m.ev === 'check') {
@@ -145,6 +150,7 @@ export function useDaemon(a: DaemonCtx) {
         const t = viewRef.current?.tabs.find(t => t.id === m.tab)
         const s = viewRef.current?.settings
         const w = viewRef.current?.workspaces.find(w => w.id === m.ws)
+        if (t && m.status !== 'failed') convoTell(viewRef.current, 'done', t, m.status === 'skipped' ? t.last || '' : String(m.text ?? ''))
         if (!t || m.status === 'failed' || (!m.bell && (s?.notify === false || t.muted || w?.muted))) return
         if (m.status !== 'over' && ((!m.bell && s?.notifyOn?.done === false) || (document.hasFocus() && shownTabs.current.includes(m.tab)))) return
         const body = m.status === 'skipped' ? t.last || 'finished' : m.status === 'passed' ? `done and checked: ${m.text}` : `over to you: ${m.text}`
@@ -287,6 +293,12 @@ export function useDaemon(a: DaemonCtx) {
 
 // Settings › Voice › Speak asks, Speak when done: what an ask or a finish says out loud (shared/speak.ts spokenNote;
 // main reads it out unless the talk key is down), the app window's own speaker (say.ts) listening for it
+// Q14: what the talk pill's conversation reads out of a tab's finish or ask (convoNote: never in Quiet or Recording
+// mode, never a private workspace's, not on speakers with Only on headphones; '' then: the pill says so without it)
+const convoTell = (v: View | null | undefined, kind: 'ask' | 'done', t: TabView, text: string) => {
+  const w = v?.workspaces.find(w => w.id === t.workspace)
+  bridge?.talkNote?.(t.id, kind, convoNote({ kind, ws: w ? wsName(w) : '', text, quiet: !!v?.dnd, recording: !!v?.settings.recording, private: !!w?.private || !!v?.projects.find(p => p.id === w?.project)?.private, silent: v?.settings.voice?.speakOn === 'headphones' && !personalOutput(outputLabel()) }))
+}
 const spoken = (v: View | null | undefined, kind: 'ask' | 'done', w: WorkspaceView | undefined, text: string, inView: boolean) =>
   spokenNote({ kind, ws: w ? wsName(w) : '', text, on: kind === 'ask' ? v?.settings.voice?.speakAsks : v?.settings.voice?.speakDone, quiet: !!v?.dnd, recording: !!v?.settings.recording, private: !!w?.private || !!v?.projects.find(p => p.id === w?.project)?.private, inView, silent: v?.settings.voice?.speakOn === 'headphones' && !personalOutput(outputLabel()) })
 if (bridge?.onSpeak) sayInit(bridge.onSpeak)

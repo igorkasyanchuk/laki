@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { langOf, personalOutput, speakable, spokenNote } from '../src/shared/speak.ts'
+import { convoNote, langOf, personalOutput, speakable, spokenNote } from '../src/shared/speak.ts'
 
 test('speakable: two sentences of plain prose, no code, links, paths, URLs or secrets, 240 at most', () => {
   assert.equal(speakable('**Done.** The tests pass now. I also renamed the helper.'), 'Done. The tests pass now.')
@@ -63,3 +63,11 @@ test("#H1: Out loud's Only on headphones: which outputs are yours alone, by thei
   assert.equal(spokenNote({ kind: 'ask', ws: 'web', text: 'May I run the tests?', on: true, silent: true }), '', 'silent: not on headphones')
   assert.equal(spokenNote({ kind: 'ask', ws: 'web', text: 'May I run the tests?', on: true }), 'web asks: May I run the tests?')
 })
+
+test("Q14 convoNote: a conversation reads an agent's finish or ask whatever Speak asks and Speak when done say; never Quiet, Recording mode, a private workspace or speakers when only headphones", () => {
+  assert.equal(convoNote({ kind: 'done', ws: 'fix-cart', text: 'Done. The cart totals are fixed and tested.' }), 'fix-cart finished: Done.')
+  assert.equal(convoNote({ kind: 'ask', ws: 'shop', text: 'npm install left-pad' }), 'shop asks: npm install left-pad')
+  for (const o of [{ quiet: true }, { recording: true }, { private: true }, { silent: true }]) assert.equal(convoNote({ kind: 'done', ws: 'x', text: 'Done.', ...o }), '', JSON.stringify(o))
+  assert.equal(convoNote({ kind: 'done', ws: 'x', text: 'See `src/app.ts`: ```diff\n+1\n```' }), 'x finished: See:', 'no code or paths read out')
+})
+

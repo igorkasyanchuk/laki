@@ -829,7 +829,7 @@ export function App() {
     ...(aiOn(fs) && fs?.ai?.show !== false && { aiShow: true }), at: fs?.floaterAt === 'notch' ? 'notch' : 'edge', ...(fs?.islandOn && { islandOn: fs.islandOn }), ...(fs?.hideFloats === true && { hide: true }),
     ...(talkOn && { talk: pool }), ...(talkOn && fs?.talkTo === 'ai' && aiOn(fs) && { talkAi: true }),
     ...(talkOn && fs?.voice?.selection === true && { selection: true }), ...(talkOn && fs?.voice?.talkEngine === 'mac' && { speech: fs.voice.locale || 'en-US' }),
-    ...(talkOn && fs?.voice?.answers === false && { noAnswers: true }), ...(talkOn && fs?.talkCards === true && { talkCards: true }),
+    ...(talkOn && fs?.voice?.answers === false && { noAnswers: true }), ...(talkOn && fs?.talkConvo === true && !fs?.recording && !((view?.dnd?.until ?? 0) > Date.now()) && { talkConvo: true }) /* Q14: never in Quiet or Recording mode */, ...(talkOn && fs?.talkCards === true && { talkCards: true }),
     ...(talkOn && aiOn(fs) && fs?.voice?.speak === 'short' && !fs?.recording && !((view?.dnd?.until ?? 0) > Date.now()) && { speak: true }) /* never in Quiet or
     Recording mode */, ...(fs?.voice?.route !== false && { route: { projects: (view?.projects ?? []).filter(p => !p.kind).map(p => ({ id: p.id, name: p.name })),
     note: fs?.voice?.routeNote !== false, todo: fs?.voice?.routeTodo !== false, aiWord: fs?.voice?.aiWord, fixes: fs?.voice?.fixes } }) } // Q5: Route by first

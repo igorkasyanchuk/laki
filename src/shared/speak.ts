@@ -67,6 +67,11 @@ export function spokenNote(n: Spoken): string {
   return words.length > SPOKEN_WORDS ? `${words.slice(0, SPOKEN_WORDS).join(' ').replace(/[,;:]$/, '')}…` : said
 }
 
+// Q14: what a conversation (the talk pill's, talk.ts) reads out of an agent's finish or ask: spokenNote's words, read
+// though the pill is open and whatever Speak asks and Speak when done say; never in Quiet or Recording mode, never a
+// private workspace's, not on speakers with Out loud's Only on headphones ('': the pill says it finished or asks)
+export const convoNote = (n: Omit<Spoken, 'on' | 'dictating' | 'inView'>) => spokenNote({ ...n, on: true })
+
 // #H1: Settings › Voice › Out loud's Only on headphones (voice.speakOn 'headphones'): is the output, by the name the
 // system gives it (navigator.mediaDevices' default audiooutput; Chromium's "Default - " before it), yours alone:
 // headphones, AirPods, earbuds, buds, a headset, a Bluetooth hands-free one. Speakers, a display's or an HDMI output:

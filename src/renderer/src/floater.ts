@@ -14,9 +14,10 @@ import type { Ask } from '../../shared/types'
 import { base64, dropText, initials, noteWhole, wavOf } from './text'
 import type { SpeechLine } from '../../shared/speech'
 import { spokenMode } from '../../shared/ask'
-import { AI_TO, NOTE_TO, TODO_TO, type Route, routeOf, spokenAnswer, type RouteTab, talkDefault, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
+import { AI_TO, CONVO_IDLE_MS, convoEnd, endpoint, type Ep, NOTE_TO, TODO_TO, type Route, routeOf, spokenAnswer, type RouteTab, talkDefault, talkingOver, talkName, talkNext, talkTime, VOICE_MAX_MS, VOICE_SHORT_MS, FLAT, levelOf, QUIET_MS, quietSay } from '../../shared/talk'
+import { personalOutput } from '../../shared/speak'
 import { voiceFix } from '../../shared/types'
-import { utter } from './say'
+import { outputLabel, utter, watchOutput } from './say'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them; agent, at, ask, answer, took: the
 // island's cards and the reply window's (its agent, since when it needs you, its menu, its last answer, its turn's time)
@@ -85,6 +86,7 @@ type Bridge = {
     onTalk: (cb: (c: Talk) => void) => void
     onTalkKey: (cb: () => void) => void
     onTalkSpeak?: (cb: (text: string) => void) => void
+    onTalkNote?: (cb: (n: TalkNote) => void) => void
     talkText: (audio: string) => Promise<{ text?: string; error?: string }>
     talkSend: (tab: string, text: string, project?: string, selection?: boolean) => Promise<{ kept?: boolean; error?: string; queued?: boolean; new?: boolean; ai?: boolean; speak?: boolean; shot?: boolean; noShot?: string }>
     talkUndo: () => Promise<{ error?: string }>
@@ -100,7 +102,10 @@ type Bridge = {
 }
 // Q2: what the talk pill opens with: who it may go to and who by default, the theme, the mic's state (macOS's), smoke:
 // npm run test:ui's (no microphone opened); ai: Laki AI is on (Tab goes to it too)
-type Talk = { list: TalkTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg; speech?: string; answers?: boolean; cards?: boolean /* Answer cards: an ask card on screen takes the words */; selection?: { label: string; head: string } } // answers: a spoken yes or no answers a waiting ask (Settings › Voice); selection (Q11): what main copied, its label and first line
+// Q14: an agent's finish or ask in a conversation (main's talk-note: convoNote's words, '' when not read out), the agents now
+type TalkNote = { tab: string; kind: 'done' | 'ask' | 'end'; text: string; list: TalkTab[] } // end: Quiet, Recording mode or the switch off
+type Note = { tab: string; kind: 'done' | 'ask'; text: string }
+type Talk = { convo?: boolean; list: TalkTab[]; to: string; ai?: boolean; colors: Colors; mic: string; smoke?: boolean; route?: RouteCfg; speech?: string; answers?: boolean; cards?: boolean /* Answer cards: an ask card on screen takes the words */; selection?: { label: string; head: string } } // answers: a spoken yes or no answers a waiting ask (Settings › Voice); selection (Q11): what main copied, its label and first line
 // a waiting one's ask (what a spoken yes or no answers) and held: its secret or plan (never answered from the pill)
 type TalkTab = RouteTab & { ask?: Ask; held?: boolean } // speech: the on-device engine's locale (main's Laki Speech), else Cloud
 // Q5: Route by first words, on: the projects (a new task in one), Laki AI's word and whether it's on, the word fixes,
@@ -774,33 +779,122 @@ function talkPage() {
   let toProject: string | undefined // a new task's project (Q5)
   let cfg: RouteCfg | undefined
   let ai = false // Laki AI on: a Tab target
-  let phase: 'wait' | 'rec' | 'writing' | 'route' | 'answer' | 'sending' | 'sent' | 'speak' | 'card' = 'wait' // speak: Laki AI's answer awaited, then read out
+  let phase: 'wait' | 'rec' | 'writing' | 'route' | 'answer' | 'sending' | 'sent' | 'speak' | 'card' | 'agent' = 'wait' // speak: Laki AI's answer awaited, then read out; agent: a conversation's agent at work, its finish awaited
   let routed: { text: string; t: ReturnType<typeof setTimeout> } | undefined // Q5: shown before it goes
   let stopRec: ((send: boolean) => void) | undefined
-  const close = () => bridge?.talkClose()
+  let closeLate = false // a conversation's end said first: the pill goes a moment later
+  let lateT: ReturnType<typeof setTimeout> | undefined
+  let mic = false // a conversation's: listening (or opening the mic), so its speech's end doesn't start another
+  const close = () => {
+    convo = undefined
+    if (!closeLate) return bridge?.talkClose()
+    closeLate = false
+    lateT = setTimeout(() => bridge?.talkClose(), 1800)
+  }
   const say = (t: string, bad = false) => ((note.textContent = t), note.classList.toggle('bad', bad))
+  // Q14: a conversation (Settings › Voice › Talk key › Conversation): it listens, sends each utterance (talk.ts endpoint
+  // ends one), reads the answer out (Laki AI's, or the agent's finish: main's talk-note) and listens again, until the
+  // key, Esc, an end word (convoEnd) or CONVO_IDLE_MS of nothing. Its turns on the pill, the last thing it heard beside
+  // its note; the mic shut while it speaks, but on headphones (personalOutput) it listens and your voice stops it.
+  // Nothing kept here: each utterance is written down and sent as the pill's one would be
+  let convo: { turns: number; at: number; agent?: string; notes: Note[] } | undefined
+  let engine: 'mac' | 'cloud' = 'cloud'
+  let smokeRun = false
+  const heardEl = box.querySelector<HTMLElement>('.t-heard')!
+  const CONVO_HINT = 'Listening · the key, Esc or “stop” ends it'
+  const after = (ms: number) => setTimeout(() => (convo ? next() : close()), ms) // a conversation goes on; a single message's pill goes
+  const listenNow = () => {
+    if (mic || !convo) return
+    mic = true
+    convo.at = Date.now()
+    if (phase !== 'speak') phase = 'wait'
+    void (engine === 'mac' && !smokeRun ? listen() : record(smokeRun))
+  }
+  // a conversation's listening, each level: the utterance's end sends it, your voice over Laki's (headphones) stops it
+  function convoEp(ep: Ep, l: number): Ep {
+    const [s, end] = endpoint(ep, l, Date.now())
+    if (phase === 'speak' && talkingOver(s)) (phase = 'rec'), box.classList.remove('speaking'), speechSynthesis.cancel(), say(CONVO_HINT)
+    if (end) stopRec?.(true)
+    return s
+  }
+  // and each tick, nothing heard yet: a minute of it ends the conversation; an agent's note waiting is read first
+  function convoTick(ep: Ep) {
+    if (!convo || ep.from !== undefined || phase !== 'rec') return
+    if (Date.now() - convo.at >= CONVO_IDLE_MS) return endConvo('Nothing heard for a minute: the conversation ended')
+    if (convo.notes.length) stopRec?.(false)
+  }
+  function next() {
+    if (!convo) return close()
+    phase = 'wait' // nothing's said any more (Laki AI's answer only on its page, a note shown): it listens
+    toEl.classList.remove('moved')
+    const n = convo.notes.shift()
+    return n ? noteSay(n) : listenNow()
+  }
+  function endConvo(why?: string) {
+    convo = undefined
+    clearTimeout(waitSpeak)
+    speechSynthesis.cancel()
+    if (why) say(why), (closeLate = true)
+    const stop = stopRec
+    if (stop) stop(false)
+    else close()
+  }
+  // its words out loud (say.ts utter, a voice of their language); then, unless you talked over it (it listens already)
+  function speakOut(text: string, then: () => void) {
+    phase = 'speak'
+    box.classList.add('speaking')
+    say(text)
+    const u = utter(text)
+    let over = false
+    u.onend = u.onerror = () => {
+      if (over) return
+      over = true
+      box.classList.remove('speaking')
+      if (phase !== 'speak') return // talked over: it listens already
+      if (!mic) return void ((phase = 'wait'), then())
+      phase = 'rec' // on headphones it listened as it spoke: on, the minute from now
+      if (convo) (convo.at = Date.now()), say(CONVO_HINT)
+    }
+    speechSynthesis.speak(u)
+    if (convo && personalOutput(outputLabel())) setTimeout(() => phase === 'speak' && listenNow(), 150) // headphones: the speakers can't be heard back
+  }
+  // an agent's finish (the one talked to) or ask, read out; '' (a private workspace's, Only on headphones on speakers): said so
+  function noteSay(n: Note) {
+    const name = talkName(list, n.tab)
+    if (n.kind === 'ask') (to = n.tab), show()
+    if (!n.text) return void (say(n.kind === 'ask' ? `${name} asks something: open it to see (not read out)` : `${name} finished (not read out)`), after(2000))
+    speakOut(n.text, next)
+  }
+  bridge?.onTalkNote?.(n => {
+    if (!convo) return
+    if (n.kind === 'end') return endConvo('Quiet or Recording mode is on: the conversation ended')
+    list = n.list
+    if (n.kind === 'done' && n.tab !== convo.agent) return // another agent's finish: Speak when done's, not this conversation's
+    if (n.kind === 'done') convo.agent = undefined
+    const one: Note = { tab: n.tab, kind: n.kind, text: n.text }
+    if (phase === 'agent') return noteSay(one)
+    convo.notes.push(one)
+    convo.notes.splice(0, convo.notes.length - 3) // the newest few
+  })
   // Settings › Voice › Speak Laki AI's answers: its answer's first sentences (main's speakable), in a voice of its
   // language (say.ts utter); Esc, the key again or the pill closing stops it
   let waitSpeak: ReturnType<typeof setTimeout> | undefined
-  const hush = () => (clearTimeout(waitSpeak), speechSynthesis.cancel(), close())
+  const hush = () => (convo ? endConvo() : (clearTimeout(waitSpeak), speechSynthesis.cancel(), close()))
   addEventListener('pagehide', () => speechSynthesis.cancel())
   bridge?.onTalkSpeak?.(text => {
     if (phase !== 'speak') return
     clearTimeout(waitSpeak)
-    if (!text) return close() // nothing to read out (code, a link) or no answer: it's on the AI page
-    const u = utter(text)
-    u.onend = u.onerror = () => close()
-    box.classList.add('speaking')
-    say(text)
-    speechSynthesis.speak(u)
+    if (!text) return convo ? void (say("Laki AI's answer is on the AI page"), after(1500)) : close() // nothing to read out (code, a link) or no answer: it's on the AI page
+    speakOut(text, () => (convo ? next() : close()))
   })
-  const show = () => (toEl.textContent = `→ ${to ? talkName(list, to, cfg?.projects.find(p => p.id === toProject)?.name) : toProject ? `new task in ${cfg?.projects.find(p => p.id === toProject)?.name ?? toProject}` : 'new task'}`)
+  const show = () => (toEl.textContent = `${convo ? `Conversation${convo.turns ? ` · ${convo.turns}` : ''} ` : ''}→ ${to ? talkName(list, to, cfg?.projects.find(p => p.id === toProject)?.name) : toProject ? `new task in ${cfg?.projects.find(p => p.id === toProject)?.name ?? toProject}` : 'new task'}`)
   const HINT = 'The key again or ⏎ sends · Tab: who gets it · Esc drops it'
   // Answer cards: the words went to the newest ask card; any key (Esc too) or the talk key stops its answer
   const cardStop = () => (cardT ? (clearTimeout(cardT), (cardT = undefined), bridge?.talkCardStop?.(), say('Not answered'), setTimeout(close, 1000)) : close())
   document.addEventListener('keydown', e => {
     if (phase === 'card') return void (e.preventDefault(), cardStop())
     if (e.metaKey || e.ctrlKey) return
+    if (convo && e.key === 'Escape') return void (e.preventDefault(), routed && clearTimeout(routed.t), asking?.t && clearTimeout(asking.t), endConvo())
     // a spoken yes or no shown: ⏎ answers, Tab sends the words as a message instead, Esc drops it
     if (phase === 'answer' && asking) {
       if (e.key === 'Enter') return void (e.preventDefault(), clearTimeout(asking.t), asking.go())
@@ -821,7 +915,7 @@ function talkPage() {
     if (e.key === 'Enter' && phase === 'rec') e.preventDefault(), stopRec?.(true)
     else if (e.key === 'Enter' && phase === 'route' && routed) e.preventDefault(), clearTimeout(routed.t), void send(routed.text) // now
   })
-  bridge?.onTalkKey(() => (phase === 'card' ? cardStop() : phase === 'speak' ? hush() : phase === 'answer' && asking ? (clearTimeout(asking.t), asking.go()) : phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
+  bridge?.onTalkKey(() => (convo && !(phase === 'answer' && asking) ? (routed && clearTimeout(routed.t), endConvo()) : phase === 'card' ? cardStop() : phase === 'speak' ? hush() : phase === 'answer' && asking ? (clearTimeout(asking.t), asking.go()) : phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
   undo.onclick = async () => {
     undo.disabled = true
     const r = await bridge?.talkUndo()
@@ -830,6 +924,7 @@ function talkPage() {
     setTimeout(close, 1200)
   }
   bridge?.onTalk(c => {
+    clearTimeout(lateT)
     paint(c.colors)
     list = c.list
     to = c.to
@@ -845,6 +940,13 @@ function talkPage() {
     if (c.mic === 'denied' || c.mic === 'restricted') return say('The microphone is off for Laki: System Settings › Privacy & Security › Microphone, then the key again', true)
     if (c.mic === 'not-determined') say('macOS asks once: Laki hears what you say to an agent, and only while this pill shows red')
     else say(HINT)
+    engine = c.speech ? 'mac' : 'cloud'
+    smokeRun = !!c.smoke
+    convo = c.convo ? { turns: 0, at: Date.now(), notes: [] } : undefined
+    mic = !!convo
+    heardEl.hidden = true
+    box.classList.toggle('convo', !!convo)
+    if (convo) show(), say(CONVO_HINT), watchOutput()
     if (c.speech && !c.smoke) return void listen()
     void record(!!c.smoke)
   })
@@ -854,12 +956,17 @@ function talkPage() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
       } catch (e) {
+        mic = false
+        if (convo) convo = undefined
         return say(`Microphone: ${(e as Error).message}`, true)
       }
+    if (stream && convo) watchOutput() // a label once the mic's allowed
     const at = Date.now()
-    phase = 'rec'
+    const over = phase === 'speak' // on headphones, listening as it speaks
+    phase = over ? 'speak' : 'rec'
     box.classList.add('rec')
-    say(HINT)
+    if (!over) say(convo ? CONVO_HINT : HINT)
+    let ep: Ep = {}
     const ctx = stream && new AudioContext()
     const an = ctx?.createAnalyser()
     if (an && ctx && stream) (an.fftSize = 512), ctx.createMediaStreamSource(stream).connect(an)
@@ -874,9 +981,11 @@ function talkPage() {
       const l = levelOf(buf)
       level.style.width = `${l * 100}%`
       if (l >= FLAT) loud = Date.now()
+      if (convo) return convoTick(ep = convoEp(ep, l))
       const q = phase === 'rec' && Date.now() - loud >= QUIET_MS
       if (q !== deaf) (deaf = q), say(q ? quietSay(device) : HINT, q)
     }, 60)
+    if (smoke && convo) setTimeout(() => stopRec?.(true), 700) // the smoke's: an utterance, no mic
     const r = stream && new MediaRecorder(stream)
     const chunks: Blob[] = []
     r?.addEventListener('dataavailable', e => chunks.push(e.data))
@@ -887,12 +996,13 @@ function talkPage() {
       clearTimeout(limit)
       clearInterval(tick)
       const done = () => {
+        mic = false
         stream?.getTracks().forEach(t => t.stop()) // the mic off
         void ctx?.close()
         box.classList.remove('rec')
         level.style.width = '0'
-        if (!send) return close()
-        if (Date.now() - at < VOICE_SHORT_MS) return void (say('Too short: say it, then press the key again', true), setTimeout(close, 1500))
+        if (!send) return convo ? next() : close()
+        if (Date.now() - at < VOICE_SHORT_MS && !convo) return void (say('Too short: say it, then press the key again', true), setTimeout(close, 1500))
         void heard(smoke ? 'smoke test' : undefined, r && new Blob(chunks, { type: r.mimeType }))
       }
       if (r && r.state !== 'inactive') (r.onstop = done), r.stop()
@@ -909,8 +1019,10 @@ function talkPage() {
     let ended = false
     let loud = Date.now()
     let deaf = false
+    let ep: Ep = {}
     const tick = setInterval(() => {
       timeEl.textContent = talkTime(Date.now() - at)
+      if (convo) return convoTick(ep)
       const q = phase === 'rec' && Date.now() - loud >= QUIET_MS
       if (q !== deaf) (deaf = q), say(q ? quietSay(undefined) : HINT, q)
     }, 200)
@@ -922,25 +1034,28 @@ function talkPage() {
       void bridge?.talkFix(text).then(w => heard(w?.text ?? text), () => heard(text))
     }
     onHeard = x => {
-      if (x.kind === 'level') (level.style.width = `${x.level * 100}%`), x.level >= FLAT && (loud = Date.now())
+      if (x.kind === 'level') (level.style.width = `${x.level * 100}%`), x.level >= FLAT && (loud = Date.now()), convo && (ep = convoEp(ep, x.level))
       else if (x.kind === 'partial') (partial = x.text), phase === 'rec' && !deaf && say(x.text.length > 70 ? `…${x.text.slice(-70)}` : x.text)
       else if (x.kind === 'final') phase === 'writing' && end(x.text.trim() || partial)
-      else if (x.kind === 'error') (ended = true), clearInterval(tick), clearTimeout(limit), stopRec?.(false), say(`${x.error}${x.code === 'no-on-device' || x.code === 'locale' ? ': Settings › Voice › Talk key, Cloud' : ''}`, true), setTimeout(close, 5000)
+      else if (x.kind === 'error') (ended = true), (convo = undefined), clearInterval(tick), clearTimeout(limit), stopRec?.(false), say(`${x.error}${x.code === 'no-on-device' || x.code === 'locale' ? ': Settings › Voice › Talk key, Cloud' : ''}`, true), setTimeout(close, 5000)
       else if (x.kind === 'end' && phase === 'writing') end(partial) // it stopped without a final line
     }
-    phase = 'rec'
+    const over = phase === 'speak'
+    phase = over ? 'speak' : 'rec'
     box.classList.add('rec')
+    if (convo && !over) say(CONVO_HINT)
     const r = await bridge?.talkListen()
-    if (r?.error) return void ((phase = 'wait'), box.classList.remove('rec'), say(r.error, true))
+    if (r?.error) return void ((phase = 'wait'), (mic = false), (convo = undefined), box.classList.remove('rec'), say(r.error, true))
     stopRec = keep => {
       stopRec = undefined
+      mic = false
       clearTimeout(limit)
       clearInterval(tick)
       box.classList.remove('rec')
       level.style.width = '0'
       if (!keep || Date.now() - at < VOICE_SHORT_MS) bridge?.talkListenStop(false)
-      if (!keep) return ended || close()
-      if (Date.now() - at < VOICE_SHORT_MS) return void (say('Too short: say it, then press the key again', true), setTimeout(close, 1500))
+      if (!keep) return void (ended || ((ended = true), (onHeard = undefined), convo ? next() : close()))
+      if (Date.now() - at < VOICE_SHORT_MS) return void (say('Too short: say it, then press the key again', true), after(1500))
       phase = 'writing'
       say('Writing it down…')
       bridge?.talkListenStop(true)
@@ -954,19 +1069,26 @@ function talkPage() {
       try {
         const b = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(await audio.arrayBuffer())
         const w = await bridge?.talkText(base64(wavOf(b.getChannelData(0), 16000)))
-        if (w?.error) return void (say(w.error, true), setTimeout(close, 4000))
+        if (w?.error) return void ((convo = undefined), say(w.error, true), setTimeout(close, 4000))
         text = w?.text?.trim() ?? ''
       } catch (e) {
-        return void (say((e as Error).message, true), setTimeout(close, 4000))
+        return void ((convo = undefined), say((e as Error).message, true), setTimeout(close, 4000))
       }
     }
-    if (!text) return void (say('Nothing heard', true), setTimeout(close, 1500))
+    if (!text) return convo ? void listenNow() : void (say('Nothing heard', true), setTimeout(close, 1500))
+    if (convo) {
+      heardEl.textContent = `“${text}”`
+      heardEl.hidden = false
+      if (convoEnd(text, lang)) return endConvo('Conversation ended')
+      convo.turns++
+      show()
+    }
     // Answer cards: an ask card on screen takes the words (main's talk-card: talk.ts cardPick), not Laki AI or an agent
     const heard = cardsOn ? await bridge?.talkCard?.(text) : undefined
     if (heard?.card) {
       phase = 'card'
-      if (heard.pick) return void (say(`${heard.card}: ${heard.pick} in 2 s · any key stops it`), (cardT = setTimeout(() => ((cardT = undefined), close()), 1800))) // main answers at 2 s (HEARD_MS): a key after it can't stop it, so the pill's gone by then
-      return void (say(`${heard.card}: ${heard.refuse ? `click to answer (${heard.refuse})` : `“${text}” isn't one of its choices`}`, true), setTimeout(close, 3500))
+      if (heard.pick) return void (say(`${heard.card}: ${heard.pick} in 2 s · any key stops it`), (cardT = setTimeout(() => ((cardT = undefined), convo ? next() : close()), 1800))) // main answers at 2 s (HEARD_MS): a key after it can't stop it, so the pill's gone by then
+      return void (say(`${heard.card}: ${heard.refuse ? `click to answer (${heard.refuse})` : `“${text}” isn't one of its choices`}`, true), after(3500))
     }
     // a spoken yes or no with an ask waiting (the pill's target's, else the newest): that ask's answer, not a message
     const yes = answers && spokenAnswer(text, lang)
@@ -977,7 +1099,7 @@ function talkPage() {
     const r = cfg && routeOf(text, { tabs: list, projects: cfg.projects, aiOn: cfg.aiOn, aiWord: cfg.aiWord, note: cfg.note, todo: cfg.todo, last: cfg.last })
     const at = r && routeTo(r)
     if (!r || !at) return send(text)
-    if (!r.rest) return void (say(`Nothing after “${r.how}”: say it again with what to do`, true), setTimeout(close, 3000))
+    if (!r.rest) return void (say(`Nothing after “${r.how}”: say it again with what to do`, true), after(3000))
     to = at.tab
     toProject = at.project
     show()
@@ -994,6 +1116,7 @@ function talkPage() {
     show()
     phase = 'answer'
     const word = yes === 'yes' ? 'Yes' : 'No'
+    if (mode === 'laki' && convo) return void (say(`${t.name} asks something to answer in Laki: ${what}`, true), after(4000)) // spokenMode keeps it there
     if (mode === 'laki') {
       asking = { text, go: () => void bridge?.talkClose() }
       return say(`${t.name} asks something to answer in Laki: ${what} · Tab: send “${text}” as a message · Esc`, true)
@@ -1006,8 +1129,9 @@ function talkPage() {
         phase = 'sending'
         const r = await bridge?.talkAnswer(t.tab, opt.n, opt.label)
         phase = 'sent'
-        say(r?.error ? `Not answered: ${r.error}` : `Answered ${word}: ${t.name}`, !!r?.error)
-        setTimeout(close, r?.error ? 4000 : 2000)
+        say(r?.error ? `Not answered: ${r.error}` : `Answered ${word}: ${t.name}${convo ? ' · read out when it finishes' : ''}`, !!r?.error)
+        if (convo && !r?.error) return void ((convo.agent = t.tab), (phase = 'agent')) // its finish: main's talk-note
+        after(r?.error ? 4000 : 2000)
       },
     }
     say(`Answer ${word} to: ${what} · ${mode === 'auto' ? 'in a moment, ⏎ now' : '⏎ answers'} · Tab: send it as a message · Esc drops it`)
@@ -1019,17 +1143,19 @@ function talkPage() {
     const name = talkName(list, to, cfg?.projects.find(p => p.id === toProject)?.name)
     const r = await bridge?.talkSend(to, text, to && to !== TODO_TO ? undefined : toProject, withSel)
     phase = 'sent'
+    if (convo && !r?.error) (withSel = false), (selEl.hidden = true) // a conversation's selection goes with its first message only
     if (r?.error) {
       const copied = await navigator.clipboard?.writeText(text).then(() => true, () => false)
-      return void (say(`Not sent: ${r.error}${copied ? '. Copied, paste it' : ''}`, true), setTimeout(close, 5000))
+      return void (say(`Not sent: ${r.error}${copied ? '. Copied, paste it' : ''}`, true), after(5000))
     }
-    if (r?.new) return close() // the new task's window has it
-    if (r?.kept) return void (say(`Added to ${name}`), (undo.hidden = false), setTimeout(close, 4000)) // Q5b: a note's line, a Backlog's item; Undo takes it out
-    if (r?.ai && r.speak) return void ((phase = 'speak'), say(`Asked Laki AI${r.shot ? ' with your screen' : ''}: its answer is read out here · Esc stops${r.noShot ? ` (no screen: ${r.noShot})` : ''}`, !!r.noShot), (waitSpeak = setTimeout(close, 120_000))) // a long answer, or one queued behind another: given up on
-    if (r?.ai) return void (say(`Asked Laki AI${r.shot ? ' with your screen' : ''}: its answer is on the AI page${r.noShot ? ` (no screen: ${r.noShot})` : ''}`, !!r.noShot), setTimeout(close, r.noShot ? 5000 : 2500))
-    say(r?.queued ? `Sent to ${name}: it gets it when its turn ends` : `Sent to ${name}`)
+    if (r?.new) return convo ? void (say(`Started a new task: ${name}`), after(2000)) : close() // the new task's window has it
+    if (r?.kept) return void (say(`Added to ${name}`), (undo.hidden = false), after(4000)) // Q5b: a note's line, a Backlog's item; Undo takes it out
+    if (r?.ai && r.speak) return void ((phase = 'speak'), say(`Asked Laki AI${r.shot ? ' with your screen' : ''}: its answer is read out here · Esc stops${r.noShot ? ` (no screen: ${r.noShot})` : ''}`, !!r.noShot), (waitSpeak = setTimeout(() => (convo ? next() : close()), 120_000))) // a long answer, or one queued behind another: given up on
+    if (r?.ai) return void (say(`Asked Laki AI${r.shot ? ' with your screen' : ''}: its answer is on the AI page${r.noShot ? ` (no screen: ${r.noShot})` : ''}`, !!r.noShot), after(r.noShot ? 5000 : 2500))
+    say(`${r?.queued ? `Sent to ${name}: it gets it when its turn ends` : `Sent to ${name}`}${convo && to ? ' · read out when it finishes · Esc ends' : ''}`)
     undo.hidden = !r?.queued
-    setTimeout(close, 4000)
+    if (convo && to) return void ((convo.agent = to), (phase = 'agent')) // an agent's: its finish read out (main's talk-note), then it listens
+    after(4000)
   }
 }
 

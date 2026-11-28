@@ -1029,6 +1029,7 @@ export type Settings = {
   talkKey?: string // its keys (unset: ui.tsx TALK_KEY)
   updateCheck?: boolean // the app asks GitHub for its newest release at launch, then daily (main's update.ts; on unless false)
   tgAi?: TgAi // Settings › AI › From Telegram: Laki AI's backend for the chat (tgBackend); mac: the Mac's own, full access (typed confirm)
+  talkConvo?: boolean // Settings › Voice › Talk key › Conversation (Q14): the key opens a conversation (talk.ts endpoint, the pill's loop); on only if true; never in Quiet or Recording mode (AGENT_SETTINGS_NO, REMOTE_KEYS)
   talkCards?: boolean // Settings › Voice › Answer cards: the talk key answers the newest ask card on screen (talk.ts cardPick; on only if true; AGENT_SETTINGS_NO, REMOTE_KEYS)
   recording?: boolean // Recording mode: private workspaces and projects out of every window's view (veiled), the phone's pushes too; they keep running
   background?: { file?: string; dim?: number; blur?: number } // Settings › Appearance › Background image: <data>/background/<file> (core's bgSet), how much the theme covers it (%) and its blur (px)
