@@ -29,12 +29,13 @@ for m in $MATRIX; do
     set -e
     $inst
     echo \"\$(. /etc/os-release && echo \$PRETTY_NAME), glibc \$(ldd --version | head -1 | grep -o '[0-9.]*\$')\"
-    cd /tmp && cp /a/Laki.AppImage . && ./Laki.AppImage --appimage-extract > /dev/null
+    cd /tmp && cp /a/Laki.AppImage . && printf '\\0\\0\\0' | dd of=Laki.AppImage bs=1 seek=8 count=3 conv=notrunc 2> /dev/null # AppImage's magic (AI 2 in the ELF header's padding) off the copy: binfmt's x86 emulation won't run it with it
+    ./Laki.AppImage --appimage-extract > /dev/null
     miss=\$(ldd squashfs-root/laki | grep 'not found' || true); [ -z \"\$miss\" ] || { echo \"missing: \$miss\"; exit 1; }
     script -qec 'APP=/tmp/squashfs-root bash /src/scripts/pack-smoke.sh /tmp/laki-pack' /dev/null < /dev/null > /tmp/smoke.log 2>&1 || { tail -30 /tmp/smoke.log; exit 1; }
     tail -3 /tmp/smoke.log; cp /tmp/laki-pack/shot.png /out/shot-$tag.png
   " > "$OUT/$tag.log" 2>&1; then
-    echo "ok: $(sed -n 1p "$OUT/$tag.log")"
+    echo "ok: $(grep -m1 glibc "$OUT/$tag.log")"
   else
     echo "FAILED ($OUT/$tag.log):"; tail -15 "$OUT/$tag.log"; fail=1
   fi

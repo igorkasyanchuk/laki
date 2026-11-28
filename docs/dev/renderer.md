@@ -754,7 +754,9 @@ are tested in `test/units-more.test.ts`.
   now) → the pill's `onTalkNote`: the talked-to tab's finish (`convo.agent`), any tab's ask (its target then, so a yes
   answers it), the newest three queued while busy. The words: shared/speak.ts `convoNote` (`spokenNote` read whatever
   Speak asks / Speak when done say: '' in Quiet, Recording mode, a private workspace's, Only on headphones on speakers,
-  and the pill says *finished (not read out)*). `spokenMode`'s `laki` asks are said and left. On headphones
+  and the pill says *finished (not read out)*). `spokenMode`'s `laki` asks are said and left; its `enter` ones listen on
+  (`asking.word`) and the same word said again answers (anything else drops it). A turn a usage limit or a sign-out
+  ended is the agent's finish too. On headphones
   (`personalOutput(outputLabel())`, say.ts `watchOutput` once the mic's allowed) it listens while it speaks, and
   `talkingOver` cancels the speech; else the mic opens after. Esc or the key (but in an `answer`): `endConvo`. Nothing
   kept: each utterance goes through `talk-text` as the single message's. `test:ui`'s `talk-convo`: one turn (the smoke's

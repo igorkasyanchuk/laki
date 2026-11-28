@@ -3081,7 +3081,8 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   *Conversation* (off until on): the key opens a conversation instead of one message, to Laki AI when it's on, else
   as above (Tab still picks who gets it). Talk, and when you stop for about a second what you said is written down
   and sent; the answer is read out (Laki AI's first sentences, or the agent's *finished: …* line when its turn ends)
-  and the pill listens again. Routing by first words works as ever, and a spoken *yes* or *no* answers a waiting ask;
+  and the pill listens again. Routing by first words works as ever, and a spoken *yes* or *no* answers a waiting ask
+  (one that would wait for ⏎, a chained command say, when you say the same word again);
   an agent that asks meanwhile is read out, and your next words can answer it (what stays for Laki's window stays
   there, and the pill says so). Laki AI keeps one chat for the whole conversation. The microphone is shut while Laki
   speaks; on headphones it stays open and talking over Laki stops it. It ends with the key, Esc, "stop", "that's all"

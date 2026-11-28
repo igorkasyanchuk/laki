@@ -196,8 +196,8 @@ export const talkingOver = (s: Ep) => s.from !== undefined && s.loud !== undefin
 // Russian (the languages SPOKEN's yes and no carry besides the others)
 const ENDS: Record<string, string[]> = {
   en: ['stop', "that's all", 'that is all', 'bye', 'goodbye', 'bye bye', 'ok bye', 'okay bye'],
-  uk: ['стоп', 'це все', 'на цьому все', 'все', 'усе', 'бувай', 'бувайте', 'па па', 'до побачення'],
-  ru: ['стоп', 'это всё', 'это все', 'на этом всё', 'всё', 'все', 'пока', 'пока пока', 'до свидания'],
+  uk: ['стоп', 'це все', 'на цьому все', 'бувай', 'бувайте', 'па па', 'до побачення'], // never a bare все: "all", an answer
+  ru: ['стоп', 'это всё', 'это все', 'на этом всё', 'пока', 'пока пока', 'до свидания'],
 }
 export function convoEnd(text: string, lang?: string): boolean {
   const said = wordsOf(text).join(' ')

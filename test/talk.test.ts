@@ -193,7 +193,7 @@ test('Q14 endpoint: an utterance ends 1.2 s under FLAT after speech; a blip is n
 
 test('Q14 convoEnd: stop, that\'s all, bye (Ukrainian and Russian too) end it, as the whole utterance only', () => {
   for (const t of ['Stop.', "That's all", 'that is all!', 'Bye', 'um, bye', 'Goodbye', 'Стоп', 'Це все', 'Бувай', 'До побачення', 'Это всё', 'Пока', 'до свидания']) assert.ok(convoEnd(t), t)
-  for (const t of ['stop the dev server', "that's all for the tests, now docs", 'bye the way', 'say goodbye to the old API', 'все тести', 'пока не трогай', '']) assert.ok(!convoEnd(t), t)
+  for (const t of ['stop the dev server', "that's all for the tests, now docs", 'bye the way', 'say goodbye to the old API', 'все тести', 'пока не трогай', 'все', 'Всё.', 'усе', '']) assert.ok(!convoEnd(t), t)
   assert.ok(convoEnd('стоп', 'uk-UA') && convoEnd('stop', 'uk-UA'), 'English with any language')
   assert.ok(!convoEnd('пока', 'uk'), 'its language only, and English')
 })
