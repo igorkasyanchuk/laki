@@ -370,7 +370,7 @@ test("meter: Grok's and Antigravity's chats by day and model for the Usage page 
   db.close()
   const d0 = new Date()
   const key = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}`
-  const rows = await until(async () => (r => (r.some((x: any) => x.agent === 'gemini') && r.filter((x: any) => x.agent === 'grok').length === 2 ? r : undefined))((await rig.rpc('usageDays')).rows), 'their days')
+  const rows = await until(async () => (r => (r.some((x: any) => x.agent === 'gemini') && r.filter((x: any) => x.agent === 'grok').length === 2 ? r : undefined))((await rig.rpc('usageDays')).rows.filter((x: any) => x.ws === ws.id)), 'their days, the tabs’ workspace’s') // the machine scan reads them too: one chat each
   const mine = rows.filter((r: any) => r.day === key).map((r: any) => [r.agent, r.model, r.tokens, r.cost, r.ws]).sort()
   assert.deepEqual(mine, [['gemini', 'gemini-4-neon', 1000, 0, ws.id], ['grok', 'grok-4.7-build', 5000, 3, ws.id]])
   assert.equal(rows.find((r: any) => r.agent === 'grok' && r.day !== key).tokens, 1000) // two days ago, its own day
@@ -489,14 +489,14 @@ test("meter: OpenCode's sessions from its own database, for the Usage page and T
   ocSaid(db, 'm2', 'ses_sub', 'beam-free', [500, 20, 0, 0, 0], 0)
   ocSaid(db, 'm3', 'ses_other', 'z-ai/glm-5.1', [9999, 0, 0, 0, 0], 9)
   ocSaid(db, 'm4', tab.resumeId, 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002, false)
-  const rows = async () => (await rig.rpc('usageDays')).rows.filter((r: any) => r.agent === 'opencode').map((r: any) => [r.model, r.tokens, r.cost, r.priced, r.ws]).sort()
+  const rows = async () => (await rig.rpc('usageDays')).rows.filter((r: any) => r.agent === 'opencode' && r.ws === ws.id).map((r: any) => [r.model, r.tokens, r.cost, r.priced, r.ws]).sort() // ses_other: the machine scan's, outside Laki
   await until(async () => (await rows()).length === 2, 'its days')
   assert.deepEqual(await rows(), [['beam-free', 520, 0, true, ws.id], ['z-ai/glm-5.1', 1260, 0.01, true, ws.id]])
   ocSaid(db, 'm4', tab.resumeId, 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002)
   await until(async () => (await rows())[1]?.[1] === 1260 + 777, 'the answer once it ended')
   assert.deepEqual((await rows())[1], ['z-ai/glm-5.1', 2037, 0.012, true, ws.id])
-  const today = await until(async () => (x => x?.tokens === 2557 && x)((await rig.rpc('state')).today), 'today’s')
-  assert.deepEqual([today.cost, today.unpriced], [0.01, undefined])
+  const today = await until(async () => (x => x?.ws.find((w: any) => w.ws === ws.id)?.tokens === 2557 && x)((await rig.rpc('state')).today), 'today’s')
+  assert.deepEqual([today.ws.find((w: any) => w.ws === ws.id).cost, today.unpriced], [0.01, undefined])
   assert.ok(rig.fakeLog().some((l: any) => l.bin === 'opencode' && l.args[0] === 'debug'), 'its data folder asked of opencode')
 })
 

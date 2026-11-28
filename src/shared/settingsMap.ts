@@ -16,6 +16,7 @@ export const SECTIONS: { id: string; label: string; icon: IconName; group: strin
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
   { id: 'keys', label: 'Keys', icon: 'keyboard', group: 'Laki' },
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
+  { id: 'usage', label: 'Usage', icon: 'barChart', group: 'Laki' },
   { id: 'achievements', label: 'Achievements', icon: 'trophy', group: 'Laki' },
   { id: 'notes', label: 'Release notes', icon: 'file', group: 'Laki' },
   { id: 'presets', label: 'Agents & profiles', icon: 'agent', group: 'Agents' },
@@ -39,6 +40,7 @@ export const SECTIONS: { id: string; label: string; icon: IconName; group: strin
 // A result opens the section and shows the first label, row or heading starting with the title. Add new settings here.
 export const FIND: [string, string, string?][] = [
   ['general', 'New workspaces start', 'default agent profile preset'],
+  ['usage', 'Count every agent chat on this Mac', 'usage cost tokens outside laki terminal machine scan all chats claude codex grok opencode antigravity transcripts'],
   ['general', 'Back up every week', 'backup weekly automatic folder restore copies'],
   ['voice', "Your project's words", 'vocabulary names transcript speech dictation terms'],
   ['git', 'Branch prefix', 'git worktree'],

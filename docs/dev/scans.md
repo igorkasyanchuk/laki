@@ -782,7 +782,32 @@ shown as it is until the chat is read again (its first record): the recount repl
 transcript is gone keeps it, and a deleted transcript never loses its rows or keys. `skip`: chats Laki's own runs made
 (`usageSkip`: Laki AI's claude -p and codex exec chats, their session or thread id; aiOnce's claude runs
 `--no-session-persistence`, never resumed): its call log counts them. `usageWs`: a side chat's fork (turns.ts) is its
-tab's workspace's. `meterView`: `TabView.context` `{ used, max }`, `usage`
+tab's workspace's.
+
+The machine scan (`usageScan.ts`, `settings.usageAll` on unless false: Settings › Usage › *Count every agent chat on this
+Mac*; off: Laki's own tabs only; nothing leaves the Mac): every agent chat on this Mac changed in the last `USAGE_KEEP`
+days, read in a worker (`usageScanWorker.ts`, its own build entry beside agyWorker, 512 MB heap, ended at 10 minutes:
+what it posted stands) that only reads and parses, its records applied here through `ledger` (no ws: a chat no tab
+claimed keeps the folder it ran in, `dir`, its newest line's `cwd`, realpath'd). Claude's `projects/*/<session>.jsonl`
+and `<session>/subagents/*.jsonl` under `homeDir('claude')` (CLAUDE_CONFIG_DIR) and each account's folder, Codex's
+`sessions/**/rollout-*.jsonl` under `homeDir('codex')` (CODEX_HOME) and each account's (a folder whose `projects` or
+`sessions` resolves to one already read: once), a spawned thread's chat its root's (`session_meta`'s
+`parent_thread_id`, up; rollouts in name order), Grok's `~/.grok/sessions/<cwd, encoded>/<id>/usage.json` whole,
+agy's every `conversations/<id>.db` (its folder from `cache/last_conversations.json`) and OpenCode's `opencode.db` (`ocDb`,
+`ocRead` without a session: every one, each under the one it hangs from, its `directory`), only the rows past the last
+counted. The oldest first (birth time): a chat before its forks, whose copies are its. When: the Usage page's
+`usageDays` (the last scan ended over 5 minutes ago, `LAKI_SCAN_AGAIN_MS`: tests', or Laki's project and worktree
+folders changed since), answered at once with what's kept, `changed()` as it ends; and every 15 minutes (`usageScan`
+tick, `LAKI_SCAN_MS`). Each file's `{ size, mtime, ctime, ino, pos }` (and a codex rollout's running totals and model at
+`pos`, its `session_meta` id and parent; the chat and folder last read) in `<data>/usage-scan-v1.json` (the version in
+the name: an older Laki never writes a newer one's), saved every 30 s and as the daemon stops (`usageScanStop`; the
+ledger first, so the state is never past what it kept): a quit mid-scan picks up where it stopped. Unchanged: skipped;
+the same inode and bigger: read on from `pos`; any other change (same size and a new mtime, a new inode, smaller): read
+again from 0, the ledger's keys counting nothing twice; a DB: its rows past `pos` (a rowid). 4 files at a time, paced to
+32 MB/s on average (Orca's `UsageScanReadBudget`: a debt past 5 s forgiven, under 50 ms not waited: a small scan never
+waits), 8 MB reads of whole lines (a longer line: a bigger read, past 128 MB skipped). Laki's own claude -p chats: the
+ledger's `skip` (above). Tested in `test/usage-scan.test.ts` (the worker's `scan` alone, and the rig: a tab's chat, its
+fork, a resume, a codex thread once; usageAll off). `meterView`: `TabView.context` `{ used, max }`, `usage`
 `{ tokens, cost? }`, `skills` (B7: share.ts `skillsIn`, the lines that name `Skill`, `SKILL.md` or *Base directory for
 this skill*: claude's Skill calls (`input.skill`), the message that loads one (its folder; a `/skill` typed has only
 that), a Read of a SKILL.md; codex's shell calls that read one; the main chat's, by name in the order loaded, 50 at

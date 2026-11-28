@@ -53,6 +53,7 @@ import { CONFIRM, confirmKnown, confirmOf, type ConfirmWhat, TICKET_MS } from '.
 import * as resourcesMod from './resources.ts'
 import * as artifactsMod from './artifacts.ts'
 import * as metersMod from './meters.ts'
+import { usageScan, usageScanStop } from './usageScan.ts'
 import * as phoneMod from './phone.ts'
 import * as tgMod from './telegram.ts'
 import { subOk } from './push.ts'
@@ -734,7 +735,7 @@ const api = {
   prAct: (p: In<typeof prMod.prAct>) => prMod.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, head: p.head, force: p.force === true, from: p.from }),
   mergeQueueStart: p => prMod.mergeQueueStart({ wss: p.wss }), // the user's only (gates.ts AGENT_NO): each PR's project allows merging, its merge gates apply
   mergeQueueStop: p => prMod.mergeQueueStop({ project: p.project }),
-  usageDays: async () => (async u => ({ ...u, ai: await aiUsage(Date.now() - u.keep * 864e5) }))(metersMod.usageDays()), // the Usage page: tokens and $ by day, agent, model and workspace (Laki's claude and codex tabs), and Laki AI's by what made each call
+  usageDays: async () => (usageScan(true), (async u => ({ ...u, ai: await aiUsage(Date.now() - u.keep * 864e5) }))(metersMod.usageDays())), // the Usage page: tokens and $ by day, agent, model and workspace (every chat on this Mac: the machine scan, kept as it is now, a new one when due), and Laki AI's by what made each call
   commits: p => filesMod.commits(p.ws), // the side panel's Commits: what the branch adds, each pushed or not
   commitDiff: p => filesMod.commitDiff(p.ws, p.sha),
   prDraft: (p: In<typeof prMod.prDraft>) => prMod.prDraft({ ws: p.ws, draft: p.draft === true }), // { ws, draft }: Convert to draft / Ready for review
@@ -2564,6 +2565,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   ticks.register('scanOverlaps', Number(process.env.LAKI_OVERLAP_MS || 15000), filesMod.scanOverlaps, { idle: 'slow' }) // Collision radar
   ticks.register('meterTick', Number(process.env.LAKI_METER_MS || 10000), () => (metersMod.meterTick(), capTick()), { idle: 'slow' }) // claude's and codex's transcripts: the tabs' context and usage
   ticks.register('watchLimits', 30000, () => core.watchLimits())
+  ticks.register('usageScan', Number(process.env.LAKI_SCAN_MS || 15 * 60_000), () => usageScan(), { unref: true }) // every agent chat on this Mac (settings.usageAll)
   ticks.register('remoteTick', 15000, () => (remoteMod.remoteTick(), idleLock()))
   ticks.register('shareTick', 15000, () => remoteMod.shareTick())
   ticks.register('tunnelTick', 15000, () => remoteMod.tunnelTick())
@@ -2608,6 +2610,7 @@ function shutdown(keep: unknown = false) {
   remoteMod.tunnelsDown() // kept in state.json: they come back with the next daemon
   remoteMod.stopShares()
   mcpShareStop(true) // #5: the shared MCP servers' processes
+  usageScanStop() // the machine scan: what it applied saved, the ledger first
   metersMod.daysWrite() // the Usage page's days, written a moment after each read
   remoteMod.remoteDown() // kept in state.json too (D2)
   flowStopAll() // a run block's command

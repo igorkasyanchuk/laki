@@ -187,6 +187,7 @@ export type AppSettings = Paint & {
   continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
+  usageAll?: boolean // Settings › Usage: every agent chat on this Mac counted (the machine scan), on unless false
   usage?: Record<string, boolean> // R4: its usage endpoint asked too (true only); else Claude's and Codex's own numbers
   usageNote?: boolean // R4: Resources' one-time note
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
@@ -2665,6 +2666,16 @@ export function SettingsPage(p: {
                 </Switch>
               </div>
               </Group>
+            </>
+          )}
+          {sec === 'usage' && (
+            <>
+              <h2>Usage</h2>
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.usageAll !== false} onChange={v => set({ usageAll: v })}>
+                  <Says title="Count every agent chat on this Mac" hint="Claude Code, Codex, Grok, OpenCode and Antigravity chats you ran outside Laki too, read from their own files on this Mac (the last 90 days), each answer once. Off: Laki's own tabs only. Nothing leaves the Mac" />
+                </Switch>
+              </div>
             </>
           )}
           {sec === 'extras' && (

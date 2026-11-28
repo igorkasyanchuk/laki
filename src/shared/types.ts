@@ -817,6 +817,7 @@ export type Settings = {
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
+  usageAll?: boolean // Settings › Usage › Count every agent chat on this Mac: the machine scan (daemon/usageScan.ts), on unless false; off: Laki's own tabs only
   usage?: Record<string, boolean> // R4: claude, codex: its usage endpoint asked too, with its own sign-in (true only; else claude's and codex's own numbers)
   usageNote?: boolean // R4: the one-time note in Settings › Resources that plan limits moved to the agents' own numbers
   seenVersion?: string // U13: the version whose What's new card was closed (a new install: its own; '': from before U13, the next version's shows)
