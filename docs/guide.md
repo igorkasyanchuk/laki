@@ -268,7 +268,7 @@ WSL 2 (its Ubuntu; WSLg shows the window):
 
 ```bash
 sudo apt install libnss3 libasound2t64 xdg-utils wslu   # wslu: WSL only, links open in Windows' browser
-mkdir -p ~/Applications && mv Laki-*.AppImage ~/Applications/Laki.AppImage
+mkdir -p ~/Applications && mv "$(ls -t Laki-*.AppImage | head -1)" ~/Applications/Laki.AppImage   # the newest
 chmod +x ~/Applications/Laki.AppImage && ~/Applications/Laki.AppImage
 ```
 

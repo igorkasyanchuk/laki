@@ -62,7 +62,7 @@ with a desktop. Download `Laki-<version>-x86_64.AppImage` (or `-arm64`) from
 and start it:
 
 ```bash
-mkdir -p ~/Applications && mv ~/Downloads/Laki-*.AppImage ~/Applications/Laki.AppImage
+mkdir -p ~/Applications && mv "$(ls -t ~/Downloads/Laki-*.AppImage | head -1)" ~/Applications/Laki.AppImage   # the newest
 chmod +x ~/Applications/Laki.AppImage && ~/Applications/Laki.AppImage
 ```
 
