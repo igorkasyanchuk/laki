@@ -402,7 +402,7 @@ function keptNow() {
   if (kept) return kept
   const k = readJson<Kept>(daysPath)
   kept = k && typeof k.chats === 'object' ? k : { v: LEDGER_V, chats: {} }
-  if (kept.v !== LEDGER_V) { // 0.68.0's: its rows no key backs (all but parts) are pre
+  if ((kept.v ?? 0) < LEDGER_V) { // 0.68.0's: its rows no key backs (all but parts) are pre
     for (const c of Object.values(kept.chats))
       for (const [d, models] of Object.entries(c.days ?? {})) {
         for (const [m, r] of Object.entries(models)) if (!('p' in r)) (((c.pre ??= {})[d] ??= {})[m] = r), delete models[m]
@@ -447,7 +447,7 @@ export function ledger(r: UseRec, ws?: string): boolean {
     o.set(r.key, r.chat)
     ;(c.keys ??= {})[r.day] = (c.keys[r.day] ?? '') + r.key
     rowAdd(r.chat, c, r.day, r.model, r)
-    if (r.p && r.day >= dayOf(Date.now() - GROW_MS)) (k.grow ??= {})[r.key] = [r.chat, Date.now(), r.day, r.model, r.p] // today's (an old answer grows no more: a cold scan's thousands stay out)
+    if (r.p && (r.day === dayOf(Date.now()) || r.day === dayOf(Date.now() - GROW_MS))) (k.grow ??= {})[r.key] = [r.chat, Date.now(), r.day, r.model, r.p] // today's (an old answer grows no more: a cold scan's thousands stay out)
     return true
   }
   const g = k.grow?.[r.key]

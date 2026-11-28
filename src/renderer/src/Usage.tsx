@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, Icon, IconButton, Page, act } from './ui'
 import { ago as agoOf } from './Info'
 
-import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type OwnPrice, ownPriceOk, type QuotaSource, type Today, type UsageWindow, usageOld } from '../../shared/types'
+import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type OwnPrice, ownPriceOk, QUOTA_MAX, type QuotaSource, type Today, type UsageWindow, usageOld } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
@@ -93,7 +93,7 @@ export function UsageButton({ load, credits, onUse, onDays, today, asks, onAsk }
   }, [])
   if (!rows?.length) return null
   const now = Date.now()
-  const used = rows.filter(r => r.default !== false) // the ring: each agent's default account (an older daemon's: its one)
+  const used = rows.filter(r => r.default !== false && r.agent !== QUOTA) // the ring: each agent's default account (an older daemon's: its one); a quota source's only in the popup
   const tops = used.map(r => topOf(r, now))
   const known = tops.filter(p => p !== undefined)
   if (!known.length) return null // no agent has given a reading yet (a first run, signed out): no empty ring that looks like a spinner
@@ -400,7 +400,7 @@ export function QuotaSources({ list, call }: { list: QuotaSource[]; call: <T>(me
           </button>
         </div>
       ))}
-      {rows.length < 8 && (
+      {rows.length < QUOTA_MAX && (
         <form className="usage-price" onSubmit={e => (e.preventDefault(), add())}>
           <input placeholder="Name" size={12} value={v.name} onChange={e => setV({ ...v, name: e.target.value })} />
           <input className="mono" placeholder="https://… (its quota JSON)" size={28} value={v.url} onChange={e => setV({ ...v, url: e.target.value })} />

@@ -174,6 +174,7 @@ export const PRICE_OWN: Record<string, Partial<Price>> = {
 // settings (core.ts sets yours.of); a kept day re-prices at once, its rows keeping parts
 export type OwnPrice = Rates | { as: string }
 export type QuotaSource = { id: string; name: string; url: string; token?: true } // token: one kept for it (the Keychain's quota-<id>)
+export const QUOTA_MAX = 8 // quota sources at most, and accounts a source and windows an account (usage.ts quotaRead)
 export const priceYours: { of?: () => Record<string, OwnPrice> | undefined } = {}
 // a price as Settings may keep it: rates 0 to 10,000 a million each, in and out given; or { as } another model
 export function ownPriceOk(model: string, v: unknown): OwnPrice {

@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises'
 import { homedir, tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { type AgentUsage, HOME_ACCOUNT, type QuotaSource, type UsageWindow } from '../shared/types.ts'
+import { type AgentUsage, HOME_ACCOUNT, QUOTA_MAX, type QuotaSource, type UsageWindow } from '../shared/types.ts'
 import { getFollow, localUrl } from './netAddr.ts'
 import { newer } from '../shared/update.ts'
 
@@ -456,7 +456,6 @@ async function gemini(): Promise<Got> {
 // each redirect checked again; a URL on this Mac, a local hub, asked directly). Each account a row (agent and source
 // 'quota'); another version or shape: one row with the error. At most QUOTA_MAX sources, accounts and windows each.
 // No reader of Laki's own takes another app's token (Copilot, Cursor, z.ai…): a quota source covers them
-export const QUOTA_MAX = 8
 const KIND: Record<string, string> = { session: 'Session', weekly: 'Weekly', monthly: 'Monthly', other: 'Limit' }
 export function quotaRead(doc: unknown): { accounts: { id: string; label: string; windows: UsageWindow[] }[] } | { error: string } {
   const d = obj(doc)
