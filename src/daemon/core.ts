@@ -10,7 +10,7 @@ import type { ReviewNote } from '../shared/reviewNotes.ts'
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, lstat, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
-import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, linkSync, existsSync, fchmodSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, appendFileSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, linkSync, existsSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, release, tmpdir, userInfo } from 'node:os'
 import { type AllowRule, allowRuleOf, alwaysAskOf, type Perm, permOf, rulePattern, sayable, TELL_WHY } from '../shared/ask.ts'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -394,17 +394,23 @@ export function roomFor(at: string, what: string) {
 export function save() {
   try {
     if (inRig() && existsSync(join(dir, 'test-disk-full'))) throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' })
-    const fd = openSync(statePath + '.tmp', 'w', 0o600) // settings' env, the webhook's URL: yours alone
+    // a name of its own each save (this pid and 4 random bytes): a second daemon, or a copy a crash left, never shares it
+    const tmp = `${statePath}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
+    const fd = openSync(tmp, 'wx', 0o600) // settings' env, the webhook's URL: yours alone
     try {
-      fchmodSync(fd, 0o600) // one a crash left keeps its mode otherwise
-      state.v = STATE_V // R7
-      envStash(state) // secret values into the Keychain: state.json has their names only
-      writeFileSync(fd, envJson(state, 2))
-      fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
-    } finally {
-      closeSync(fd)
+      try {
+        state.v = STATE_V // R7
+        envStash(state) // secret values into the Keychain: state.json has their names only
+        writeFileSync(fd, envJson(state, 2))
+        fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
+      } finally {
+        closeSync(fd)
+      }
+      renameSync(tmp, statePath)
+    } catch (e) {
+      rmSync(tmp, { force: true }) // a full disk, a failed write: no half a state.json left beside it
+      throw e
     }
-    renameSync(statePath + '.tmp', statePath)
     syncDir(dir) // R7: the rename on disk too
   } catch (e) {
     if (!['ENOSPC', 'EDQUOT'].includes((e as NodeJS.ErrnoException).code ?? '')) throw e

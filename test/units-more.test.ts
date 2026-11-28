@@ -10,7 +10,8 @@ import { AGENT_KEY_ENV, envAllowOf, envSplit, secretLooking } from '../src/share
 import { abortAfter, copyTree, logLine, pingStep, readJson, rotateLog, writeAtomic } from '../src/shared/conn.ts'
 import { firstLoad } from '../scripts/size.ts'
 import { pickTests } from '../scripts/test-changed.ts'
-import { debtOf } from '../scripts/debt.ts'
+import { debtOf, SECURITY } from '../scripts/debt.ts'
+import { DATA_SECRETS } from '../src/daemon/dir.ts'
 import { fillTemplate as fillPrTemplate } from '../src/shared/prTemplate.ts'
 import { bgDoneOf, foldersOf, fuzzyFiles, hunkNext, shipPrimary, toolSummary, midCut, pickProject, readerShown, retrying, retryText, reviewList, triggerAt } from '../src/renderer/src/text.ts'
 import { FIND, findKey, freshOf } from '../src/shared/settingsMap.ts'
@@ -385,6 +386,12 @@ test('Needs you and ⌘J: waiting oldest first, fresh finishes newest first, sta
   assert.equal(isStale(tab('w', 'waiting', 999), 30, now), false)
   assert.equal(isStale(tab('d', 'idle', 30), 30, now), true, 'exactly staleAfter old')
   assert.equal(isStale(tab('d', 'idle', 29), 30, now), false)
+})
+
+test("S6: DATA_SECRETS hides the MCP share key, hook deliveries, starts, tool days and the rotated log from a sandboxed claude; debt's SECURITY names their files", () => {
+  const hidden = (name: string) => DATA_SECRETS.some(g => new RegExp(`^${g.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`).test(name))
+  for (const f of ['mcp-share.key', 'hook-deliveries.json', 'starts.json', 'tool-days.json', 'daemon.log', 'daemon.log.1', 'daemon.log.2', 'state.json.123.ab12cd34.tmp']) assert.ok(hidden(f), f)
+  for (const f of ['src/daemon/mcpShare.ts', 'src/shared/osc52.ts', 'src/daemon/safe.ts']) assert.ok(SECURITY.has(f) && existsSync(new URL(`../${f}`, import.meta.url)), f)
 })
 
 test("the test rig only: LAKI_POLICY and the RPC's now need LAKI_TEST_PARENT and a data folder under /tmp (dir.ts inRig)", () => {
