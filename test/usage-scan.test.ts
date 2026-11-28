@@ -148,11 +148,19 @@ test('scan: lines appended after a restart count once; 0.68.0’s old rows recou
   writeFileSync(f, JSON.stringify(k))
   await rig.start()
   await until(async () => total(await rows(rig)) === 11 + 22 + 500, 'x2 once; o1’s old row recounted, gone’s kept')
+  const base = 11 + 22 + 500 + 1e6
+  // a price of your own: the kept days re-priced at once
+  write(join(dir, 'gw.jsonl'), line({ type: 'assistant', timestamp: now(), requestId: 'r_gw', message: { id: 'gw1', model: 'my-gateway-1', usage: { input_tokens: 1e6, output_tokens: 0 } } }))
+  const gw = async () => (await rows(rig)).find(r => r.model === 'my-gateway-1')
+  await until(async () => (await gw())?.priced === false, 'no price')
+  await rig.rpc('settingsSet', { prices: { 'my-gateway-1': { in: 3, out: 9 } } })
+  assert.deepEqual([(await gw()).priced, (await gw()).cost], [true, 3])
+  await assert.rejects(rig.rpc('settingsSet', { prices: { x: { in: 'lots' } } }), /USD per million/)
   // off: nothing new outside Laki is read
   await rig.rpc('settingsSet', { usageAll: false })
   write(join(dir, 'o2.jsonl'), ans('y1', 1000, 1))
   await new Promise(r => setTimeout(r, 1000))
-  assert.equal(total(await rows(rig)), 11 + 22 + 500)
+  assert.equal(total(await rows(rig)), base)
   const off = await fresh(t, { env: SCAN })
   await off.rpc('settingsSet', { usageAll: false })
   write(join(off.home, '.claude/projects/-x/z.jsonl'), ans('z1', 5, 5))

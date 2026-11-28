@@ -545,7 +545,7 @@ export function meterTick() {
   if (any) changed()
 }
 // Grok's, Antigravity's and OpenCode's chats (agentUsage.ts): each answer into the ledger, under the tab's workspace
-// (Grok's and OpenCode's at their own price, agy's tokens only). This Mac's only
+// (Grok's and OpenCode's at their own price, agy's parts at the API's). This Mac's only
 function otherRead(t: Tab) {
   const ws = state.workspaces.find(w => w.id === t.workspace)
   if (!ws || ws.host) return false

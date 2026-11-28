@@ -757,13 +757,22 @@ counted anew); claude's answer is a line per block, the largest of each part acr
 output grows as it streams: T3 Code's rule, `partsMax`), once. Tokens as parts by model (`Meter.by`, `days`; `types.ts` `Parts`: `in` (input not from the cache), `out`, `w5` and `w1`
 (cache writes kept 5 minutes and an hour: claude's `cache_creation.ephemeral_1h_input_tokens`, the rest 5 minutes; no
 split said, all), `rd` (reads); `L` past the model's long line, `F` fast mode: `partsOf`, share.ts `usageParts`), priced as
-they're read (`meterCost`: the priced cost, the tokens of each model with no price). Prices: `shared/prices.json`
-(`npm run prices`, scripts/prices.ts: LiteLLM's table, the claude-*, gpt-5*, grok-* and gemini-* chat rows, dated), then
+they're read (`meterCost`: the priced cost, the tokens of each model with no price). Prices: yours first (`settings.prices`,
+Settings › Usage › Model prices and the Usage page's *Set price* on a *no price for <model>*: `{ in, out, rd?, w5?, w1? }`
+USD per million, or `{ as: '<model>' }` priced as that one, three hops at most; `ownPriceOk` checks them in `settingsSet`;
+core.ts sets `priceYours.of`; a kept day re-prices at once, its rows keeping parts), then `shared/prices.json`
+(`npm run prices`, scripts/prices.ts: LiteLLM's table, the claude-*, gpt-5*, grok-*, gemini-*, glm-*, kimi-* and MiniMax-*
+chat rows, a first party's own (`xai/`, `zai/`, `moonshot/`, `minimax/` dropped) over a reseller's same id, dated), then
 `types.ts` `PRICE_OWN` over a row field by field (retired claude ids old chats name, Sonnet 4 and 4.5's rates past 200K,
 fast mode's 2x on Opus 5.5, Opus 5, Opus 4.8, Fable 5.2 and Mythos 5.2); by the exact model id, never a family guess: a
 model with no row is unpriced. `costOf`: a 1-hour write 2x input and a 5-minute one 1.25x unless the row says; a
 request whose whole input (cache too) is past the row's `long.above` (Haiku 5.5's 100K, Sonnet 4/4.5's 200K, gpt-5.4,
-5.5 and 5.6's 272K) at those rates, every token of it; fast (claude's `usage.speed` `fast`) times every rate.
+5.5 and 5.6's 272K) at those rates, every token of it (codex's: its own request's, `last_token_usage.input_tokens`, not
+what the totals grew by, which can be several requests: a rollout read from its middle, its first `token_count` read);
+fast (claude's `usage.speed` `fast`) times every rate. Claude's advisor calls (`usage.iterations`' `advisor_message`: the
+top-level usage is the executor's alone) each count on their own model at its prices, keyed as the answer's and
+`:advisor:<index>`, never in the context. Antigravity's steps keep their parts (field 9's 2 input, 3 output, 4 cache
+write, 5 cache read), priced as the API's where its model has a price.
 
 The ledger (meters.ts `ledger`): `<data>/usage-days.json` is the only one, by chat (its session id: claude's transcript
 name, codex's `session_meta` id, OpenCode's, agy's and Grok's own; a tab's `resumeId` is that same id for each). Each

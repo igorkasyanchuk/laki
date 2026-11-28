@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, Icon, IconButton, Page, act } from './ui'
 import { ago as agoOf } from './Info'
 
-import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type Today, type UsageWindow, usageOld } from '../../shared/types'
+import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type OwnPrice, type Today, type UsageWindow, usageOld } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
@@ -318,14 +318,59 @@ const money = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n).toLocaleS
 const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : '')
 // what a workspace's id names: its name and project (gone: none)
 export type WsNames = (id: string) => { name: string; project?: string; archived?: boolean } | undefined
-// scan: the machine scan's (View.usageScan): read again as one ends; all: settings.usageAll
-export function UsagePage({ load, onClose, names, scan, all }: { load: () => Promise<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>; onClose: () => void; names: WsNames; scan?: { at: number; running?: true }; all?: boolean }) {
+// a model's price of your own (settings.prices): its rates, USD per million tokens, or the same as a priced model's
+// (models: the ones this page has priced: a list to pick from, any id taken)
+export function PriceForm({ model, models, onSave, onCancel }: { model?: string; models: string[]; onSave: (model: string, p: OwnPrice) => Promise<unknown>; onCancel?: () => void }) {
+  const [v, setV] = useState({ model: model ?? '', in: '', out: '', rd: '', as: '' })
+  const [err, setErr] = useState('')
+  const field = (k: 'in' | 'out' | 'rd', label: string) => (
+    <label>
+      {label} <input inputMode="decimal" size={6} value={v[k]} disabled={!!v.as.trim()} onChange={e => setV({ ...v, [k]: e.target.value })} />
+    </label>
+  )
+  const save = () => {
+    const m = v.model.trim()
+    if (!m) return setErr('Which model?')
+    const num = (x: string) => (x.trim() === '' ? undefined : Number(x))
+    onSave(m, v.as.trim() ? { as: v.as.trim() } : { in: num(v.in)!, out: num(v.out)!, ...(num(v.rd) !== undefined && { rd: num(v.rd)! }) }).then(() => setErr(''), e => setErr(String(e?.message ?? e)))
+  }
+  return (
+    <form className="usage-price" onSubmit={e => (e.preventDefault(), save())}>
+      {model ? <b className="mono">{model}</b> : <input className="mono" placeholder="Model id, as its chats name it" value={v.model} onChange={e => setV({ ...v, model: e.target.value })} />}
+      <span className="muted">USD per million tokens:</span>
+      {field('in', 'In')}
+      {field('out', 'Out')}
+      {field('rd', 'Cache read')}
+      <label>
+        or the same as <input className="mono" list="usage-priced" size={16} value={v.as} onChange={e => setV({ ...v, as: e.target.value })} />
+      </label>
+      <datalist id="usage-priced">
+        {models.map(m => (
+          <option key={m} value={m} />
+        ))}
+      </datalist>
+      <button type="submit">Save</button>
+      {onCancel && (
+        <button type="button" className="link" onClick={onCancel}>
+          Cancel
+        </button>
+      )}
+      {err && <span className="warn">{err}</span>}
+    </form>
+  )
+}
+
+// scan: the machine scan's (View.usageScan): read again as one ends; all: settings.usageAll; onPrice: a model's price of
+// your own (Set price)
+export function UsagePage({ load, onClose, names, scan, all, onPrice }: { load: () => Promise<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>; onClose: () => void; names: WsNames; scan?: { at: number; running?: true }; all?: boolean; onPrice?: (model: string, p: OwnPrice) => Promise<unknown> }) {
   const [d, setD] = useState<{ keep: number; rows: Row[]; where: boolean } | null>(null) // where: rows name their workspace (a daemon from API 213)
   const [err, setErr] = useState('')
   const [range, setRange] = useState(30)
   const [agent, setAgent] = useState('')
   const [model, setModel] = useState('')
   const [place, setPlace] = useState<'' | 'in' | 'out'>('')
+  const [pricing, setPricing] = useState('') // the model whose Set price is open
+  const [again, setAgain] = useState(0) // a price set: read again
   const [by, setBy] = useState<'cost' | 'tokens'>('cost')
   useEffect(
     () =>
@@ -333,7 +378,7 @@ export function UsagePage({ load, onClose, names, scan, all }: { load: () => Pro
         r => setD({ keep: r.keep, where: !!r.ai, rows: [...r.rows.map(x => ({ ...x, src: x.ws || x.where === undefined ? `ws:${x.ws ?? ''}` : `out:${x.where}` })), ...(r.ai ?? []).map(x => ({ day: x.day, agent: LAKI, model: x.model, src: `ai:${x.from}`, tokens: x.tokens, cost: x.cost }))] }),
         e => setErr(String(e?.message ?? e)),
       ),
-    [scan?.at],
+    [scan?.at, again],
   )
   const days = Array.from({ length: range }, (_, i) => (t => dayKey(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (range - 1 - i))))(new Date())) // by the calendar: a DST day is still one
   const inRange = (d?.rows ?? []).filter(r => r.day >= days[0] && (!place || (place === 'out') === r.src.startsWith('out:')))
@@ -526,9 +571,29 @@ export function UsagePage({ load, onClose, names, scan, all }: { load: () => Pro
             ) : (
               <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts Claude Code, Codex, Grok, OpenCode and Antigravity chats from their own files, and Laki AI's calls.</p>
             )}
-            {unpriced.length > 0 && <p className="muted small">No price for {unpriced.map(m => m.model).join(', ')}: {tokensText(unpriced.reduce((n, m) => n + m.tokens, 0))} tokens counted, not what they cost.</p>}
+            {unpriced.length > 0 && (
+              <p className="muted small">
+                No price for{' '}
+                {unpriced.map((m, i) => (
+                  <span key={m.key}>
+                    {i ? ', ' : ''}
+                    {m.model}
+                    {onPrice && (
+                      <>
+                        {' '}
+                        <button type="button" className="link small" onClick={() => setPricing(m.model)}>
+                          Set price
+                        </button>
+                      </>
+                    )}
+                  </span>
+                ))}
+                : {tokensText(unpriced.reduce((n, m) => n + m.tokens, 0))} tokens counted, not what they cost.
+              </p>
+            )}
+            {pricing && onPrice && <PriceForm key={pricing} model={pricing} models={byModel.filter(m => !facts.get(m.key)?.none).map(m => m.model)} onSave={(m, p) => onPrice(m, p).then(() => (setPricing(''), setAgain(n => n + 1)))} onCancel={() => setPricing('')} />}
             <p className="muted small">
-              At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price); Grok's at its own price, Antigravity's tokens only: your plan bills its own way. {all === false ? "Laki's own tabs only" : 'Every agent chat on this Mac, each answer once'} (Settings › Usage), {d.keep} days back.{scan?.running ? ' Counting the chats outside Laki…' : ''}
+              At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price); Grok's and OpenCode's at their own price; a model with no price: Set price. Your plan bills its own way. {all === false ? "Laki's own tabs only" : 'Every agent chat on this Mac, each answer once'} (Settings › Usage), {d.keep} days back.{scan?.running ? ' Counting the chats outside Laki…' : ''}
             </p>
           </>
         )}

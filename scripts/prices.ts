@@ -1,6 +1,7 @@
 // npm run prices: LiteLLM's model price table (model_prices_and_context_window.json) into src/shared/prices.json, the
-// rows Laki prices transcripts by (src/shared/types.ts costOf): claude-*, gpt-5*, grok-* (xAI's, "xai/" dropped) and
-// gemini-* chat models, each with its input, output, cache read, 5-minute and 1-hour cache write and a long prompt's
+// rows Laki prices transcripts by (src/shared/types.ts costOf): claude-*, gpt-5*, grok-*, gemini-*, glm-*, kimi-* and
+// MiniMax-* chat models (a first party's own row, its provider's prefix dropped: xAI's "xai/", z.ai's "zai/", Moonshot's
+// "moonshot/", MiniMax's "minimax/": the ids their APIs say in a transcript's message.model, glm-5.1, kimi-k2.6, MiniMax-M2.5), each with its input, output, cache read, 5-minute and 1-hour cache write and a long prompt's
 // rates (above_200k, above_272k…: the first such line), USD per million tokens; sorted, with the date. The app never
 // fetches prices: this runs by hand before a release (docs/release.md; dmg.sh warns when the file is over 30 days old).
 // A model LiteLLM lacks or gets wrong goes in types.ts' PRICE_OWN, which wins. Run: npm run prices [-- <file.json>]
@@ -9,7 +10,8 @@ import { join } from 'node:path'
 
 const URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json'
 const OUT = join(import.meta.dirname, '..', 'src', 'shared', 'prices.json')
-const KEEP = /^(claude-|gpt-5|grok-|gemini-)/
+const KEEP = /^(claude-|gpt-5|grok-|gemini-|glm-|kimi-|MiniMax-)/
+const FIRST: Record<string, string> = { 'xai/': 'grok-', 'zai/': 'glm-', 'moonshot/': 'kimi-', 'minimax/': 'MiniMax-' } // a provider's own prefix: the ids it keeps
 
 type Row = Record<string, unknown>
 type Rates = { in: number; out: number; rd?: number; w5?: number; w1?: number }
@@ -32,10 +34,11 @@ export function rowOf(r: Row): PriceRow | undefined {
 export function pricesOf(all: Record<string, Row>, date: string) {
   const models: Record<string, PriceRow> = {}
   for (const [key, r] of Object.entries(all)) {
-    const id = key.startsWith('xai/') ? key.slice(4) : key
-    if (id.includes('/') || !KEEP.test(id) || (key.startsWith('xai/') && !id.startsWith('grok-')) || !r || typeof r !== 'object') continue
+    const pre = Object.keys(FIRST).find(x => key.startsWith(x))
+    const id = pre ? key.slice(pre.length) : key
+    if (id.includes('/') || !KEEP.test(id) || (pre && !id.startsWith(FIRST[pre])) || !r || typeof r !== 'object') continue
     const row = rowOf(r)
-    if (row && !(id in models && !key.startsWith('xai/'))) models[id] = row
+    if (row && !(id in models && !pre)) models[id] = row // the first party's own row wins over a reseller's same id
   }
   return { date, source: URL, models: Object.fromEntries(Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) }
 }

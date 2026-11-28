@@ -169,8 +169,35 @@ export const PRICE_OWN: Record<string, Partial<Price>> = {
   'claude-fable-5-2': { fast: 2 },
   'claude-mythos-5-2': { fast: 2 },
 }
-export function priceOf(model: string | undefined): Price | undefined {
+// settings.prices (Settings › Usage › Model prices, the Usage page's Set price): yours, USD per million, over PRICE_OWN and
+// prices.json; { as }: priced as another model is (one with no price of its own: a gateway's alias). The daemon's own
+// settings (core.ts sets yours.of); a kept day re-prices at once, its rows keeping parts
+export type OwnPrice = Rates | { as: string }
+export const priceYours: { of?: () => Record<string, OwnPrice> | undefined } = {}
+// a price as Settings may keep it: rates 0 to 10,000 a million each, in and out given; or { as } another model
+export function ownPriceOk(model: string, v: unknown): OwnPrice {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+  if (typeof o.as === 'string') {
+    const as = o.as.trim()
+    if (!as || as === model || as.length > 200) throw new Error(`${model}: priced as which other model?`)
+    return { as }
+  }
+  const r: Partial<Rates> = {}
+  for (const k of ['in', 'out', 'rd', 'w5', 'w1'] as const) {
+    if (o[k] === undefined || o[k] === null || o[k] === '') continue
+    const n = Number(o[k])
+    if (!Number.isFinite(n) || n < 0 || n > 10_000) throw new Error(`${model}: ${k} is USD per million tokens, 0 to 10,000`)
+    r[k] = n
+  }
+  if (r.in === undefined || r.out === undefined) throw new Error(`${model}: its input and output prices, USD per million tokens`)
+  return r as Rates
+}
+export function priceOf(model: string | undefined, hops = 0): Price | undefined {
   if (!model) return
+  const y = priceYours.of?.()
+  const mine = y && Object.hasOwn(y, model) ? y[model] : undefined
+  if (mine && 'as' in mine) return hops < 3 ? priceOf(mine.as, hops + 1) : undefined
+  if (mine && typeof mine.in === 'number' && typeof mine.out === 'number') return { ...mine }
   const TABLE = PRICE_TABLE.models as Record<string, Price>
   const row = Object.hasOwn(TABLE, model) ? TABLE[model] : undefined
   const own = Object.hasOwn(PRICE_OWN, model) ? PRICE_OWN[model] : undefined
@@ -187,11 +214,10 @@ const rate = (p: Price, k: string, long: boolean) => {
   const v = (f: keyof Rates) => at(r, f) ?? at(p, f)
   return k === 'rd' ? (v('rd') ?? v('in')!) : k === 'w5' ? (v('w5') ?? 1.25 * v('in')!) : k === 'w1' ? (v('w1') ?? 2 * v('in')!) : v(k as keyof Rates)!
 }
-// one answer's tokens as parts: its prompt's whole size (input and cache) past the row's long line prices all of them
-// long; fast mode only where the row has it
-export function partsOf(model: string | undefined, n: { in?: number; out?: number; w5?: number; w1?: number; rd?: number }, fast = false): Parts {
+// one answer's tokens as parts: its prompt's whole size (input and cache; size: the request's own, said apart: codex's
+// last_token_usage) past the row's long line prices all of them long; fast mode only where the row has it
+export function partsOf(model: string | undefined, n: { in?: number; out?: number; w5?: number; w1?: number; rd?: number }, fast = false, size = (n.in ?? 0) + (n.w5 ?? 0) + (n.w1 ?? 0) + (n.rd ?? 0)): Parts {
   const p = priceOf(model)
-  const size = (n.in ?? 0) + (n.w5 ?? 0) + (n.w1 ?? 0) + (n.rd ?? 0)
   const tag = `${p?.long && size > p.long.above ? 'L' : ''}${fast && p?.fast ? 'F' : ''}`
   const out: Parts = {}
   for (const k of ['in', 'out', 'w5', 'w1', 'rd'] as const) if (n[k]) out[k + tag] = n[k]!
@@ -817,6 +843,7 @@ export type Settings = {
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
+  prices?: Record<string, OwnPrice> // Settings › Usage › Model prices: yours, by model id, over Laki's (priceOf); { as }: another model's
   usageAll?: boolean // Settings › Usage › Count every agent chat on this Mac: the machine scan (daemon/usageScan.ts), on unless false; off: Laki's own tabs only
   usage?: Record<string, boolean> // R4: claude, codex: its usage endpoint asked too, with its own sign-in (true only; else claude's and codex's own numbers)
   usageNote?: boolean // R4: the one-time note in Settings › Resources that plan limits moved to the agents' own numbers

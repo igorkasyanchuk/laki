@@ -3260,6 +3260,8 @@ button.project-icon { padding: 0; border: none; background: none; min-height: 0;
 .usage-page { display: flex; flex-direction: column; gap: var(--sp-6); max-width: 980px; }
 .usage-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); }
 .usage-filters select { width: auto; min-width: 160px; }
+.usage-price { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.usage-price input { width: auto; }
 .usage-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--sp-4); }
 .usage-tiles > div { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-5) var(--sp-5); border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 .usage-tiles b { font-size: var(--fs-5); font-weight: 600; font-variant-numeric: tabular-nums; }

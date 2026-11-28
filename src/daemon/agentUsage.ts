@@ -22,7 +22,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
-import type { Tab } from '../shared/types.ts'
+import { partsOf, type Tab } from '../shared/types.ts'
 import { answerKey, dayOf, type UseRec } from './share.ts'
 
 const ID = /^[\w-]{1,80}$/
@@ -122,7 +122,9 @@ export function agyParse(steps: { id: number; b: Uint8Array }[], gens: Uint8Arra
     if (!u) continue
     const at = int(msg(m, 1), 1) * 1000
     const model = names.get(int(u, 1)) ?? `model ${int(u, 1)}`
-    rec(out, { chat, agent: 'gemini', key: answerKey(`agy:${chat}:${s.id}`), model, at: at || NaN, tokens: int(u, 2) + int(u, 3) + int(u, 4) + int(u, 5), ...(cwd && { cwd }) })
+    // its parts (2 input, 3 output, 4 cache write, 5 cache read), priced as the API's where its model has a price
+    if (!at || !(int(u, 2) + int(u, 3) + int(u, 4) + int(u, 5) > 0)) continue
+    out.push({ chat, agent: 'gemini', key: answerKey(`agy:${chat}:${s.id}`), model, day: dayOf(at), p: partsOf(model, { in: int(u, 2), out: int(u, 3), w5: int(u, 4), rd: int(u, 5) }), ...(cwd && { cwd }) })
   }
   return out
 }

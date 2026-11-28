@@ -23,7 +23,7 @@ import { AGENT_NAMES, agentBin, aliasFlags, LIMIT_AGENTS, endpointOk, keyEvent, 
   type Doctor, doctorRows, doctorText, EFFORTS, FAST, FILE_MAX, GOAL_SAYS, type GoalState, fillVars, STORAGE_DAYS, type Card, type ClosedTab, flowsOn, type Gate,
   type GateHeld, IMAGE_DAYS, isAccountAgent, isAgent, latin, nonLatin, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, neverAsks, permArgs, permInArgs,
   PERMS, SANDBOX, SANDBOX_NO, sandboxOff, sandboxStop, type Boxed, type Net, NET_OK, NET_NO, NET_HOST, netList, type PR, type PRAllow, prAllows, type Preset,
-  prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun,
+  ownPriceOk, priceYours, prIn, type Proc, type Project, type ProjectConfig, RAIL_PINS, refsIn, REMOTE, rowsOf, RUN_SCRIPTS, type RunAction, type RunScript, type ScriptRun,
   type SecretFound, type Sep, type Settings, SLEEP_AFTER, specsOn, type State, type Status, type Tab, TAB_COLORS, type TabView, taskTitle, type Template,
   type View, type TurnChanges, type TabLoop, WHEN_DONE_WAIT, type WhenDone, type Workspace, WS_SORTS, type WsSort, VIEWPORTS, viewportOf, type TabStuck } from '../shared/types.ts'
 import { CAPS } from '../shared/caps.ts'
@@ -168,6 +168,7 @@ export const presetNamed = (name?: string) => (name ? presets().find(p => p.name
 export const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
+priceYours.of = () => state.settings?.prices // your model prices (Settings › Usage) over Laki's, wherever priceOf runs in the daemon
 export const sessions = new Map<string, Session>()
 export type Runtime = { stuck?: TabStuck /* #3: why this worker can't go on (stuck.ts) */; stretchAt?: number /* its turn's start, kept past its end (stuck's key) */; retryFrom?: number /* retrying an API error since */; endAt?: number /* its last turn's end */; loopSeen?: LoopSeen; loop?: TabLoop; loopLet?: boolean /* the same command failing (shared/loop.ts): this turn's failures, its mark, Let it work's (none till the turn ends) */; inTool?: number /* claude's PreToolUse to its PostToolUse: a tool call under way (cap.ts waits for its end) */; held?: string /* F15: the always-ask glob its ask touches (no rule answers it) */; goalEnd?: GoalState | 'cleared' /* A1: the goal that
   stopped, for its held turn end's words (goalTick) */; signedOut?: SignedOut /* A2, C6: signin.ts */; mcpAuth?: McpAuth /* an MCP server that needs a sign-in (mcpAuth.ts) */; boxed?: Boxed /* a command its sandbox stopped this turn
@@ -3269,6 +3270,7 @@ export function settingsSet(o: Settings, own = false) {
   const dirs = (s?: Settings) => JSON.stringify([s?.widgetDirs ?? [], s?.widgetDev ?? [], s?.widgetDevAgent ?? []])
   const dirsWere = dirs(state.settings)
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
+  if (o.prices) o = { ...o, prices: Object.fromEntries(Object.entries(o.prices).slice(0, 500).map(([m, v]) => [m.trim().slice(0, 200), ownPriceOk(m.trim(), v)]).filter(([m]) => m)) } // yours, checked
   const { accounts: _, widgetDevAgent, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
   o = own && widgetDevAgent ? { ...rest, widgetDevAgent } : rest
   const was = state.settings

@@ -9,7 +9,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, type OwnPrice, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { outLine, RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -26,7 +26,7 @@ import { Backdrop, BACKDROP, BACKDROPS, type BackdropKind } from './Backdrop'
 import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, usePageTitle, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, cmdClash, cmdMap, cmdOthers, COMMANDS, hotkeyClash, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
-import { USAGE_AGENTS, USAGE_HINTS, USAGE_HOSTS } from './Usage'
+import { PriceForm, USAGE_AGENTS, USAGE_HINTS, USAGE_HOSTS } from './Usage'
 import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
@@ -187,6 +187,7 @@ export type AppSettings = Paint & {
   continueOnError?: boolean // a turn ended on an API error continued by itself, once, after a minute
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
+  prices?: Record<string, OwnPrice> // Settings › Usage › Model prices: yours (priceOf)
   usageAll?: boolean // Settings › Usage: every agent chat on this Mac counted (the machine scan), on unless false
   usage?: Record<string, boolean> // R4: its usage endpoint asked too (true only); else Claude's and Codex's own numbers
   usageNote?: boolean // R4: Resources' one-time note
@@ -2676,6 +2677,20 @@ export function SettingsPage(p: {
                   <Says title="Count every agent chat on this Mac" hint="Claude Code, Codex, Grok, OpenCode and Antigravity chats you ran outside Laki too, read from their own files on this Mac (the last 90 days), each answer once. Off: Laki's own tabs only. Nothing leaves the Mac" />
                 </Switch>
               </div>
+              <Group title="Model prices" hint="Your own price for a model Laki has none for, or one you pay otherwise: USD per million tokens, or the same as another model's. Yours win over Laki's, and the days kept re-price at once">
+                <div className="setting-box">
+                  {Object.entries(s.prices ?? {}).map(([m, p]) => (
+                    <div key={m} className="switch-row">
+                      <span className="mono">{m}</span>
+                      <span className="muted small">{'as' in p ? `as ${p.as}` : `$${p.in} in, $${p.out} out${p.rd !== undefined ? `, $${p.rd} cache read` : ''}`}</span>
+                      <button type="button" className="link" onClick={() => set({ prices: Object.fromEntries(Object.entries(s.prices ?? {}).filter(([k]) => k !== m)) })}>
+                        Drop
+                      </button>
+                    </div>
+                  ))}
+                  <PriceForm models={[]} onSave={async (m, p) => set({ prices: { ...s.prices, [m]: p } })} />
+                </div>
+              </Group>
             </>
           )}
           {sec === 'extras' && (

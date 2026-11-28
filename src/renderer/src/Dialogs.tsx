@@ -494,7 +494,7 @@ export function Pages({ app }: { app: AppCtx }) {
             />
           </Lazy>
         ))(flowsOf(dialog))}
-      {dialog === 'usage' && <UsagePage load={() => api.call<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>('usageDays')} names={id => (w => w && { name: wsName(w), project: view.projects.find(x => x.id === w.project)?.name, archived: w.archived })(view.workspaces.find(w => w.id === id))} scan={view.usageScan} all={view.settings.usageAll !== false} onClose={() => setDialog(null)} />}
+      {dialog === 'usage' && <UsagePage load={() => api.call<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>('usageDays')} names={id => (w => w && { name: wsName(w), project: view.projects.find(x => x.id === w.project)?.name, archived: w.archived })(view.workspaces.find(w => w.id === id))} scan={view.usageScan} all={view.settings.usageAll !== false} onPrice={(model, p) => api.call('settingsSet', { prices: { ...view.settings.prices, [model]: p } })} onClose={() => setDialog(null)} />}
       {dialog === 'bird' && settings.birdView !== false && (
         <BirdPage
           view={view}

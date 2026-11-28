@@ -58,6 +58,48 @@ test('prices: a long prompt at its own rates, by each request’s whole input; f
   assert.deepEqual(partsOf('claude-sonnet-5-5', { in: 5 }, true), { in: 5 }, 'no fast mode: as usual')
 })
 
+test("prices: claude's advisor calls each on their own model at its prices, keyed apart, never the context; codex's long prompt by its own request's size", () => {
+  const m = meterNew()
+  const keys: string[] = []
+  const owns = (k: string) => (keys.push(k), true)
+  const adv = { type: 'advisor_message', model: 'claude-opus-5-5', input_tokens: 1000, cache_read_input_tokens: 5000, output_tokens: 100 }
+  const u = { input_tokens: 10, output_tokens: 20, cache_read_input_tokens: 40000, iterations: [{ type: 'message', input_tokens: 10 }, adv] }
+  meterOf('claude', said('x1', 'claude-haiku-5-5', u, 0, { requestId: 'r1' }) + said('x1', 'claude-haiku-5-5', u, 0, { requestId: 'r1' }), m, now, owns)
+  assert.deepEqual(Object.fromEntries(Object.entries(m.by).map(([k, v]) => [k, v])), { 'claude-haiku-5-5': { in: 10, out: 20, rd: 40000 }, 'claude-opus-5-5': { in: 1000, out: 100, rd: 5000 } }, 'each once over the answer’s two lines')
+  assert.equal(m.used, 10 + 40000, 'the executor’s prompt, not the advisor’s')
+  assert.equal(new Set(keys).size, 2, 'the answer and its advisor call: two keys')
+  near(meterCost(m.by).cost, costOf('claude-haiku-5-5', { in: 10, out: 20, rd: 40000 })! + costOf('claude-opus-5-5', { in: 1000, out: 100, rd: 5000 })!, 'each at its own model’s')
+  // codex: what its totals grew by (400K in, 300K of it cached; 20K out) whose last request had 60K in: the base rates
+  const c = meterNew()
+  const tot = (i: number, k: number, o: number) => ({ input_tokens: i, cached_input_tokens: k, output_tokens: o, total_tokens: i + o })
+  meterOf('codex', line({ type: 'turn_context', timestamp: at(0), payload: { model: 'gpt-5.5' } }) + tokenCount(tot(400_000, 300_000, 20_000), { input_tokens: 60_000, total_tokens: 61_000 }), c, now)
+  near(meterCost(c.by).cost, 1.25, '$1.25, not $2.20')
+  const l = meterNew()
+  meterOf('codex', line({ type: 'turn_context', timestamp: at(0), payload: { model: 'gpt-5.5' } }) + tokenCount(tot(300_000, 0, 1000), { input_tokens: 300_000, total_tokens: 301_000 }), l, now)
+  near(meterCost(l.by).cost, (10 * 300_000 + 45 * 1000) / 1e6, 'a 300K request: long')
+})
+
+test('prices: your own over Laki’s (PRICE_OWN and prices.json), an alias priced as its model, checked as kept', async t => {
+  const { priceYours, ownPriceOk } = await import('../src/shared/types.ts')
+  const yours: Record<string, any> = {}
+  priceYours.of = () => yours
+  t.after(() => (priceYours.of = undefined))
+  assert.equal(priceOf('my-gateway-model'), undefined)
+  yours['my-gateway-model'] = { in: 2, out: 8 }
+  near(costOf('my-gateway-model', { in: 1e6, out: 1e6, rd: 1e6 }), 2 + 8 + 2, 'its own; a cache read at its input’s when not said')
+  yours['claude-opus-4-20250514'] = { in: 1, out: 1, rd: 0.1 }
+  near(costOf('claude-opus-4-20250514', { in: 1e6, out: 1e6 }), 2, 'over PRICE_OWN')
+  yours['opus-preview'] = { as: 'claude-opus-5-5' }
+  near(costOf('opus-preview', { in: 1e6 }), costOf('claude-opus-5-5', { in: 1e6 })!, 'an alias: its model’s')
+  yours.loop = { as: 'loop2' }
+  yours.loop2 = { as: 'loop' }
+  assert.equal(priceOf('loop'), undefined, 'a loop: no price')
+  assert.deepEqual(ownPriceOk('m', { in: '3', out: 15, rd: '' }), { in: 3, out: 15 })
+  assert.throws(() => ownPriceOk('m', { in: 3 }), /input and output/)
+  assert.throws(() => ownPriceOk('m', { in: -1, out: 2 }), /0 to 10,000/)
+  assert.throws(() => ownPriceOk('m', { as: 'm' }), /priced as which/)
+})
+
 test("meter: claude's cache writes split by how long they're kept; fast mode by usage.speed", () => {
   const w = (c?: object, speed?: string) => meterCost(meterOf('claude', said('h', 'claude-opus-5-5', { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 1e6, ...(c && { cache_creation: c }), ...(speed && { speed }) }), meterNew(), now).by).cost
   near(w({ ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 1e6 }), 8, 'only 1-hour writes: 2x input')
@@ -391,13 +433,20 @@ test('agyRead: only the new steps; a smaller DB starts over; no temp folder left
   t.after(() => (was === undefined ? delete process.env.TMPDIR : (process.env.TMPDIR = was), rmSync(dir, { recursive: true, force: true }))) // unset again, not the string 'undefined'
   const sec = Math.floor(Date.now() / 1000)
   const step = (tokens?: number) => pb([1, pb([1, sec])], ...(tokens ? [[9, pb([1, 7], [2, tokens])] as [number, Uint8Array]] : []))
+  { // its parts priced as the API's where its model has one (2 input, 3 output, 4 cache write, 5 cache read)
+    const { agyParse } = await import('../src/daemon/agentUsage.ts')
+    const gen = pb([1, pb([3, 9], [19, new TextEncoder().encode('gemini-2.5-pro')])])
+    const [r] = agyParse([{ id: 1, b: pb([1, pb([1, sec])], [9, pb([1, 9], [2, 1000], [3, 200], [4, 0], [5, 4000])]) }], [gen], 'conv-p')
+    assert.deepEqual([r.model, r.p, r.own], ['gemini-2.5-pro', { in: 1000, out: 200, rd: 4000 }, undefined])
+    near(costOf(r.model, r.p!), (1.25 * 1000 + 10 * 200 + 0.125 * 4000) / 1e6)
+  }
   const make = (f: string, ...steps: (number | undefined)[]) => {
     const db = new DatabaseSync(f)
     db.exec('CREATE TABLE IF NOT EXISTS steps (idx integer, metadata blob); CREATE TABLE IF NOT EXISTS gen_metadata (idx integer, data blob)')
     for (const n of steps) db.prepare('INSERT INTO steps VALUES (0, ?)').run(step(n))
     db.close()
   }
-  const total = (r: { recs: { own?: { tokens: number } }[] }) => r.recs.reduce((n, x) => n + (x.own?.tokens ?? 0), 0)
+  const total = (r: { recs: { p?: Record<string, number> }[] }) => r.recs.reduce((n, x) => n + partsTokens(x.p ?? {}), 0)
   const f = join(dir, 'conv.db')
   make(f, 100, 200)
   let n = agyRows.n

@@ -313,23 +313,30 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       const u = j.type === 'assistant' && j.message?.usage
       if (!u || j.message.model === '<synthetic>') continue // claude's own notes: no call
       const model = String(j.message.model || 'unknown')
-      const p = usageParts(model, u)
       if (!j.isSidechain) m.used = (num(u.input_tokens) ?? 0) + (num(u.cache_creation_input_tokens) ?? 0) + (num(u.cache_read_input_tokens) ?? 0) // a subagent's is a context of its own
       // an answer is a line per block, each with its usage so far: of its lines the largest of each part counts (a
       // subagent's output grows as it streams; T3 Code's rule), once, by its id, so a subagent's lines in between don't
       // count it twice; one another chat owns (copied in) counts there. No id: the line's own (its uuid)
       const id = typeof j.message.id === 'string' ? j.message.id : undefined
       const key = id ? answerKey(id, typeof j.requestId === 'string' ? j.requestId : undefined) : typeof j.uuid === 'string' ? answerKey(`u:${j.uuid}`) : undefined
-      const was = id ? m.seen?.get(id) : undefined
-      const spent: Spent = was ? { ...was, p: partsMax(was.p, p) } : { p, day: at, model }
-      if (key && owns && !owns(key, spent.day, spent.model, spent.p)) continue
-      if (was) add(was, -1)
-      add(spent)
-      if (id) {
+      const spend = (sid: string | undefined, k: string | undefined, model: string, p: Parts) => {
+        const was = sid ? m.seen?.get(sid) : undefined
+        const spent: Spent = was ? { ...was, p: partsMax(was.p, p) } : { p, day: at, model }
+        if (k && owns && !owns(k, spent.day, spent.model, spent.p)) return
+        if (was) add(was, -1)
+        add(spent)
+        if (!sid) return
         const seen = (m.seen ??= new Map())
-        seen.delete(id)
-        seen.set(id, spent)
+        seen.delete(sid)
+        seen.set(sid, spent)
         if (seen.size > 50) seen.delete(seen.keys().next().value!)
+      }
+      spend(id, key, model, usageParts(model, u))
+      // its advisor's calls (usage.iterations' advisor_message: another model at its own prices; the top-level usage is the
+      // executor's alone, T3 Code's Drivers/claudeUsage.ts): each its own, keyed as the answer's and its index; never the context
+      for (const [i, it] of (Array.isArray(u.iterations) ? (u.iterations as Record<string, unknown>[]) : []).entries()) {
+        if (it?.type !== 'advisor_message' || typeof it.model !== 'string' || !it.model || it.model === '<synthetic>') continue
+        spend(id && `${id}:advisor:${i}`, key && answerKey(`${key}:advisor:${i}`), it.model, usageParts(it.model, { ...it, speed: u.speed }))
       }
     } else {
       const p = j.payload
@@ -360,8 +367,9 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       const d = (k: string) => (all[k] ?? 0) - (was[k] ?? 0)
       m.total = all
       if (!d('total_tokens')) continue // a rate limit's update: the same totals
-      // its input has the cached in it; a long prompt by the request's whole input (partsOf)
-      const p2 = partsOf(m.model, { in: d('input_tokens') - d('cached_input_tokens'), out: d('output_tokens'), rd: d('cached_input_tokens') })
+      // its input has the cached in it; a long prompt by its own request's whole input (last_token_usage: what the totals
+      // grew by can be several requests, a rollout read from its middle or its first token_count read)
+      const p2 = partsOf(m.model, { in: d('input_tokens') - d('cached_input_tokens'), out: d('output_tokens'), rd: d('cached_input_tokens') }, false, num(i.last_token_usage?.input_tokens))
       if (owns && !owns(answerKey(JSON.stringify(p)), at, m.model || 'unknown', p2)) continue // a fork's or spawned thread's copy of its parent's: its totals and limits as they were (its line's time is the copy's)
       add({ p: p2, day: at, model: m.model || 'unknown' })
     }
