@@ -60,6 +60,7 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/daemon/verify.ts` | Done check: a project's scripts and a second agent's review as an agent's turn ends, failures sent back; the Proof card (each script's end and output in the storage folder's `proof/`, git's facts, the Preview's pictures: `proofShot`; `src/renderer/src/Proof.tsx` draws it) |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
 | `src/daemon/tickets.ts` | linked tickets: a project's Ticket script per workspace, its key, title and status |
+| `src/daemon/picture.ts` | #5: a project's badge picture: the best logo, icon or favicon in its folder (`pictureIn`: the root and a web app's folders, else one folder down; SVG, then 128 px or more, then the largest), pure fs |
 | `src/daemon/policy.ts` | a managed policy for teams: locked settings, remote access off, approvals required, which agents |
 | `src/daemon/program.ts` | OSC 7501, an agent's status through its terminal: reports parsed, one terminal's records; in shadow, only compared with hooks (`docs/dev/agents.md`) |
 | `src/daemon/screens.ts` | #S1: shell tabs' screens kept in `<data>/screens` every 5 min and at a stop, written back dimmed into a restored shell |

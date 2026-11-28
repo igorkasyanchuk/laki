@@ -39,6 +39,7 @@ import { usual, USUAL_KEEP, USUAL_MIN } from '../shared/nextStep.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { DATA_SECRETS, dir, flowTrustDrop, inRig, walkFile } from './dir.ts'
 import { STARTER_DROPPED } from './starterEnv.ts'
+import { pictureIn } from './picture.ts'
 import { clientName } from './clients.ts'
 import * as agentCliMod from './agentCli.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
@@ -1105,29 +1106,13 @@ function wsView(w: Workspace) {
 
 // a project as the view has it: a Terminals or Browsers one as it is; else what it waits on, its setup script, GitHub,
 // and (B6) the memory and notes in its checkout
-// #5: a project's picture for its badge: the folder's own logo or favicon (an SVG, PNG or ICO of 12 KB at most, the first
-// of PICTURES there), as a data URL; a plain folder's too. ponytail: read once per project and daemon start (a logo added
-// later shows after a restart); no web manifest or <link rel=icon> read
-const PICTURES = ['logo.svg', 'logo.png', 'icon.svg', 'icon.png', 'favicon.svg', 'favicon.png', 'public/favicon.svg', 'public/favicon.png', 'public/favicon-32x32.png', 'public/logo.svg', 'public/logo.png', 'public/apple-touch-icon.png', 'public/icon.svg', 'public/icon.png', 'public/icon-192.png', 'app/icon.svg', 'app/icon.png', 'src/app/icon.svg', 'src/app/icon.png', 'static/favicon.svg', 'static/favicon.png', 'assets/logo.svg', 'assets/logo.png', 'app/assets/images/logo.svg', 'app/assets/images/logo.png', 'docs/logo.svg', 'docs/logo.png', '.github/logo.svg', '.github/logo.png', 'build/icon.png', 'resources/icon.png', 'web/favicon.png', 'favicon.ico', 'public/favicon.ico', 'app/favicon.ico', 'src/app/favicon.ico', 'static/favicon.ico']
-// a new Rails app's public/icon.svg and icon.png: a plain red circle in every one, never the repo's own (its favicon is)
-const PLACEHOLDERS = new Set(['ba7398f28422ebe3abbaf1f677afae671c5a65e7', '52f3bfec2798e4cb7ef3e4814ad6e5adb1e71269'])
+// #5: a project's picture for its badge (picture.ts' pictureIn: the best logo, icon or favicon in its folder), a plain
+// folder's too. ponytail: read once per project and daemon start (a logo added later shows after a restart)
 const pictures = new Map<string, string>()
 export function pictureOf(p: Project) {
   if (p.host || p.kind) return ''
   let got = pictures.get(p.path) // by its folder: an id is given again to the next project of that name
-  if (got === undefined) {
-    got = ''
-    for (const f of PICTURES)
-      try {
-        const st = statSync(join(p.path, f), { throwIfNoEntry: false })
-        if (!st?.isFile() || st.size > 12 << 10 || !st.size) continue
-        const b = readFileSync(join(p.path, f))
-        if (PLACEHOLDERS.has(createHash('sha1').update(b).digest('hex'))) continue // a framework's stand-in, not the repo's
-        got = `data:image/${f.endsWith('.svg') ? 'svg+xml' : f.endsWith('.ico') ? 'x-icon' : 'png'};base64,${b.toString('base64')}`
-        break
-      } catch {}
-    pictures.set(p.path, got)
-  }
+  if (got === undefined) pictures.set(p.path, (got = pictureIn(p.path)))
   return got
 }
 function projectView(p: Project) {

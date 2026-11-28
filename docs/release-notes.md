@@ -8,6 +8,7 @@ the biggest first, and end a line with `[Try it](laki://…)` to give it a Try b
 - Usage counts every agent chat on this Mac, Claude Code, Codex, Grok, OpenCode and Antigravity, the ones you ran outside Laki too, each answer once: In Laki, Outside Laki or All. [Try it](laki://settings/usage)
 - Claude's plan limits come from Claude Code itself, the per-model weeks too, with no sign-in read by Laki; any other provider's from a quota source (Settings › Usage).
 - Set your own price for a model Laki has none for; Claude's advisor calls, Codex's long prompts and Antigravity's cache count at their exact prices.
+- A project's badge finds its sharpest logo, icon or favicon: an SVG first, then a PNG of 128 px or more, in public/ and the like, or one folder down (web/public/).
 
 ## 0.68.0 · Nov 28, 2026
 

@@ -19,7 +19,7 @@ short version.
   shows *looping ×n* on its row, in Needs you and on the Board, with *Nudge*, *Stop* and *Let it work*, and a phone push
   (Settings › Notifications › *An agent loops*).
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
-  settings. Each has a badge in the sidebar, ⌘K, the rail and pickers: its repo's logo or favicon, else two letters of its own on its color (a click changes the letters, icon, picture or color; Settings › Layout › *Project badges* turns them off). *New project…* (Welcome, ⌘K) makes a folder with git and a first commit and adds it.
+  settings. Each has a badge in the sidebar, ⌘K, the rail and pickers: its repo's logo, icon or favicon (the sharpest found at its root, in public/, static/ or assets/, else one folder down: an SVG first), else two letters of its own on its color (a click changes the letters, icon, picture or color; Settings › Layout › *Project badges* turns them off). *New project…* (Welcome, ⌘K) makes a folder with git and a first commit and adds it.
 - **Specs & Brainstorms**: write what to build like a Notion page (checklists, images, diagrams), from
   your own templates, then start a workspace from it; or brainstorm an idea with Laki AI in a chat beside it, which writes
   options, a mind map, diagrams and clickable prototypes. Both in one list, filtered by kind, and *New* ▾ for either.
