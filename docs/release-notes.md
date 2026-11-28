@@ -3,7 +3,7 @@
 version it builds, with the date. A version's first three lines are its What's new card after an update (U13): put
 the biggest first, and end a line with `[Try it](laki://…)` to give it a Try button there. -->
 
-## Next
+## 0.69.0 · Nov 28, 2026
 
 - Usage counts every agent chat on this Mac, Claude Code, Codex, Grok, OpenCode and Antigravity, the ones you ran outside Laki too, each answer once: In Laki, Outside Laki or All. [Try it](laki://settings/usage)
 - Claude's plan limits come from Claude Code itself, the per-model weeks too, with no sign-in read by Laki; any other provider's from a quota source (Settings › Usage).
