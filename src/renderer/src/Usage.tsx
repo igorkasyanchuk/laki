@@ -251,7 +251,7 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
         {today && (
           <section className="usage-agent">
             <div className="usage-name">
-              <b>Today {usageText({ tokens: today.tokens, cost: today.cost || undefined })}</b>
+              <b data-tip={today.out ? `In Laki ${usageText({ tokens: today.tokens - today.out.tokens, cost: today.cost - today.out.cost || undefined })} · Outside ${usageText({ tokens: today.out.tokens, cost: today.out.cost || undefined })}` : undefined}>Today {usageText({ tokens: today.tokens, cost: today.cost || undefined })}</b>
               <span className="grow" />
               <span className="tag" data-tip="What these tokens would cost at the API's list prices, from each chat's transcript: your plan bills its own way">
                 ≈ API price
@@ -271,6 +271,13 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
                 <span className="muted small usage-when">{tokensText(w.tokens)} tokens</span>
               </div>
             ))}
+            {today.out && (
+              <div className="usage-row usage-spent" data-tip="Chats no Laki tab ran: Settings › Usage › Count every agent chat on this Mac">
+                <span className="usage-label muted">Outside Laki</span>
+                <span className="usage-pct">{today.out.cost ? `$${today.out.cost.toFixed(2)}` : ''}</span>
+                <span className="muted small usage-when">{tokensText(today.out.tokens)} tokens</span>
+              </div>
+            )}
             {today.unpriced?.map(u => (
               <div key={u.model} className="usage-row usage-spent" data-tip="Laki has no price for this model: its tokens are counted, not what they cost">
                 <span className="usage-label muted">no price for {u.model}</span>
@@ -295,9 +302,11 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
 // then each model's share
 // priced: false, no price for its model (its tokens counted, not their cost); old: some kept before Laki kept each part,
 // at the price then; read of input: what came from the cache (an older daemon's: none of these)
-export type UsageDay = { day: string; agent: string; model: string; ws?: string; tokens: number; cost: number; priced?: boolean; old?: boolean; read?: number; input?: number }
+export type UsageDay = { day: string; agent: string; model: string; ws?: string; where?: string /* a chat no Laki tab ran: its folder's name */; tokens: number; cost: number; priced?: boolean; old?: boolean; read?: number; input?: number }
 export type UsageAi = { day: string; from: AiFrom; model: string; tokens: number; cost: number }
-type Row = { day: string; agent: string; model: string; src: string; tokens: number; cost: number; priced?: boolean; old?: boolean; read?: number; input?: number } // src: ws:<id> or ai:<from>
+type Row = { day: string; agent: string; model: string; src: string; tokens: number; cost: number; priced?: boolean; old?: boolean; read?: number; input?: number } // src: ws:<id>, out:<where> (a chat no Laki tab ran) or ai:<from>
+const OUTSIDE = /^Outside Laki · /
+const PLACES = [['in', 'In Laki'], ['out', 'Outside Laki'], ['', 'All']] as const
 const RANGES = [7, 30, 90]
 const LAKI = 'laki' // Laki AI's series
 const SERIES = ['claude', 'codex', 'gemini', 'grok', 'opencode', LAKI] // the stack's order and colors, fixed
@@ -309,23 +318,25 @@ const money = (n: number) => `$${n < 10 ? n.toFixed(2) : Math.round(n).toLocaleS
 const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : '')
 // what a workspace's id names: its name and project (gone: none)
 export type WsNames = (id: string) => { name: string; project?: string; archived?: boolean } | undefined
-export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>; onClose: () => void; names: WsNames }) {
+// scan: the machine scan's (View.usageScan): read again as one ends; all: settings.usageAll
+export function UsagePage({ load, onClose, names, scan, all }: { load: () => Promise<{ keep: number; rows: UsageDay[]; ai?: UsageAi[] }>; onClose: () => void; names: WsNames; scan?: { at: number; running?: true }; all?: boolean }) {
   const [d, setD] = useState<{ keep: number; rows: Row[]; where: boolean } | null>(null) // where: rows name their workspace (a daemon from API 213)
   const [err, setErr] = useState('')
   const [range, setRange] = useState(30)
   const [agent, setAgent] = useState('')
   const [model, setModel] = useState('')
+  const [place, setPlace] = useState<'' | 'in' | 'out'>('')
   const [by, setBy] = useState<'cost' | 'tokens'>('cost')
   useEffect(
     () =>
       void load().then(
-        r => setD({ keep: r.keep, where: !!r.ai, rows: [...r.rows.map(x => ({ ...x, src: `ws:${x.ws ?? ''}` })), ...(r.ai ?? []).map(x => ({ day: x.day, agent: LAKI, model: x.model, src: `ai:${x.from}`, tokens: x.tokens, cost: x.cost }))] }),
+        r => setD({ keep: r.keep, where: !!r.ai, rows: [...r.rows.map(x => ({ ...x, src: x.ws || x.where === undefined ? `ws:${x.ws ?? ''}` : `out:${x.where}` })), ...(r.ai ?? []).map(x => ({ day: x.day, agent: LAKI, model: x.model, src: `ai:${x.from}`, tokens: x.tokens, cost: x.cost }))] }),
         e => setErr(String(e?.message ?? e)),
       ),
-    [],
+    [scan?.at],
   )
   const days = Array.from({ length: range }, (_, i) => (t => dayKey(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (range - 1 - i))))(new Date())) // by the calendar: a DST day is still one
-  const inRange = (d?.rows ?? []).filter(r => r.day >= days[0])
+  const inRange = (d?.rows ?? []).filter(r => r.day >= days[0] && (!place || (place === 'out') === r.src.startsWith('out:')))
   const agents = SERIES.filter(a => inRange.some(r => r.agent === a)).concat([...new Set(inRange.map(r => r.agent))].filter(a => !SERIES.includes(a)))
   const models = [...new Set(inRange.filter(r => !agent || r.agent === agent).map(r => r.model))].sort()
   const rows = inRange.filter(r => (!agent || r.agent === agent) && (!model || r.model === model))
@@ -345,6 +356,7 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
   const where = d?.where ? group(r => r.src) : [] // an older daemon's rows name no workspace: no Where it went
   const srcName = (src: string) => {
     if (src.startsWith('ai:')) return { name: AI_FROM[src.slice(3) as AiFrom] ?? src.slice(3), kind: 'Laki AI' }
+    if (src.startsWith('out:')) return { name: src.slice(4).replace(OUTSIDE, ''), kind: 'Outside Laki' }
     const w = names(src.slice(3))
     return w ? { name: w.name, kind: `${w.project ?? 'workspace'}${w.archived ? ' · archived' : ''}` } : { name: 'A deleted workspace', kind: src.slice(3) || 'no workspace' }
   }
@@ -383,6 +395,13 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
             {RANGES.filter(n => n <= (d?.keep ?? 90)).map(n => (
               <button key={n} className={range === n ? 'on' : ''} onClick={() => setRange(n)}>
                 {n} days
+              </button>
+            ))}
+          </span>
+          <span className="seg" aria-label="Where it ran">
+            {PLACES.map(([k, label]) => (
+              <button key={k} className={place === k ? 'on' : ''} onClick={() => setPlace(k)}>
+                {label}
               </button>
             ))}
           </span>
@@ -505,10 +524,12 @@ export function UsagePage({ load, onClose, names }: { load: () => Promise<{ keep
                 </table>
               </section>
             ) : (
-              <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts its own Claude Code, Codex, Grok and Antigravity tabs, from their own files, as they work, and Laki AI's calls.</p>
+              <p className="muted">Nothing in these {range} days{agent || model ? ' for this filter' : ''}: Laki counts Claude Code, Codex, Grok, OpenCode and Antigravity chats from their own files, and Laki AI's calls.</p>
             )}
             {unpriced.length > 0 && <p className="muted small">No price for {unpriced.map(m => m.model).join(', ')}: {tokensText(unpriced.reduce((n, m) => n + m.tokens, 0))} tokens counted, not what they cost.</p>}
-            <p className="muted small">At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price); Grok's at its own price, Antigravity's tokens only: your plan bills its own way. Laki's own tabs only, {d.keep} days back.</p>
+            <p className="muted small">
+              At the API's list prices, from each chat's transcript and Laki AI's call log (codex exec's: your plan, no price); Grok's at its own price, Antigravity's tokens only: your plan bills its own way. {all === false ? "Laki's own tabs only" : 'Every agent chat on this Mac, each answer once'} (Settings › Usage), {d.keep} days back.{scan?.running ? ' Counting the chats outside Laki…' : ''}
+            </p>
           </>
         )}
       </div>

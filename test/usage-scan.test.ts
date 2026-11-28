@@ -93,12 +93,24 @@ test('scan + tabs: a tab’s chat, its fork, its resume and a codex spawned thre
   await until(async () => total(await rows(rig)) === 110 + 220 + 55 + 2 + 10, 'every chat once', 20000)
   const by = (rs: any[]) => Object.fromEntries(['', ws.id].map(w => [w, total(rs.filter(r => (r.ws ?? '') === w))]))
   await until(async () => (x => x[''] === 2 + 10 && x[ws.id] === 385)(by(await rows(rig))), 'the fork’s own and the outside chat outside Laki, the tab’s chat its workspace’s')
+  // where the outside ones show: by their folder; Today has them apart
+  const wsPath = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).path
+  write(join(dir, 'in-folder.jsonl'), ans('i1', 4, 1, { cwd: join(wsPath, 'src') }) )
+  write(join(dir, 'no-cwd.jsonl'), line({ type: 'assistant', timestamp: now(), requestId: 'r_n1', message: { id: 'n1', model: 'claude-opus-5-5', usage: { input_tokens: 2, output_tokens: 1 } } }))
+  const named = await until(async () => (r => (r.length === 4 ? r : undefined))([...new Set((await rows(rig)).filter(r => !r.ws).map(r => r.where))].sort()), 'each outside chat named')
+  const w0 = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)
+  const tmp = realpathSync('/tmp').split('/').filter(Boolean).slice(-2).join('/')
+  assert.deepEqual(named, [`${(await rig.rpc('state')).projects[0].name} · ${w0.name || w0.id}`, 'Outside Laki · elsewhere/proj', `Outside Laki · ${tmp}`, 'Unknown folder'].sort(), 'a Laki worktree’s folder names it; else its last two folders; none: unknown')
+  const today = (await rig.rpc('state')).today
+  assert.deepEqual(today.out, { tokens: 2 + 10 + 5 + 3, cost: today.out.cost })
+  assert.deepEqual(today.ws.map((w: any) => w.ws), [ws.id], 'Today’s workspaces: Laki’s')
   // the outside chat resumed in a tab: one chat, its rows move to that workspace
   const t2 = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
   await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === t2.id)?.resumeId, 'its own chat first')
   await rig.rpc('hook', { tab: t2.id, state: 'start', payload: { session_id: 'out-1' } })
   appendFileSync(join(dir, 'out-1.jsonl'), ans('o2', 1, 1))
   await until(async () => by(await rows(rig))[ws.id] === 385 + 10 + 2, 'moved, with its new answer')
+  assert.ok(!(await rows(rig)).some(r => r.where === 'Outside Laki · elsewhere/proj'))
   // codex: a tab's chat and the thread it spawned, the scan reading both too
   const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
   await new Promise(r => setTimeout(r, 500))

@@ -806,8 +806,16 @@ the same inode and bigger: read on from `pos`; any other change (same size and a
 again from 0, the ledger's keys counting nothing twice; a DB: its rows past `pos` (a rowid). 4 files at a time, paced to
 32 MB/s on average (Orca's `UsageScanReadBudget`: a debt past 5 s forgiven, under 50 ms not waited: a small scan never
 waits), 8 MB reads of whole lines (a longer line: a bigger read, past 128 MB skipped). Laki's own claude -p chats: the
-ledger's `skip` (above). Tested in `test/usage-scan.test.ts` (the worker's `scan` alone, and the rig: a tab's chat, its
-fork, a resume, a codex thread once; usageAll off). `meterView`: `TabView.context` `{ used, max }`, `usage`
+ledger's `skip` (above). Where each chat shows: a Laki tab's under its workspace (`ws`), as before; any other (`ws` '') by its folder (`dir`):
+meters.ts `whereOf`, the Laki project or worktree with the longest folder that holds it (both resolved; a folder gone
+since: its nearest one still there, the rest as said) names it (`<project> · <workspace>`, Recording mode: a private one
+unnamed), else *Outside Laki · <its last two folders>*, none said *Unknown folder*: `usageDays`' rows' `where`. The
+Usage page (Usage.tsx) filters In Laki (Laki's tabs and Laki AI), Outside Laki and All (the default), and by agent; it
+reads again as a scan ends (`View.usageScan`: `at`, `running`). Today counts every chat; `todayView`'s `out` is the
+outside ones' (the popup's *Outside Laki* row, *Today*'s tip: In Laki and Outside apart); its workspaces Laki's. A
+workspace's cap, a goal's and a workflow's budget still count only Laki's tabs (`meterView`). Tested in
+`test/usage-scan.test.ts` (the worker's `scan` alone, and the rig: a tab's chat, its fork, a resume, a codex thread
+once; where each shows; usageAll off). `meterView`: `TabView.context` `{ used, max }`, `usage`
 `{ tokens, cost? }`, `skills` (B7: share.ts `skillsIn`, the lines that name `Skill`, `SKILL.md` or *Base directory for
 this skill*: claude's Skill calls (`input.skill`), the message that loads one (its folder; a `/skill` typed has only
 that), a Read of a SKILL.md; codex's shell calls that read one; the main chat's, by name in the order loaded, 50 at

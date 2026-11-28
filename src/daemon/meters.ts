@@ -1,7 +1,7 @@
 // claude's and codex's transcripts, read as they grow: a tab's context and usage meters, and today's spend. core.ts
 // imports it, and its users import it directly.
 
-import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from 'node:fs'
+import { closeSync, createReadStream, existsSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, relative, sep } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -507,7 +507,29 @@ export function daysWrite() {
 // and its workspace's id (ws: the Usage page's Where it went names it, or says it's gone), priced by today's table
 // (costOf). priced: false, tokens with no price (none for its model; agy's); old: some kept before parts, at their cost
 // then; read and input: its cache reads of all its input (the cache's share), parts' only
-export const usageDays = () => ({ keep: USAGE_KEEP, rows: daysRows(Object.fromEntries(Object.entries(keptNow().chats).map(([id, c]) => [id, c.pre ? { ...c, days: daysJoin(c.days, c.pre) } : c]))) })
+export const usageDays = () => ({ keep: USAGE_KEEP, rows: daysRows(Object.fromEntries(Object.entries(keptNow().chats).map(([id, c]) => [id, c.pre ? { ...c, days: daysJoin(c.days, c.pre) } : c])), whereOf()) })
+// where a chat no Laki tab ran shows: the Laki project or worktree with the longest folder that holds its folder (both
+// resolved), else Outside Laki · its last two folders; none said: Unknown folder. Recording mode: a private one unnamed
+export function whereOf(): (dir?: string) => string {
+  const veil = !!state.settings?.recording
+  const real = (p: string) => {
+    try {
+      return realpathSync(p)
+    } catch {
+      return p
+    }
+  }
+  const hid = (p?: { private?: boolean }) => veil && !!p?.private
+  const places: [string, string][] = []
+  for (const p of state.projects) places.push([real(p.path), hid(p) ? 'A private project' : p.name])
+  for (const w of state.workspaces) if (!w.host) (p => places.push([real(w.path), hid(p) || hid(w) ? 'A private workspace' : `${p?.name ? `${p.name} · ` : ''}${w.name || w.id}`]))(state.projects.find(p => p.id === w.project))
+  places.sort((a, b) => b[0].length - a[0].length)
+  return dir => {
+    if (!dir) return 'Unknown folder'
+    const hit = places.find(([p]) => dir === p || dir.startsWith(p.endsWith('/') ? p : `${p}/`))
+    return hit ? hit[1] : `Outside Laki · ${dir.split('/').filter(Boolean).slice(-2).join('/')}`
+  }
+}
 const daysJoin = (a: Days, b: Days): Days => Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].map(d => [d, { ...b[d], ...a[d] }]))
 // ponytail: claude's API retries (meterOf's retry: the Reader's line, the tab's Retrying…) come with this read too; both
 // meters off, none show
@@ -663,10 +685,15 @@ export function todayView(): Today | undefined {
   const none = new Map<string, number>()
   let tokens = 0
   let cost = 0
+  const out = { tokens: 0, cost: 0 } // the chats no Laki tab ran
   for (const c of chats) {
-    const w = ws.get(c.ws) ?? { ws: c.ws, tokens: 0, cost: 0 }
-    ws.set(c.ws, w)
-    w.name = state.workspaces.some(x => x.id === c.ws) ? nameOf(c.ws) : (c.name ?? w.name) // its name now (none if private), a removed one's as it was kept
+    let w = out
+    if (c.ws) {
+      const x = ws.get(c.ws) ?? { ws: c.ws, tokens: 0, cost: 0 }
+      ws.set(c.ws, x)
+      x.name = state.workspaces.some(y => y.id === c.ws) ? nameOf(c.ws) : (c.name ?? x.name) // its name now (none if private), a removed one's as it was kept
+      w = x
+    }
     for (const [model, r] of Object.entries(c.models)) {
       const n = rowTokens(r)
       const usd = rowCost(model, r)
@@ -675,7 +702,7 @@ export function todayView(): Today | undefined {
       else (w.cost += usd), (cost += usd)
     }
   }
-  return { tokens, cost: Math.round(cost * 100) / 100, ws: [...ws.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5).map(w => ({ ...w, cost: Math.round(w.cost * 100) / 100 })), ...(none.size && { unpriced: [...none].map(([model, tokens]) => ({ model, tokens })).sort((a, b) => b.tokens - a.tokens) }) }
+  return { tokens, cost: Math.round(cost * 100) / 100, ws: [...ws.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5).map(w => ({ ...w, cost: Math.round(w.cost * 100) / 100 })), ...(out.tokens > 0 && { out: { tokens: out.tokens, cost: Math.round(out.cost * 100) / 100 } }), ...(none.size && { unpriced: [...none].map(([model, tokens]) => ({ model, tokens })).sort((a, b) => b.tokens - a.tokens) }) }
 }
 
 // Search chats (⇧⌘F, ⌘K): every claude and codex chat Laki knows: its workspaces' agent tabs (an archived one's too) and

@@ -375,15 +375,17 @@ export type Row = { p: Parts } | { tokens: number; cost?: number; own?: true }
 export const isOld = (r: Row) => !('p' in r) && !r.own
 export const rowTokens = (r: Row) => ('p' in r ? partsTokens(r.p) : (r.tokens ?? 0))
 export const rowCost = (model: string, r: Row) => ('p' in r ? costOf(model, r.p) : r.cost)
-export function daysRows(chats: Record<string, { ws: string; agent: string; days: Record<string, Record<string, Row>> }>) {
-  type Day = { day: string; agent: string; model: string; ws: string; tokens: number; cost: number; priced: boolean; old?: true; read?: number; input?: number }
+// where: a chat no Laki tab ran (ws ''), named by its folder (meters.ts whereOf)
+export function daysRows(chats: Record<string, { ws: string; agent: string; days: Record<string, Record<string, Row>>; dir?: string }>, where: (dir?: string) => string = () => '') {
+  type Day = { day: string; agent: string; model: string; ws: string; where?: string; tokens: number; cost: number; priced: boolean; old?: true; read?: number; input?: number }
   const sum = new Map<string, Day>()
-  for (const c of Object.values(chats))
+  for (const c of Object.values(chats)) {
+    const w = c.ws ? undefined : where(c.dir)
     for (const [d, models] of Object.entries(c.days))
       for (const [model, r] of Object.entries(models)) {
         const day = (([y, m, dd]) => `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`)(d.split('-'))
-        const key = `${day}|${c.agent}|${model}|${c.ws}`
-        const x = sum.get(key) ?? (sum.set(key, { day, agent: c.agent, model, ws: c.ws, tokens: 0, cost: 0, priced: true }), sum.get(key)!)
+        const key = `${day}|${c.agent}|${model}|${c.ws}|${w ?? ''}`
+        const x = sum.get(key) ?? (sum.set(key, { day, agent: c.agent, model, ws: c.ws, ...(w !== undefined && { where: w }), tokens: 0, cost: 0, priced: true }), sum.get(key)!)
         const usd = rowCost(model, r)
         x.tokens += rowTokens(r)
         x.cost += usd ?? 0
@@ -391,6 +393,7 @@ export function daysRows(chats: Record<string, { ws: string; agent: string; days
         if (isOld(r)) x.old = true
         if ('p' in r) for (const [k, v] of Object.entries(r.p)) k.startsWith('rd') && (x.read = (x.read ?? 0) + v), k.startsWith('out') || (x.input = (x.input ?? 0) + v)
       }
+  }
   return [...sum.values()].map(r => ({ ...r, cost: Math.round(r.cost * 1e4) / 1e4 })).sort((a, b) => a.day.localeCompare(b.day))
 }
 

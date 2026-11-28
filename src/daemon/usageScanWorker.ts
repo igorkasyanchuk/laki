@@ -13,7 +13,7 @@
 // must not take the disk an agent works on; a small one never waits).
 import { realpathSync } from 'node:fs'
 import { open, readdir, readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import { agyRead, grokParse, ocRead } from './agentUsage.ts'
 import { meterNew, meterOf, type UseRec } from './share.ts'
@@ -48,12 +48,17 @@ export function budgetOf(rate = RATE): Budget {
 type Job = { file: string; agent: 'claude' | 'codex' | 'grok' | 'gemini' | 'opencode'; chat?: string; cwd?: string }
 const ls = async (d: string) => readdir(d, { withFileTypes: true }).catch(() => [])
 const real = new Map<string, string>()
-const realOf = (p: string) => {
+// a folder resolved (/tmp: /private/tmp); one gone since, its nearest folder that's still there and the rest as said
+const realOf = (p: string): string => {
   if (!real.has(p)) {
-    let r = p
+    let r: string
     try {
       r = realpathSync(p)
-    } catch {} // gone: as said
+    } catch {
+      const up = dirname(p)
+      r = up === p ? p : join(realOf(up), basename(p))
+    }
+    if (real.size > 5000) real.clear()
     real.set(p, r)
   }
   return real.get(p)!

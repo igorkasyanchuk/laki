@@ -72,6 +72,7 @@ import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShar
 import { stuck, stuckScan } from './stuck.ts'
 import { mcpShareStop, sharedFor } from './mcpShare.ts'
 import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
+import { scanNow } from './usageScan.ts'
 import { capOver, capParse, capSet, capToolEnd, capView, costWarnParse, wsCost } from './cap.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnIndex, viewWs } from './files.ts'
 import { flowFiles, pendingTick, pendingView, REMINDERS_DONE, RUNS_SHOWN, startPending } from './schedule.ts'
@@ -1189,6 +1190,7 @@ export function view(): View {
     caps: CAPS,
     built: BUILT,
     today: todayView(),
+    ...(scanNow.at || scanNow.running ? { usageScan: { at: scanNow.at, ...(scanNow.running && { running: true as const }) } } : {}),
     ...(doneSoon && { whenDone: { act: doneSoon.act, at: doneSoon.at } }),
     ...(soonList().length && { archivedSoon: soonList() }),
     ...(state.settings?.ptyHost && ptyWhy() && { ptyHostOff: ptyWhy() }), // R9: why new terminals run in the daemon
