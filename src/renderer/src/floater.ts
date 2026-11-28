@@ -774,7 +774,7 @@ function talkPage() {
   let cardsOn = false
   let cardT: ReturnType<typeof setTimeout> | undefined // an ask card's answer on its way (main's HEARD_MS)
   let lang: string | undefined
-  let asking: { go: () => void; t?: ReturnType<typeof setTimeout>; text: string } | undefined // a spoken yes or no shown before it answers
+  let asking: { go: () => void; t?: ReturnType<typeof setTimeout>; text: string; word?: 'yes' | 'no' } | undefined // a spoken yes or no shown before it answers; word: a conversation's, said again to answer
   let to = ''
   let toProject: string | undefined // a new task's project (Q5)
   let cfg: RouteCfg | undefined
@@ -1090,6 +1090,9 @@ function talkPage() {
       if (convoEnd(text, lang)) return endConvo('Conversation ended')
       convo.turns++
       show()
+      const a = asking?.word ? asking : undefined
+      asking = undefined
+      if (a && spokenAnswer(text, lang) === a.word) return a.go()
     }
     // Answer cards: an ask card on screen takes the words (main's talk-card: talk.ts cardPick), not Laki AI or an agent
     const heard = cardsOn ? await bridge?.talkCard?.(text) : undefined
@@ -1142,6 +1145,8 @@ function talkPage() {
         after(r?.error ? 4000 : 2000)
       },
     }
+    // a conversation's: hands-free, the same word said again answers it (anything else drops it and goes on as usual)
+    if (convo && mode === 'enter') return void ((asking.word = yes), say(`Answer ${word} to: ${what} · say “${word.toLowerCase()}” again to answer · Esc ends`), listenNow())
     say(`Answer ${word} to: ${what} · ${mode === 'auto' ? 'in a moment, ⏎ now' : '⏎ answers'} · Tab: send it as a message · Esc drops it`)
     if (mode === 'auto') asking.t = setTimeout(() => asking?.go(), 1500)
   }
