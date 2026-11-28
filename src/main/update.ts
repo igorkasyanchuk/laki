@@ -1,15 +1,21 @@
 // The app's updates (Settings › General › Updates, the app menu's Check for Updates…): the releases repo's newest
 // release, at launch and every 4 hours while Settings says so, or when asked. Nothing downloads until you click: on a
 // Developer ID signed Mac through Electron's autoUpdater (Squirrel.Mac, the release's update-mac-<arch>.json), then
-// Restart to update; anywhere else Download is the release's page. The daemon outlives it: its yellow bar, as before.
-// ponytail: no Linux self-update (an AppImage updater is a new dependency: Settings says to replace the AppImage,
-// shared/update.ts outLine), no beta channel
+// Restart to update; on Linux an AppImage Laki may replace by its own download and swap (appimage.ts: the release's
+// SHA256SUMS.txt checks it, no updater package); anywhere else Download is the release's page. The daemon outlives it:
+// its yellow bar, as before. ponytail: no beta channel
 import { app, autoUpdater, net } from 'electron'
 import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { backOf, feedName, RELEASES, type Release, releaseOf, UPDATE_EVERY, type UpdateState, verdict } from '../shared/update.ts'
+import { appImageBack, appImageGet, appImageOf, appImageSwap, backWhy, keptOf } from './appimage.ts'
 import { goBack, keepNow, keepWait, kept as keptBack, refused } from './back.ts'
+
+const linux = process.platform === 'linux'
+const appImage = () => (app.isPackaged ? appImageOf() : undefined) // an AppImage this copy may replace
+const keptLinux = () => join(app.getPath('userData'), 'previous-appimage.json') // the .previous one's version
+const relaunch = (f: string) => (app.relaunch({ execPath: f, args: process.argv.slice(1) }), app.quit()) // before-quit: its windows close for good
 
 // update.json: `told`, the last version the app was told about (one toast each); `skip`, the one Skip the delay once let in
 const toldFile = () => join(app.getPath('userData'), 'update.json')
@@ -35,7 +41,8 @@ export const signed = (): Promise<boolean> =>
 export function updater(send: (s: UpdateState) => void) {
   let s: UpdateState = { version: app.getVersion(), status: 'idle', install: false }
   const set = (next: Partial<UpdateState>) => send((s = { ...s, found: undefined, ...next }))
-  const known = signed().then(install => void (s.install = install))
+  const known = (linux ? Promise.resolve(!!appImage()) : signed()).then(install => void (s.install = install))
+  let part: string | undefined // Linux: the checked download, until Restart to update
   let soon: ReturnType<typeof setTimeout> | undefined // the launch's check
   let every: ReturnType<typeof setInterval> | undefined
   let autoOn: boolean | undefined
@@ -52,7 +59,7 @@ export function updater(send: (s: UpdateState) => void) {
     try {
       const r = await net.fetch(`https://api.github.com/repos/${RELEASES}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(30_000) })
       if (!r.ok && r.status !== 404) throw new Error(`GitHub answered ${r.status}`)
-      fetched = r.ok ? releaseOf(await r.json(), process.arch) : null // 404: no release published yet
+      fetched = r.ok ? releaseOf(await r.json(), process.arch, process.platform) : null // 404: no release published yet
       s.checked = Date.now()
       judge(auto)
     } catch (e) {
@@ -89,10 +96,22 @@ export function updater(send: (s: UpdateState) => void) {
     return s
   }
 
-  // only a signed Mac with the release's feed; the renderer opens the release's page otherwise
+  // only a signed Mac with the release's feed, or an AppImage Laki may replace with the release's own; the renderer opens
+  // the release's page otherwise
   function download() {
     if (s.status !== 'available' && s.status !== 'error') return s
     if (!s.latest || !s.install || !s.latest.feed) return s
+    if (linux) {
+      const f = appImage()
+      if (!f) return set({ status: 'error', error: "This copy isn't an AppImage Laki can replace: download it instead" }), s
+      const v = s.latest.version
+      set({ status: 'downloading', error: undefined })
+      void appImageGet({ f, base: `https://github.com/${RELEASES}/releases/download/v${v}`, version: v, arch: process.arch, fetch: (u, o) => net.fetch(u, o) }).then(
+        p => ((part = p), set({ status: 'ready', back: undefined })),
+        (e: Error) => set({ status: 'error', error: `The download failed: ${e.message}` }),
+      )
+      return s
+    }
     if (!wired) {
       wired = true
       autoUpdater.on('update-downloaded', () => (set({ status: 'ready' }), void keepNow().then(() => set({ back: undefined })))) // #G1: this version kept for Go back (the one kept before: gone)
@@ -114,6 +133,19 @@ export function updater(send: (s: UpdateState) => void) {
   async function install() {
     if (s.status !== 'ready' || installing) return s
     installing = true // a second click while the copy finishes: nothing more
+    if (linux) {
+      const f = appImage()
+      try {
+        if (!f || !part) throw new Error('The download is gone: update again')
+        appImageSwap(f, part, app.getVersion(), keptLinux())
+        relaunch(f)
+      } catch (e) {
+        set({ status: 'error', error: `Couldn't update: ${(e as Error).message}` })
+      } finally {
+        installing = false
+      }
+      return s
+    }
     await keepWait() // #G1: the copy of this version, a few seconds at most
     try {
       autoUpdater.quitAndInstall()
@@ -129,9 +161,18 @@ export function updater(send: (s: UpdateState) => void) {
   function lookBack() {
     if (looked) return
     looked = true
+    if (linux) return void (f => (k => k && !backWhy(app.getVersion(), k) && set({ back: backOf(k) }))(f && keptOf(f, keptLinux())))(appImage())
     setTimeout(() => void refused().then(why => (k => !why && k && set({ back: backOf(k) }))(keptBack()), () => {}), 10_000).unref()
   }
   async function back(): Promise<string> {
+    if (linux) {
+      const f = appImage()
+      const why = f ? appImageBack(f, app.getVersion(), keptLinux()) : 'Going back is for an AppImage Laki updated'
+      if (why) return set({ back: undefined }), why
+      keep({ pass: app.getVersion() }) // the version it leaves: not offered again until a newer one
+      relaunch(f!)
+      return ''
+    }
     const why = await goBack(v => keep({ pass: v }))
     if (why) set({ back: undefined })
     return why ?? ''

@@ -53,8 +53,8 @@ export function verdict(latest: Release | null | undefined, version: string, o: 
   return (o.skip === latest.version ? undefined : heldUntil(latest.at, delay, now)) ?? 'offer'
 }
 
-// Settings › Updates' line for a newer release. Linux has no self-update (main/update.ts): you replace the AppImage
-export const outLine = (version: string, platform: string) => (platform === 'linux' ? `Laki ${version} is out: download it and replace this AppImage` : `Laki ${version} is out`)
+// Settings › Updates' line for a newer release: on Linux, an AppImage Laki can't replace (main/appimage.ts) is yours to
+export const outLine = (version: string, platform: string, install = false) => (platform === 'linux' && !install ? `Laki ${version} is out: download it and replace this AppImage` : `Laki ${version} is out`)
 
 // Settings › Updates' Update delay: a release is offered once it's that many days old (unset: at once)
 export const UPDATE_DELAYS = [0, 1, 3, 7, 14, 30]
@@ -84,14 +84,26 @@ export function newer(a: string, b: string): boolean {
 }
 
 // GitHub's releases/latest answer: its version, notes and page, and whether it has this Mac's feed
-export function releaseOf(r: { tag_name?: string; body?: string | null; html_url?: string; published_at?: string; assets?: { name: string }[] }, arch: string): Release | null {
+// feed: what this copy updates from is there: a Mac's Squirrel feed; on Linux this architecture's AppImage and SHA256SUMS.txt
+export function releaseOf(r: { tag_name?: string; body?: string | null; html_url?: string; published_at?: string; assets?: { name: string }[] }, arch: string, platform = 'darwin'): Release | null {
   if (!r.tag_name) return null
+  const version = r.tag_name.replace(/^v/, '')
+  const has = (n: string) => !!r.assets?.some(a => a.name === n)
   return {
-    version: r.tag_name.replace(/^v/, ''),
+    version,
     notes: (r.body ?? '').trim(),
     url: r.html_url || RELEASES_URL,
     at: r.published_at,
-    feed: !!r.assets?.some(a => a.name === feedName(arch)),
+    feed: platform === 'linux' ? has(appImageName(version, arch)) && has('SHA256SUMS.txt') : has(feedName(arch)),
+  }
+}
+// a release's AppImage (scripts/release.sh: electron-builder's artifactName, x64 as x86_64)
+export const appImageName = (version: string, arch: string) => `Laki-${version}-${arch === 'x64' ? 'x86_64' : arch}.AppImage`
+// a file's hash in a SHA256SUMS.txt (shasum -a 256's lines: <64 hex>, two spaces or a space and *, its name)
+export function sumOf(text: string, name: string): string | undefined {
+  for (const l of text.split('\n')) {
+    const m = /^([0-9a-f]{64}) [ *](.+?)\s*$/i.exec(l)
+    if (m && m[2] === name) return m[1].toLowerCase()
   }
 }
 

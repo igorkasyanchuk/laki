@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { parseLink } from '../src/renderer/src/links.ts'
-import { BACK_FREE, backOf, backRefused, feedName, feedOf, heldUntil, keepWhy, newer, notesOf, outLine, RELEASES, releaseOf, STATE_V, verdict } from '../src/shared/update.ts'
+import { appImageName, BACK_FREE, backOf, backRefused, feedName, feedOf, heldUntil, keepWhy, newer, notesOf, outLine, RELEASES, releaseOf, STATE_V, sumOf, verdict } from '../src/shared/update.ts'
 
 test('newer: numbers by part, a pre-release before its release, a leading v', () => {
   assert.equal(newer('0.25.0', '0.24.0'), true)
@@ -127,8 +127,19 @@ test('#G1 Go back: a copy kept only by the packaged Mac app with 1 GB free; refu
   assert.deepEqual(backOf({ version: '0.63.0' }), { version: '0.63.0', newerData: true })
 })
 
-test("outLine: a newer release's line in Settings › Updates; on Linux, replace the AppImage (no self-update there)", () => {
+test("outLine: a newer release's line in Settings › Updates; on Linux, replace the AppImage unless Laki can", () => {
   assert.equal(outLine('0.67.0', 'darwin'), 'Laki 0.67.0 is out')
   assert.equal(outLine('0.67.0', ''), 'Laki 0.67.0 is out')
   assert.equal(outLine('0.67.0', 'linux'), 'Laki 0.67.0 is out: download it and replace this AppImage')
+  assert.equal(outLine('0.67.0', 'linux', true), 'Laki 0.67.0 is out', 'an AppImage it updates itself')
+  // Linux's feed: this architecture's AppImage and the release's SHA256SUMS.txt, both
+  const r = { tag_name: 'v0.70.0', assets: [{ name: 'Laki-0.70.0-x86_64.AppImage' }, { name: 'Laki-0.70.0-arm64.AppImage' }, { name: 'SHA256SUMS.txt' }] }
+  assert.equal(releaseOf(r, 'x64', 'linux')!.feed, true)
+  assert.equal(releaseOf(r, 'arm64', 'linux')!.feed, true)
+  assert.equal(releaseOf({ ...r, assets: r.assets.slice(0, 2) }, 'x64', 'linux')!.feed, false, 'no sums: no self-update')
+  assert.equal(releaseOf(r, 'arm64')!.feed, false, "a Mac's feed is its own")
+  assert.equal(appImageName('0.70.0', 'x64'), 'Laki-0.70.0-x86_64.AppImage')
+  const sums = `${'a'.repeat(64)}  Laki-0.70.0-arm64.dmg\n${'B'.repeat(64)} *Laki-0.70.0-x86_64.AppImage\n`
+  assert.equal(sumOf(sums, 'Laki-0.70.0-x86_64.AppImage'), 'b'.repeat(64))
+  assert.equal(sumOf(sums, 'Laki-0.70.0-arm64.AppImage'), undefined)
 })

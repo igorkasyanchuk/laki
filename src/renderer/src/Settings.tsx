@@ -735,7 +735,7 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
     : u.status === 'downloading' ? `Downloading ${l?.version}…`
     : u.status === 'ready' ? `${l?.version} is downloaded: restart to finish. Your agents keep running.`
     : u.status === 'error' ? u.error
-    : l ? outLine(l.version, /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent) ? 'linux' : '')
+    : l ? outLine(l.version, /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent) ? 'linux' : '', !!(u.install && l.feed))
     : u.passed ? `Laki ${u.passed} is out: you skipped it, so the next one is offered`
     : u.held ? `Laki ${u.held.version} is out: offered on ${new Date(u.held.until).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, by your update delay`
     : u.checked ? `Up to date · checked ${ago(u.checked)}`

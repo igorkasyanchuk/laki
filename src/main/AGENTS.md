@@ -15,4 +15,5 @@ What this folder's files are. Read the root [AGENTS.md](../../AGENTS.md) first: 
 | `src/main/smoke.ts` | `npm run test:ui` and `test:sheet` (`--laki-smoke=<dir>`, `uiSmoke`): the real window walked page by page, then the risky flows (E3), each step waited for and screenshotted, `sheetDiff` against the last run's; index.ts starts it once the window has loaded |
 | `src/main/guards.ts` | main's checks, pure (no electron: `test/main-guards.test.ts`): who sent an IPC message (`fromApp`, `pageIs`), and the URLs it lets through (`local`, `web`, `webviewOk`, `externalOf`), the partitions' names; `titleOf` (shared/title.ts: a window's title, cleaned, for `win-title`) |
 | `src/main/back.ts` | #G1: Go back: the version before an update kept (ditto to userData/previous.noindex: out of Spotlight), checked (codesign, Team ID) and swapped in, then a relaunch |
-| `src/main/update.ts` | the app's updates: GitHub's latest release, Squirrel.Mac's download and install (Updates: `docs/dev/scans.md`) |
+| `src/main/update.ts` | the app's updates: GitHub's latest release, Squirrel.Mac's download and install, an AppImage's own (Updates: `docs/dev/scans.md`) |
+| `src/main/appimage.ts` | Linux self-update, no electron: the release's AppImage beside `$APPIMAGE`, checked against its SHA256SUMS.txt, swapped in by rename (one `.previous` kept for Go back) |
