@@ -224,6 +224,7 @@ const ACTION_EG: Record<RunAction['target'], string> = {
   gemini: 'Review the changes and fix what you find',
   grok: 'Review the changes and fix what you find',
   opencode: 'Review the changes and fix what you find',
+  pi: 'Review the changes and fix what you find',
   shell: 'bundle exec rails db:migrate',
 }
 // a preset's args, for example
@@ -233,6 +234,7 @@ export const ARGS_EG: Record<Agent, string> = {
   gemini: '--settings agy-work.json',
   grok: '--permission-mode acceptEdits',
   opencode: '--agent build',
+  pi: '--tools read,grep,find,ls',
 }
 
 // actions (Settings › Actions, a project's): a name, who it's for, and the prompt or command

@@ -12,14 +12,14 @@ checked against it by `test/trust.test.ts`), how to check the build you run, and
 | Laki's state: projects, workspaces, tabs, settings, workflows' runs, the queue | The data folder, `~/.laki` (`$LAKI_HOME` when set; `~/.laki-electron` from older installs): `state.json`, `daemon.json` (the daemon's port and token, 0600) |
 | Terminals' scrollback, kept turns, pasted images, notes, specs, prompts | The data folder: `turns/`, `images/`, `notes/`, `plans/`, `prompts.json`, `files/`, `storage/` |
 | Your workflows, extensions and their data | The data folder: `workflows/` (with `workflow-history/`, `workflow-trash/`), `widgets/`, `widget-data/`; a project's own in its repo's `.laki/` |
-| Agents' transcripts | Where each agent writes them (`~/.claude/projects/…`, `~/.codex/sessions/…`): Laki reads them for the context and cost meters and the Reader, never copies them elsewhere |
+| Agents' transcripts | Where each agent writes them (`~/.claude/projects/…`, `~/.codex/sessions/…`, `~/.pi/agent/sessions/…`): Laki reads them for the context and cost meters and the Reader, never copies them elsewhere |
 | Today's and each day's token use and cost | The data folder: `usage-today.json`, `usage-days.json` |
 | Laki AI's chats and its call log | The data folder: `ai-chats/`, `ai-chat.json`, `ai-calls.jsonl` |
 | Secrets you give Laki (the OpenRouter key, your endpoint's key, secret-looking env values and the phone push's URL, `laki secret` answers, extensions' secrets) | Laki AI's two keys, secret-looking env values (Settings', a profile's, a project's; `state.json` keeps their names) and extensions' secrets: the macOS Keychain (service *Laki AI*) in a signed release with the default data folder, wrapped with the app's own encryption key while its window is open (a plain `security` call gets the wrapped value), else 0600 files (`ai-key`, `ai-endpoint-key`, `env-keys/`, `widget-secrets.json`); the rest 0600 files in the data folder (a secret's own file) |
 | Logs | The data folder: `daemon.log`, `ptyhost.log`, `script-logs/` |
 | The window's place and the Dock icon | Electron's own folder (`~/Library/Application Support/Laki`) |
 
-Laki never writes `~/.claude/settings.json` or `~/.codex/*`: agents get Laki's settings through command-line flags.
+Laki never writes `~/.claude/settings.json`, `~/.codex/*` or `~/.pi`: agents get Laki's settings through command-line flags (Pi's extension too: `-e`, a file in Laki's data folder).
 The daemon listens on 127.0.0.1 only, behind its token and an Origin check ([SECURITY.md](../SECURITY.md)).
 
 ## Every network destination

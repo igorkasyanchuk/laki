@@ -314,7 +314,7 @@ export function bodyOf(app: AppCtx) {
                 onPrimary={url => call('prAttach', { ws: ws.id, pr: url }).then(r => done(`PR #${(r as { number: number }).number} is this workspace's PR`), () => {})}
                 onUnrelate={url => call('wsSet', { id: ws.id, unrelate: url }).catch(() => {})}
                 onDetach={() => detachPr(ws)}
-                sees={(['claude', 'codex'] as const).filter(a => !ws.host && view.tabs.some(t => t.workspace === ws.id && tabAgent(t, view.presets) === a))}
+                sees={(['claude', 'codex', 'pi'] as const).filter(a => !ws.host && view.tabs.some(t => t.workspace === ws.id && tabAgent(t, view.presets) === a))}
                 onSees={a => setDialog({ sees: a, in: ws.project })}
                 agentLog={hasCap(view, 'agent.log') ? () => call<AgentDid[]>('agentLog', { ws: ws.id }) : undefined}
                 spend={hasCap(view, 'ws.spend') && !ws.host ? () => call<SpendView>('wsSpend', { ws: ws.id }) : undefined}

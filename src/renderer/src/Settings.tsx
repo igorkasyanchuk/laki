@@ -387,9 +387,9 @@ function StorageUse({ api, dir }: { api: () => Promise<{ dir: string; bytes: num
     </div>
   )
 }
-// a new profile of an agent Laki turns no sandbox on for (gemini: agy, grok, opencode), on a Mac: the wrapper sandbox
+// a new profile of an agent Laki turns no sandbox on for (gemini: agy, grok, opencode, pi), on a Mac: the wrapper sandbox
 // suggested on (shared/wrap.ts); off for every profile you had
-const wrapNew = (agent: string) => (/Mac/.test(navigator.userAgent) && ['gemini', 'grok', 'opencode'].includes(agent) ? { wrap: 'macos' as const } : {})
+const wrapNew = (agent: string) => (/Mac/.test(navigator.userAgent) && ['gemini', 'grok', 'opencode', 'pi'].includes(agent) ? { wrap: 'macos' as const } : {})
 const UI_SIZES = [9, 10, 11, 12, 13, 14, 15, 16] // Appearance › Interface › Text size, px
 // Settings and Help's own size (Appearance), over the terminal font's: ⌘± step through these while one is open
 export const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'JetBrains Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', 'Cascadia Mono',
@@ -3335,7 +3335,7 @@ export function SettingsPage(p: {
               </Group>
               {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
                 <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} act={hookSays(agent)} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
-                  {(agent === 'claude' || agent === 'codex') && p.typeIn && (
+                  {(agent === 'claude' || agent === 'codex' || agent === 'pi') && p.typeIn && (
                     <details className="sees-box">
                       <summary>What it sees: its rules and MCP servers</summary>
                       <WhatItSees agent={agent} projects={(p.projects ?? []).map(x => ({ id: x.id, name: x.name }))} onType={p.typeIn} />

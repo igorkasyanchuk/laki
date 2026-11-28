@@ -21,7 +21,7 @@ export type PanelDo =
   | { op: 'auto'; ws: string; k: AutoKey; v: boolean }
   | { op: 'rename' | 'attach'; ws: string }
   | { op: 'go'; ws: string; tab?: string }
-  | { op: 'sees'; agent: 'claude' | 'codex'; project: string }
+  | { op: 'sees'; agent: 'claude' | 'codex' | 'pi'; project: string }
   | { op: 'ext'; id: string; ws?: string; page?: boolean; key?: string } // an extension panel tab's full view, or its page (page: Settings' Extension page, key: at that setting)
   | { op: 'extDo'; id: string; cmd: UiDo; label?: string } // its button's Laki command (asked and done in the app window)
   | { op: 'link'; url: string } // a laki:// link an extension opens

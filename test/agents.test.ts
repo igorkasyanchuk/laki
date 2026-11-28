@@ -1,6 +1,6 @@
 // Each agent in the daemon: claude's hooks, codex's notify, grok's quiet screen, agy's OSC 7501, opencode's plugin.
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { agentRuns, agyResume } from '../src/daemon/core.ts'
@@ -121,11 +121,11 @@ test('grok: Laki picks its chat id, a quiet screen ends its turn, a restart resu
   assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'grok')[1].args.slice(0, 3), ['--resume', tab.resumeId, '--rules']) // Laki's note each start: memory test below
 })
 
-test('grok, agy and opencode: a scheduled task, a workflow agent block and sleep each work as for claude', async t => {
+test('grok, agy, opencode and pi: a scheduled task, a workflow agent block and sleep each work as for claude', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { workflows: true, scheduleAtOnce: 0, sleepAfter: 60 })
-  for (const [a, bin] of [['grok', 'grok'], ['gemini', 'agy'], ['opencode', 'opencode']]) {
+  for (const [a, bin] of [['grok', 'grok'], ['gemini', 'agy'], ['opencode', 'opencode'], ['pi', 'pi']]) {
     // a scheduled task: a new workspace with this agent and the prompt
     const s = await rig.rpc('scheduleSet', { project: p.id, preset: a, ws: 'new', prompt: `nightly ${a}`, when: 'every day at 2am' })
     const r = await rig.rpc('scheduleRun', { id: s.id })
@@ -139,7 +139,7 @@ test('grok, agy and opencode: a scheduled task, a workflow agent block and sleep
     const n = starts().length
     await rig.rpc('send', { target: tab.id, text: 'again' })
     await until(() => starts().length === n + 1, `${a} resumed`)
-    assert.deepEqual(starts().at(-1).args.slice(0, 2), a === 'grok' ? ['--resume', id] : a === 'opencode' ? ['--session', id] : id ? [`--conversation=${id}`] : ['-c'])
+    assert.deepEqual(a === 'pi' ? starts().at(-1).args.slice(2, 4) : starts().at(-1).args.slice(0, 2), a === 'grok' ? ['--resume', id] : a === 'opencode' || a === 'pi' ? ['--session', id] : id ? [`--conversation=${id}`] : ['-c'])
     // a workflow's agent block: its turn's end goes on to the next block
     await rig.rpc('flowSave', { id: `w-${a}`, text: `# W\nruns in: main\n\n## start\ninput: task\nnext: one\n\n## one\nagent: ${a}\n> do {{task}}\nnext: e\n\n## e\nend: success\n` })
     const run = await rig.rpc('flowStart', { workflow: `w-${a}`, project: p.id, task: 'x' })
@@ -215,6 +215,47 @@ test('opencode: Laki\'s plugin reports its session and turns (not a subagent\'s)
   await rig.start()
   await until(() => rig.fakeLog().filter(l => l.bin === 'opencode').length === 2, 'opencode restarted')
   assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'opencode')[1].args, ['--session', id])
+})
+
+test("pi: Laki's extension (-e) says its session, turns and answer; note and skills by flags, model and thinking; its meters from its session file; Esc and an API error end a turn; a restart resumes the session", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'pi', prompt: '-v hello pi', model: 'anthropic/claude-sonnet-4-5', effort: 'high' })
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'pi'), 'pi up')
+  const val = (args: string[], f: string) => args[args.indexOf(f) + 1]
+  assert.equal(run.args[0], '-e')
+  assert.equal(run.args[1], join(rig.data, 'pi', 'laki.js'))
+  assert.ok(!run.args.includes('--session'), 'a new chat')
+  const note = val(run.args, '--append-system-prompt')
+  assert.ok(note.startsWith(join(rig.data, 'pi', 'notes')), 'its note in a file of the tab\'s, not on argv')
+  assert.equal(statSync(note).mode & 0o777, 0o600)
+  assert.match(readFileSync(note, 'utf8'), /laki/i)
+  const skills = run.args.flatMap((a: string, i: number) => (a === '--skill' ? [run.args[i + 1]] : []))
+  assert.deepEqual(skills.map((s: string) => s.split('/').at(-1)), ['laki', 'laki-orchestrate', 'laki-specs', 'laki-widget'])
+  assert.ok(skills.every((s: string) => s.startsWith(join(rig.data, 'pi', 'skills')) && existsSync(join(s, 'SKILL.md'))), 'in Laki\'s data folder')
+  assert.equal(val(run.args, '--model'), 'anthropic/claude-sonnet-4-5')
+  assert.equal(val(run.args, '--thinking'), 'high')
+  assert.deepEqual(run.messages, [' -v hello pi'], 'a prompt that starts with - is never a flag to it')
+  const id = (await until(async () => (await rig.tab(ws.id)).resumeId, 'session id from the extension')) as string
+  assert.match(id, /^[0-9a-f-]{36}$/)
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle from the extension')
+  assert.equal((await rig.tab(ws.id)).last, 'answer: -v hello pi')
+  const m = await until(async () => (x => x.context?.max === 200000 && x.usage?.tokens > 0 && x)(await rig.tab(ws.id)), 'context and usage')
+  assert.ok(m.context.used > 1000 && m.usage.cost > 0, JSON.stringify(m.usage))
+  assert.ok(!existsSync(join(rig.home, '.pi', 'agent', 'settings.json')) && !existsSync(join(rig.home, '.pi', 'agent', 'extensions')), 'its own folder: only the sessions it wrote')
+  const tab = await rig.tab(ws.id)
+  await rig.rpc('input', { tab: tab.id, data: 'slow one\r' })
+  await until(async () => (await rig.tab(ws.id)).status === 'running', 'running')
+  await rig.rpc('input', { tab: tab.id, data: '\x1b' })
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'Esc: the turn over')
+  await rig.rpc('input', { tab: tab.id, data: 'hit the limit\r' })
+  await until(async () => (await rig.tab(ws.id)).limit, 'limit from the error')
+  await rig.stop()
+  await rig.start()
+  await until(() => rig.fakeLog().filter(l => l.bin === 'pi').length === 2, 'pi restarted')
+  const again = rig.fakeLog().filter(l => l.bin === 'pi')[1].args
+  assert.equal(val(again, '--session'), id)
+  assert.equal(again[0], '-e')
 })
 
 test("opencode's model: in its inline config, not -m (some TUIs refuse it), over a profile's own config", async t => {
@@ -308,12 +349,19 @@ test("F6: agentContext lists an agent's rule files and MCP servers, masked; an a
   ])
   assert.ok(!JSON.stringify(x).includes('sekret-2'))
 
+  // pi: its agent folder's AGENTS.md, then each folder's AGENTS.md or CLAUDE.md down to the repo; no MCP servers
+  mkdirSync(join(rig.home, '.pi', 'agent'), { recursive: true })
+  writeFileSync(join(rig.home, '.pi', 'agent', 'AGENTS.md'), '# mine\n')
+  const y = await rig.rpc('agentContext', { agent: 'pi', project: p.id })
+  assert.deepEqual(y.rules.map((r: any) => [repo(r.at), r.scope]).filter(([at]: string[]) => at.startsWith('~') || at.startsWith('<repo>')), [['~/.pi/agent/AGENTS.md', 'user'], ['<repo>/AGENTS.md', 'project']])
+  assert.deepEqual(y.servers, [])
+
   // an agent's call: refused (its user's files, not its own); a path not on the list isn't opened
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'peek' })
   const tab = (await until(() => rig.tab(ws.id))).id
   await assert.rejects(rig.rpc('agentContext', { agent: 'claude', project: p.id, from: { ws: ws.id, tab } }), /an agent can't read what an agent sees/)
   await assert.rejects(rig.rpc('agentContextOpen', { agent: 'claude', project: p.id, path: '/etc/hosts' }), /not one of its rule files/)
-  await assert.rejects(rig.rpc('agentContext', { agent: 'gemini' }), /claude or codex/)
+  await assert.rejects(rig.rpc('agentContext', { agent: 'gemini' }), /claude, codex or pi/)
 })
 
 // How long a turn usually takes: each clean end's working time (an ask's wait out) by its hooks' at, per project and

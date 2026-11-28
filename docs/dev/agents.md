@@ -32,7 +32,7 @@ warn on the new-workspace page (panels.tsx `.nw-warn`, its *Update Claude Code*:
 agent-refused, not remote). Tested in `test/fallback.test.ts`.
 
 **The agents' CLIs** (A9, `src/daemon/agentCli.ts`, Settings › Agents & profiles › *Versions*: SettingsAgents.tsx
-`AgentVersions`, behind the `agent.versions` cap). `CLIS`: claude, codex, gemini, grok, opencode and cursor
+`AgentVersions`, behind the `agent.versions` cap). `CLIS`: claude, codex, gemini, grok, opencode, pi and cursor
 (`cursor-agent`), each with its npm package and its own updater. `agentVersions` finds each on the daemon's PATH, runs
 `--version` (8 s), and reads how it was installed off its real path (`howOf`): a global `node_modules` (npm, bun or pnpm:
 the package and `npm install -g <pkg>@<the newest shown>`, `@latest` while none is known…), Homebrew's `Cellar` or `Caskroom` (`brew upgrade [--cask] <name>`),
@@ -305,7 +305,7 @@ counts them. Tested in `test/reader.test.ts`.
 
 ### Sleep
 
-`resources.ts` `sleepTick`: an idle agent tab whose chat its next start resumes (`resumable`: claude, codex, grok, opencode and an ACP one by their id, agy by its id or as its workspace's only agy tab, `agy -c`; `sleepy`: `cantSleep` says nothing, no attached client, idle
+`resources.ts` `sleepTick`: an idle agent tab whose chat its next start resumes (`resumable`: claude, codex, grok, opencode, pi and an ACP one by their id, agy by its id or as its workspace's only agy tab, `agy -c`; `sleepy`: `cantSleep` says nothing, no attached client, idle
 `settings.sleepAfter` minutes (unset: `SLEEP_AFTER`, 480; 0: never) by `idleAt` (set in `view` like `runAt`; not the last output: a TUI may redraw); not on a host, not in a workspace with a PR switch on, none of the workspace's
 listening ports (`procs`) in its tree) is put to sleep: `asleep` (in memory) and `Session.end`, which SIGHUPs the job
 (SIGKILL 5 s later if it's still there) but keeps the screen, the clients and a note instead of the exit line; `onExit`
@@ -432,7 +432,7 @@ loops* (opens the tab), ⌘K's Needs you item says it loops; a running loop is n
 a hook's) never set it. Tested in `test/loop.test.ts` and `test/loop-daemon.test.ts`.
 
 Hooks not heard (core.ts `hookTick`, every 30 s; `daemon/hookHealth.ts`): a live tab on this Mac of an agent whose hooks
-say as a turn starts (`HEARS`: claude, opencode; codex's notify comes only as one ends), its session started
+say as a turn starts (`HEARS`: claude, opencode, pi; codex's notify comes only as one ends), its session started
 `DEAF_AFTER` (2 minutes) ago, given a prompt (`prompted`, per Session: `typeInto`'s Enter, a typed Enter in `input`, its
 start's) that its screen answered (`Session.lastOutput` since), and no hook from this start (`heardIn`, per Session: a restart under a moved app is checked anew): its view's `hookless`
 is `hookCause`'s first that holds: `disableAllHooks` or `allowManagedHooksOnly` true in the worktree's
@@ -462,6 +462,20 @@ codex and those on PATH):
   start, session.status busy/idle (idle with the last answer, from `client.session.messages`),
   permission.asked/question.asked → waiting, session.error → failed (an Esc's `MessageAbortedError`: interrupted), and
   the idle after either says nothing; reports go one at a time, in order.
+- **Pi** (`pi`, @mariozechner/pi-coding-agent; no ACP, no hooks of its own: a terminal agent as OpenCode is): `pi -e
+  <data>/pi/laki.js [--session <id>] [--append-system-prompt <note file>] [--skill <data>/pi/skills/<name>]… [--model
+  <provider/id>] [--thinking off…xhigh] <prompt>` (a prompt starting with `-` gets a space before it: pi has no `--`).
+  Laki's extension (`PI_EXTENSION`, loaded by `-e`, never put in `~/.pi`): session_start → start with its session id
+  (a /new, /resume or /fork too), agent_start → running, agent_end → idle with the last answer, or interrupted (its
+  stopReason aborted: Esc) or failed (error, its errorMessage), each with `context_window` from `ctx.getContextUsage()`
+  (`meters.ts piCtx`: the tab's context meter's max). Its reports go one at a time, never awaited by Pi, 10 s each at
+  most. Laki's note in a 0600 file (`<data>/pi/notes/<tab>.md`, `memoryFile`; a host: the profile's text); Laki's skills
+  written to `<data>/pi/skills` (`skill.ts piSkills`, as the daemon starts), never `~/.pi` or `~/.agents/skills` (Codex
+  reads that one too). Its usage from its session file (`<PI_CODING_AGENT_DIR or ~/.pi/agent>/sessions/--<folder>--/
+  <time>_<id>.jsonl`, `share.ts piMeter`): each assistant message's input, output, cacheRead and cacheWrite at Laki's
+  prices, keyed by its entry's id and time (a /fork's copy is the first chat's); the machine scan reads every one.
+  Resumable (sleep, a restart) by its id; `BUSY` "esc to interrupt"; no permission prompts and no MCP (What it sees says
+  so; its rules: `<agent dir>/AGENTS.md`, then each folder's AGENTS.md or CLAUDE.md from `/` down). Its update: `pi update self`.
 - **Grok**: `grok --session-id <uuid> <prompt>`: Laki picks the chat's id, `--resume <id>` after. Its TUI takes hooks
   only from `~/.grok` (or `~/.claude/settings.json`), so it has none: Enter or a prompt sets running; `sweepRunning`
   reads its window title (`Session.title`: `BUSY` while it works, `ASKS` "Action Required": waiting) and ends the

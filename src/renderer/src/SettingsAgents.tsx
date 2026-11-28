@@ -775,7 +775,7 @@ export function SkillSection({ api }: { api: SkillApi }) {
 // Add a server…, Remove… and Check health: the agent's own CLI command typed in a terminal for you to run
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`)
 const sh = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`)
-export function WhatItSees({ agent, projects, project: first, onType }: { agent: 'claude' | 'codex'; projects: { id: string; name: string }[]; project?: string; onType: (cmd: string, project?: string) => void }) {
+export function WhatItSees({ agent, projects, project: first, onType }: { agent: 'claude' | 'codex' | 'pi'; projects: { id: string; name: string }[]; project?: string; onType: (cmd: string, project?: string) => void }) {
   const [project, setProject] = useState(first ?? projects[0]?.id ?? '')
   const [c, setC] = useState<AgentContext | null>(null)
   const [err, setErr] = useState('')
@@ -829,7 +829,7 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
               ))}
             </ul>
           ) : (
-            <p className="muted small">No {agent === 'claude' ? 'CLAUDE.md' : 'AGENTS.md'} files.</p>
+            <p className="muted small">No {agent === 'claude' ? 'CLAUDE.md' : agent === 'pi' ? 'AGENTS.md or CLAUDE.md' : 'AGENTS.md'} files.</p>
           )}
           <p className="muted small">
             Laki's memory, added to its instructions {MEMORY_HOW[agent]}: {c.memory.global} global, {c.memory.mine} of this project's from you, {c.memory.learned} learned ({kb(c.memory.bytes)}). The other agents get it too: {Object.entries(MEMORY_HOW).filter(([a]) => a !== agent).map(([a, how]) => `${AGENT_NAMES[a as Agent] ?? a} ${how}`).join(', ')}.
@@ -885,7 +885,9 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
             </details>
           )}
           <h4>MCP servers</h4>
-          {c.servers.length ? (
+          {agent === 'pi' ? (
+            <p className="muted small">None: Pi has no MCP (its own choice: CLI tools and skills instead). Laki reaches it through the laki CLI and its skills.</p>
+          ) : c.servers.length ? (
             <ul className="sees-list">
               {c.servers.map(s => (
                 <li key={`${s.scope}:${s.name}`}>
@@ -916,7 +918,7 @@ export function WhatItSees({ agent, projects, project: first, onType }: { agent:
           ) : (
             <p className="muted small">None in its config.</p>
           )}
-          <div className="row">
+          <div className="row" hidden={agent === 'pi'}>
             <button className="sm" data-tip={`${agent} mcp add, typed in a terminal for you to finish and run`} onClick={() => onType(`${agent} mcp add `, at)}>
               Add a server…
             </button>

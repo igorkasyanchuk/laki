@@ -722,7 +722,7 @@ export function StaleDaemon({ restart, newer }: { restart: () => Promise<unknown
 
 // tab colors, by name: CSS --tc-<name> in each app's theme
 export { TAB_COLORS }
-export const AGENT_COLORS: Record<string, string> = { claude: 'orange', codex: 'teal', gemini: 'blue', grok: 'purple', opencode: 'green' } // a tab's color unless it has its own; the new-workspace page's agent
+export const AGENT_COLORS: Record<string, string> = { claude: 'orange', codex: 'teal', gemini: 'blue', grok: 'purple', opencode: 'green', pi: 'pink' } // a tab's color unless it has its own; the new-workspace page's agent
 export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(--tc-${c})` } as CSSProperties) : undefined)
 
 // a project's own mark (projectSet's icon in its color, or its emoji, a line under it in the color); none set: or (the

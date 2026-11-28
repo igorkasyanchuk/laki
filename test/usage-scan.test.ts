@@ -75,6 +75,24 @@ test('scan: a codex rollout read on from its middle counts what its totals grew 
   assert.deepEqual(b.recs.map(r => [r.chat, r.p?.in, r.model]), [[id, 30, 'gpt-5.4']], 'the growth, its model as it was')
 })
 
+test('scan: a pi session counts each answer once by its entry, a /fork\'s copy of it is the first chat\'s (the ledger owns it), its folder from its header', async t => {
+  const home = mkdtempSync(join(tmpdir(), 'laki-scan-'))
+  t.after(() => rmSync(home, { recursive: true, force: true }))
+  const d = join(home, '.pi/agent/sessions/--tmp--')
+  const id = '44444444-4444-4444-8444-444444444444'
+  const fork = '55555555-5555-4555-8555-555555555555'
+  const msg = (eid: string, input: number) => line({ type: 'message', id: eid, parentId: null, timestamp: '2026-11-28T10:00:00.000Z', message: { role: 'assistant', content: [], provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input, output: 5, cacheRead: 100, cacheWrite: 0, totalTokens: input + 105, cost: { total: 0.01 } }, stopReason: 'stop', timestamp: 1 } })
+  const head = (sid: string) => line({ type: 'session', version: 3, id: sid, timestamp: '2026-11-28T09:59:00.000Z', cwd: '/tmp' })
+  write(join(d, `2026-11-28T09-59-00-000Z_${id}.jsonl`), head(id) + msg('aaaa0001', 1000) + line({ type: 'message', id: 'u1', message: { role: 'user', content: 'usage of "assistant"' } }))
+  write(join(d, `2026-11-28T10-30-00-000Z_${fork}.jsonl`), head(fork) + msg('aaaa0001', 1000) + msg('bbbb0002', 7))
+  const outs: ScanOut[] = []
+  await scan({ claude: [], codex: [], pi: join(home, '.pi/agent/sessions'), files: {}, since: Date.now() - 90 * 864e5, rate: 1e12 }, o => void outs.push(o))
+  const recs = outs.flatMap(o => o.recs)
+  assert.deepEqual(recs.map(r => [r.chat, r.p?.in, r.p?.rd]).sort(), [[id, 1000, 100], [fork, 1000, 100], [fork, 7, 100]].sort(), 'every answer read; the ledger keeps the copy for the first chat (the same key)')
+  assert.equal(new Set(recs.filter(r => r.p?.in === 1000).map(r => r.key)).size, 1, 'one key for the answer and its copy')
+  assert.ok(recs.every(r => r.agent === 'pi' && r.cwd === realpathSync('/tmp') && r.day === dayOf(Date.parse('2026-11-28T10:00:00.000Z'))))
+})
+
 const rows = async (rig: any) => (await rig.rpc('usageDays')).rows as any[]
 const total = (rs: any[]) => rs.reduce((n, r) => n + r.tokens, 0)
 const SCAN = { LAKI_METER_MS: '200', LAKI_SCAN_AGAIN_MS: '100' }

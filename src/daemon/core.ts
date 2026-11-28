@@ -72,7 +72,7 @@ import { tgMigrate, tgView, tgWsGone } from './telegram.ts'
 import { daemonPort, remoteAwake, remoteDevices, remoteView, shareLink, stopShares, stopTunnels, tunnelsOf } from './remote.ts'
 import { stuck, stuckScan } from './stuck.ts'
 import { mcpShareStop, sharedFor } from './mcpShare.ts'
-import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
+import { bgLeft, chatRead, goalOf, goalSeen, meterRead, meterView, ownStatusLine, piCtx, statusDir, statusGone, statusOn, statusSh, todayView } from './meters.ts'
 import { scanNow } from './usageScan.ts'
 import { capOver, capParse, capSet, capToolEnd, capView, costWarnParse, wsCost } from './cap.ts'
 import { reviewDrop, archiveBack, archiveDrop, archiveHas, archiveKeep, archivePatch, brokenOf, collisions, gAt, inside, pageable, scanOverlaps, scanStats, stats, treeOf, turnIndex, viewWs } from './files.ts'
@@ -458,7 +458,7 @@ const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...hookArgv],
 // the daemon on 127.0.0.1) and nothing asked for a sandboxed command
 export const claudeFile = (o: { fast?: boolean; gated?: boolean; sandbox?: boolean }) => `claude-settings${o.fast ? '-fast' : ''}${o.gated ? '-gated' : ''}${o.sandbox ? '-sandbox' : ''}.json`
 
-// how an agent's hooks reach `laki hook`: claude's settings files, opencode's plugin (by their path in h.dir)
+// how an agent's hooks reach `laki hook`: claude's settings files, opencode's plugin, pi's extension (by their path in h.dir)
 export function hookFiles(h: Hooks): Record<string, string> {
   const c = (st: string, matcher?: string, bg = false) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5, ...(bg && { async: true }) }] }]
   const local = h === localHooks
@@ -502,6 +502,7 @@ export function hookFiles(h: Hooks): Record<string, string> {
   return {
     ...claude,
     'opencode/plugin/laki.js': OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(h.argv)),
+    'pi/laki.js': PI_EXTENSION.replace('HOOK', () => JSON.stringify(h.argv)),
   }
 }
 
@@ -575,7 +576,7 @@ const claudePlugin = (): Record<string, string> => ({
   'claude-plugin/.claude-plugin/plugin.json': JSON.stringify({ name: 'laki', description: "Laki's commands for its tabs: /laki:new, /laki:extension, /laki:orchestrate", author: { name: 'Laki' } }, null, 2),
   'claude-plugin/commands/new.md': `---
 description: A new Laki session for a task, in a workspace of its own in this project, with codex, claude or another agent
-argument-hint: <the task> [with codex | claude | gemini | grok | opencode]
+argument-hint: <the task> [with codex | claude | gemini | grok | opencode | pi]
 allowed-tools: Bash(${LAKI_CLI} new:*)
 ---
 Start a new Laki session for this request: $ARGUMENTS
@@ -583,7 +584,7 @@ Start a new Laki session for this request: $ARGUMENTS
 A session is a new workspace in this project (a git worktree of its own on a new branch; in a folder that isn't git,
 another session in it) with an agent started on the task. This session goes on as it is: don't do the task here.
 
-1. The agent: the one the request names (claude, codex, gemini, grok or opencode); none named: claude.
+1. The agent: the one the request names (claude, codex, gemini, grok, opencode or pi); none named: claude.
 2. The prompt: the task as the new agent needs it without this conversation: what to do, the files and facts from
    here that matter, how to tell it's done. Leave out the agent's name and "start a new session".
 3. Run it, one command (the prompt in single quotes, each ' in it written as '\\''):
@@ -908,6 +909,37 @@ export const LakiPlugin = async ({ client }) => {
 }
 `
 
+// Pi's turns as claude's hooks (Laki's extension, loaded with -e: Pi has no hooks of its own): its session as it starts
+// (a new one, a resumed or forked one too), a prompt's run, its end with the last answer and the context it fills (Esc:
+// interrupted; an API error: failed). Never awaited by Pi: laki hook runs beside it, one at a time, 10 s at most each
+const PI_EXTENSION = `// Laki's extension (Laki writes it): tells Laki when this tab's turns start and end
+import { execFile } from 'node:child_process'
+const hook = HOOK
+export default function (pi) {
+  if (!process.env.LAKI_TAB) return
+  let last = Promise.resolve() // one report at a time, in order: running then idle must not arrive swapped
+  const report = (state, payload = {}) =>
+    void (last = last.then(() => new Promise(done => execFile(hook[0], [...hook.slice(1), 'hook', state, JSON.stringify(payload)], { timeout: 10000 }, () => done()))))
+  const fill = ctx => {
+    try {
+      const u = ctx.getContextUsage?.()
+      return u ? { context_window: u.contextWindow, context_tokens: u.tokens ?? undefined } : {}
+    } catch {
+      return {}
+    }
+  }
+  pi.on('session_start', (_e, ctx) => void report('start', { session_id: ctx.sessionManager.getSessionId() }))
+  pi.on('agent_start', () => void report('running'))
+  pi.on('agent_end', (e, ctx) => {
+    const a = [...(e?.messages ?? [])].reverse().find(m => m?.role === 'assistant')
+    const text = (Array.isArray(a?.content) ? a.content : []).filter(x => x?.type === 'text').map(x => x.text).join('\\n')
+    if (a?.stopReason === 'aborted') return void report('interrupted', fill(ctx))
+    if (a?.stopReason === 'error') return void report('failed', { error: a.errorMessage, ...fill(ctx) })
+    report('idle', { last_assistant_message: text, ...fill(ctx) })
+  })
+}
+`
+
 // A Finder-launched app has a bare PATH: take the login shell's (path), so git/gh/claude are found; its
 // XDG_CONFIG_HOME too, unless one is set (where OpenCode, run from that shell, reads its skills: skill.ts homeOf). And
 // always the agents' aliases there (aliasOf), as the daemon starts
@@ -942,7 +974,7 @@ export const tabStatus = (id: string): Status => rt.get(id)?.status ?? 'idle'
 // an agent whose turns Laki follows: by its hooks (HOOKED), or by its screen (sweepRunning)
 export const tracked = (t: Tab) => t.kind === 'agent' && (isAgent(t.preset) || t.preset === 'acp')
 // a hook, notify or plugin says when a turn ends (Runtime.hooked: one came); the rest by OSC 7501 or their screen
-const HOOKED = new Set(['claude', 'codex', 'opencode'])
+const HOOKED = new Set(['claude', 'codex', 'opencode', 'pi'])
 // what an agent shows while it works, on screen or in its window title: a quiet screen without it means the turn is over
 const BUSY: Record<string, RegExp> = {
   claude: /esc to interrupt/i,
@@ -950,6 +982,7 @@ const BUSY: Record<string, RegExp> = {
   gemini: /esc to (cancel|interrupt)|thinking\.\.\./i, // agy's
   grok: /^[^\n]* - (thinking|responding|running|compacting|waiting)\b/i, // its title (the first line): "⠋ - Thinking - <session> - grok"
   opencode: /esc (again to )?interrupt/i,
+  pi: /esc to interrupt/i, // "Working... (esc to interrupt)"
 }
 const ASKS = /action required/i // grok's title while a permission prompt waits
 const QUIET = Number(process.env.LAKI_QUIET_MS) || 4000 // a turn with no hook: idle this long after its last output (tests' shorter)
@@ -2186,11 +2219,12 @@ function statusLineEnv(ws: Workspace, tab: Tab): Record<string, string> {
 }
 
 // Laki's note (its own and the project's memory) for an agent with no flag that adds instructions (agy): in front of the
-// first message of a new chat, fenced, said to be background rules and not the task. memoryFile: OpenCode's, a 0600
-// file of the tab's its config's instructions name (gone with the tab: tabFilesGone)
+// first message of a new chat, fenced, said to be background rules and not the task. memoryFile: OpenCode's and Pi's, a
+// 0600 file of the tab's (<data>/<agent>/notes) its config's instructions or --append-system-prompt name (gone with the
+// tab: tabFilesGone), never on argv
 export const memoryFirst = (note: string, text: string) => `Background rules from Laki for this project (context for the whole chat, not a task; the task follows after them):\n\n\`\`\`text\n${note.replace(/\`\`\`/g, "'''")}\n\`\`\`\n\n${text}`
 function memoryFile(tab: Tab, note: string) {
-  const f = join(dir, 'opencode', 'notes', `${tab.id.replace(/[^\w.-]/g, '')}.md`)
+  const f = join(dir, tab.preset === 'pi' ? 'pi' : 'opencode', 'notes', `${tab.id.replace(/[^\w.-]/g, '')}.md`)
   mkdirSync(dirname(f), { recursive: true, mode: 0o700 })
   writeAtomic(f, note, 0o600)
   return f
@@ -2266,6 +2300,15 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
   } else if (tab.preset === 'opencode') {
     argv = again ? ['opencode', '--session', again] : ['opencode']
     if (ask.length) ask = ['--prompt', ...ask] // its positional is a folder
+  } else if (tab.preset === 'pi') {
+    // Pi (pi-coding-agent): no hooks or ACP of its own; Laki's extension (<data>/pi/laki.js, -e) reports its turns to laki
+    // hook. Its chat by the session id the extension said (--session); Laki's note by --append-system-prompt (a 0600 file
+    // of the tab's on this Mac: not on argv; a host's: the profile's own text); Laki's skills by --skill (skill.ts
+    // piSkills: in Laki's data folder). ~/.pi is never written: flags only. No permission prompts, no MCP
+    argv = ['pi', '-e', join(h.dir, 'pi', 'laki.js'), ...(again ? ['--session', again] : [])]
+    if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', h === localHooks ? memoryFile(tab, told) : told)
+    if (h === localHooks) for (const k of (() => { try { return readdirSync(join(dir, 'pi', 'skills')).sort() } catch { return [] } })()) argv.push('--skill', join(dir, 'pi', 'skills', k))
+    if (ask[0]?.startsWith('-')) ask = [` ${ask[0]}`] // its prompt is its last word, and a word that starts with - is a flag to it (no --)
   } else {
     return { cmd: (pr?.agent === 'command' && pr.cmd?.trim()) || tab.cmd || 'true', env }
   }
@@ -2289,7 +2332,7 @@ export function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, 
     const ownMcp = o.mcp && typeof o.mcp === 'object' && !Array.isArray(o.mcp) ? o.mcp : {}
     env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ ...o, ...(model && { model }), ...(ocNote && { instructions: [...(Array.isArray(o.instructions) ? o.instructions : []), ocNote] }), ...(mcp.length && { mcp: { ...ownMcp, ...openCodeMcp(mcp) } }) }) // #6: its MCP servers too (env: its environment, never argv)
   }
-  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' || tab.preset === 'gemini' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' || tab.preset === 'gemini' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs, pr?.net) : [])] // claude's fast and sandbox: its settings file
+  const flags = [...(model && tab.preset !== 'opencode' ? [tab.preset === 'claude' || tab.preset === 'gemini' || tab.preset === 'pi' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' || tab.preset === 'gemini' ? ['--effort', effort] : tab.preset === 'pi' ? ['--thinking', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, perm), ...(fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : []), ...(sandbox && tab.preset === 'codex' ? codexBox(perm, pr?.args, gitDirs, pr?.net) : [])] // claude's fast and sandbox: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   const line = [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' ')
   // S12: the values emptied for the agent itself (sh, bash, zsh: an assignment before a command takes effect after its
@@ -3459,7 +3502,7 @@ export function closeTab(id: string, keep?: { cwd?: string }) {
 function tabFilesGone(id: string) {
   rmSync(join(dir, 'net', `${id}.json`), { force: true })
   rmSync(join(dir, 'mcp', `${id}.json`), { force: true })
-  rmSync(join(dir, 'opencode', 'notes', `${id.replace(/[^\w.-]/g, '')}.md`), { force: true }) // memoryFile's
+  for (const a of ['opencode', 'pi']) rmSync(join(dir, a, 'notes', `${id.replace(/[^\w.-]/g, '')}.md`), { force: true }) // memoryFile's
   proxyDrop(id)
 }
 
@@ -4923,6 +4966,7 @@ function turn(p: { tab: string; state: string; payload?: any; at?: number }) {
     r.compacting = undefined // any hook after PreCompact's (claude's SessionStart, source compact, as it's done)
     if (p.state !== 'waiting') r.perm = r.held = r.permCmd = r.permCut = undefined // answered (its tool runs), refused or over
   }
+  if (tab.preset === 'pi' && typeof pl.context_window === 'number' && pl.context_window > 0) piCtx.set(tab.id, pl.context_window) // Laki's extension's: its model's window
   switch (p.state) {
     case 'compacting':
       if (r.status !== 'waiting') r.status = 'running'
@@ -5596,7 +5640,7 @@ export function sweepRunning(now = Date.now()) {
 // Hooks not heard: an agent whose hooks say as a turn starts (HEARS; codex's notify comes only as one ends), on this Mac,
 // started DEAF_AFTER ago, given a prompt (a send, Enter, its start's) its screen answered, and not one hook since: the
 // tab's view has hookless, the likely why (hookHealth.ts), until a hook comes (hook). Every 30 s (main.ts)
-const HEARS = new Set(['claude', 'opencode'])
+const HEARS = new Set(['claude', 'opencode', 'pi'])
 const DEAF_AFTER = 2 * 60_000
 const prompted = new WeakMap<Session, number>() // a session's first prompt: a new start asks again
 const deaf = new WeakMap<Session, HookWhy>()

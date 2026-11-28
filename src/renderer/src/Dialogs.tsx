@@ -8,7 +8,7 @@ import { type AppCtx, backWord, type Dialog, extKey, extOf, flowsOf, notesOf, sp
 import type { AccountsApi, SkillInfo } from './Settings'
 import { FONT_SIZE } from './settingsBase'
 import { api, bridge, openExternal } from './api'
-import { type ChatHit, type Schedule, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView } from '../../shared/types'
+import { AGENT_NAMES, type ChatHit, type Schedule, type AccountView, type Account, type WorkspaceView, aiOn, prAllows, type ProjectConfig, type Doctor, type Resources, type ScriptRun, type LogLine, type CompactLogLine, type DiskTidyWhat, type DiskUsage, type KeptArts, type GateHeld, type Project, prIn, type SecretFound, type Sep, rowsOf, type TabView } from '../../shared/types'
 import { type AgentUsage, UsagePage, type UsageAi, type UsageDay } from './Usage'
 import { ask, type MenuItem, Icon } from './ui'
 import { type PanelTab, type Changes, type FileContent, FileFinder, type FileList, type TextFound } from './SidePanel'
@@ -346,7 +346,7 @@ export function Pages({ app }: { app: AppCtx }) {
       {dialog === 'help' && <HelpPage cli="laki" ship keys={kb} global={{ open: held.open ? hotkey || '' : '', shot: held.shot ? shotKey || '' : '', quick: held.quick ? quickKey || '' : '', tell: held.tell ? tellKey || '' : '', talk: held.talk ? talkKey || '' : '' }} zoom={(fontSize / FONT_SIZE) * pageZoom * own} onClose={() => setDialog(null)} />}
       {dialog === 'about' && <About onClose={() => setDialog(null)} />}
       {dialog && typeof dialog === 'object' && 'sees' in dialog && (
-        <Modal title={`What ${dialog.sees === 'claude' ? 'Claude Code' : 'Codex'} sees`} onClose={() => setDialog(null)}>
+        <Modal title={`What ${AGENT_NAMES[dialog.sees]} sees`} onClose={() => setDialog(null)}>
           <Suspense fallback={<p className="muted small">Reading…</p>}>
             <WhatItSees agent={dialog.sees} project={dialog.in} projects={view.projects.filter(p => !p.kind).map(p => ({ id: p.id, name: p.name }))} onType={(cmd, project) => void termType(cmd, project)} />
           </Suspense>

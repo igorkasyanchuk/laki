@@ -16,6 +16,7 @@ export const AGENT_KEY_ENV: Record<string, string[]> = {
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
   grok: ['XAI_API_KEY', 'GROK_API_KEY'],
   opencode: ['OPENCODE_API_KEY'],
+  pi: ['ANTHROPIC_API_KEY', 'ANTHROPIC_OAUTH_TOKEN', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'XAI_API_KEY', 'DEEPSEEK_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'ZAI_API_KEY', 'MINIMAX_API_KEY'], // pi --help's: each provider's
 }
 export const secretLooking = (name: string) => SECRET_ENV.some(r => r.test(name)) && !HARMLESS.some(r => r.test(name))
 // a value that is a secret whatever its name: a URL with a password in it (DATABASE_URL=postgres://user:pass@host/db),

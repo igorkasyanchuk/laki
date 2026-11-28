@@ -319,8 +319,8 @@ const OUTSIDE = /^Outside Laki · /
 const PLACES = [['in', 'In Laki'], ['out', 'Outside Laki'], ['', 'All']] as const
 const RANGES = [7, 30, 90]
 const LAKI = 'laki' // Laki AI's series
-const SERIES = ['claude', 'codex', 'gemini', 'grok', 'opencode', LAKI] // the stack's order and colors, fixed
-const COLOR: Record<string, string> = { claude: 'var(--tc-orange)', codex: 'var(--tc-blue)', gemini: 'var(--tc-green)', grok: 'var(--tc-yellow)', opencode: 'var(--tc-pink)', [LAKI]: 'var(--tc-purple)' }
+const SERIES = ['claude', 'codex', 'gemini', 'grok', 'opencode', 'pi', LAKI] // the stack's order and colors, fixed
+const COLOR: Record<string, string> = { claude: 'var(--tc-orange)', codex: 'var(--tc-blue)', gemini: 'var(--tc-green)', grok: 'var(--tc-yellow)', opencode: 'var(--tc-pink)', pi: 'var(--tc-teal)', [LAKI]: 'var(--tc-purple)' }
 const nameOfAgent = (a: string) => (a === LAKI ? 'Laki AI' : (AGENT_NAMES[a as keyof typeof AGENT_NAMES] ?? NAMES[a] ?? a))
 const WHERE_SHOWN = 8 // Where it went's rows before More
 const dayKey = (t: Date) => `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`

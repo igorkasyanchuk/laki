@@ -5,7 +5,7 @@
 //   settings: { <a Settings key>: value }: locked to that value (null: unset), settingsSet refuses another
 //   remote: false        nothing on the internet through Laki: remote access, tunnels (Expose to the world), shared tabs
 //   bypass: false        approvals required: no agent starts in a mode, or with args, that never ask (neverAsks)
-//   agents: [ids]        only these agents start (claude, codex, gemini: Antigravity CLI, grok, opencode); a command tab that starts one too
+//   agents: [ids]        only these agents start (claude, codex, gemini: Antigravity CLI, grok, opencode, pi); a command tab that starts one too
 //   allowRules: false    no auto-answer rules (F14): none answers an ask, and none can be added or changed
 // The view's `managed` says what's locked (Settings' banner). ponytail: what's running isn't stopped (until it
 // restarts: checked as tabs are made and at each start, core's spawnTab)

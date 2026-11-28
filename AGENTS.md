@@ -95,7 +95,7 @@ for the part you change, and keep it up to date with the change.
 
 - [docs/dev/api.md](docs/dev/api.md): the daemon's API (`src/daemon/main.ts` `api`): each method over `/rpc` and the
   WebSocket, its events and the view; `laki mcp`, the MCP server.
-- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 235. Bump `API` (`src/shared/types.ts`)
+- [docs/api-history.md](docs/api-history.md): what each `API` number added, 1 to 236. Bump `API` (`src/shared/types.ts`)
   when the renderer starts relying on a new method or daemon behavior (a setting needs no bump); the next one goes at its end.
 - [docs/dev/agents.md](docs/dev/agents.md): profiles and accounts, layouts, agent variables, turns, asks, sessions, sleep,
   terminal queries, agents and their hooks, projects and their trust, presets, interrupts, resume after a restart.
@@ -121,7 +121,7 @@ for the part you change, and keep it up to date with the change.
 
 - **The daemon only listens on 127.0.0.1**, behind the token and the Origin check: keep both on any new endpoint
   (remote access's own token and origin: `docs/dev/remote.md`).
-- **Never write** `~/.claude/settings.json` or `~/.codex/*`: agents get settings and notify through flags only.
+- **Never write** `~/.claude/settings.json`, `~/.codex/*` or `~/.pi`: agents get settings and notify through flags only.
 - **`laki hook` must never fail or block the agent.**
 - **No new dependencies**: node's stdlib and the ones already here (Conventions).
 - **Tests never touch** the real `~/.laki`, `~/.laki-electron`, `~/.claude` or `~/.codex`: `test/helpers.ts` `fresh()`

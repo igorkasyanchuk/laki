@@ -10,6 +10,7 @@ export const INSTALL: Record<Agent, { cmd?: string; docs?: string }> = {
   gemini: { cmd: 'curl -fsSL https://antigravity.google/cli/install.sh | bash', docs: 'https://antigravity.google/docs/cli' }, // Antigravity CLI (agy), Gemini CLI's successor
   grok: {},
   opencode: { cmd: 'curl -fsSL https://opencode.ai/install | bash', docs: 'https://opencode.ai/docs' },
+  pi: { cmd: 'npm install -g @mariozechner/pi-coding-agent', docs: 'https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent' },
 }
 // the agent a tab runs: its profile's (a profile named as an agent is that agent's)
 export const tabAgent = (t: { preset?: string }, presets: { name: string; agent?: string }[] = []): Agent | undefined =>

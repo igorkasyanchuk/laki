@@ -42,7 +42,7 @@ export type Dialog = null | 'toolbar' | 'chats' | 'scriptLogs' | 'new' | 'projec
   'timer' | 'importantTimer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string;
   back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog; turn?: { tab: string; at: number } /* P5:
   a turn chip's: that turn's data */ } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string; start?: DeskAsk; key?: string } | { uikit: true;
-  icons?: boolean; can?: boolean; back?: Dialog } | { sees: 'claude' | 'codex'; in?: string } /* F6: What it sees, from a workspace's Info: in that project */ |
+  icons?: boolean; can?: boolean; back?: Dialog } | { sees: 'claude' | 'codex' | 'pi'; in?: string } /* F6: What it sees, from a workspace's Info: in that project */ |
   { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string;
   id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { importWt: string } | { importChats: string } | { ciLog: string;
   job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; of?: string; kind?: PlanKind;

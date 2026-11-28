@@ -2,7 +2,7 @@
 
 Everything Laki does, how to use it, and where it keeps things. The short version is the [README](../README.md).
 
-A macOS app for running coding agents (Claude Code, Codex, Antigravity, Grok, OpenCode, or any command) side by side, each in its own
+A macOS app for running coding agents (Claude Code, Codex, Antigravity, Grok, OpenCode, Pi, or any command) side by side, each in its own
 git worktree. You get a sidebar of projects and workspaces, tabs per workspace, real terminals you can split
 into panes, and live agent status (running, waiting for you, finished). It also has a follow-up queue, a
 side panel (files, changes, review), a Run button, dev servers, listening ports, PRs and ship. Agents keep running when you quit the app;
@@ -36,7 +36,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   its own (`$PORT`, `$PORT_1`…`$PORT_9`), a number (`$LAKI_SLOT`), a database suffix (`$LAKI_DB_SUFFIX`, `_ws<n>`) and
   a compose project (`$COMPOSE_PROJECT_NAME`, `<project>-ws<n>`) in every tab, setup, run, Done check and teardown, with
   examples to copy; a server listening on another workspace's port shows ⚠ and the port on both rows. Files git ignores that a worktree needs (`.env`…) are copied in (`.worktreeinclude`).
-- **Agents**: Claude Code, Codex, Antigravity (Google's `agy`, Gemini CLI's successor), Grok, OpenCode or any command, started from presets (args, env). Live status per tab and
+- **Agents**: Claude Code, Codex, Antigravity (Google's `agy`, Gemini CLI's successor), Grok, OpenCode, Pi or any command, started from presets (args, env). Live status per tab and
   workspace; notifications and a count on the Dock icon and in the menu bar; pushes to your phone; a follow-up queue; resume after a restart; usage limits wait
   and continue; a model and effort per workspace; turn timers (off by default); ⌘J jumps to the next tab that
   needs you. An agent's numbered choices (a permission prompt, a question) are buttons under the terminal and on its
@@ -234,7 +234,7 @@ To build it yourself, you need:
 - git
 
 Optional: `gh` (logged in, for PRs and ship), and the agents you use on your PATH: `claude`, `codex`, `agy`,
-`grok`, `opencode`. Each one found there is a preset; Claude Code and Codex always are.
+`grok`, `opencode`, `pi`. Each one found there is a preset; Claude Code and Codex always are.
 
 ```bash
 git clone https://github.com/igorkasyanchuk/laki && cd laki
@@ -318,7 +318,7 @@ npm link
    Again…* brings it back); *Don't show again* too.
 3. Add a project: **⌘O**, + at the top of the sidebar › *Project folder…*, or drag a folder from Finder onto the
    window. It can be a git repository or any other folder.
-4. The new-workspace page opens. Pick an agent (claude, codex, gemini: Antigravity's `agy`, grok, opencode, shell, or a custom command) and,
+4. The new-workspace page opens. Pick an agent (claude, codex, gemini: Antigravity's `agy`, grok, opencode, pi, shell, or a custom command) and,
    optionally, a first prompt.
    - For a git repository, also pick a base branch (the repo's main one, `main` or `master`, unless you pick
      another; ⌄ lists them all, or type any ref). The workspace gets a worktree in
@@ -725,7 +725,7 @@ selected workspace's PR is in the status bar.
   are a reading, not a verdict: what runs is the command above them.
 - Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
   *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange, codex
-  teal, gemini blue, grok purple and opencode green, unless you pick another color (or none).
+  teal, gemini blue, grok purple, opencode green and pi pink, unless you pick another color (or none).
 
 **Menus:** every item has a key, shown on its right: press it while the menu is open (e.g. right click a
 workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 pick a color (brown and gray by a click).
@@ -787,7 +787,7 @@ working): a click lists them; the selected tab always shows, ⌘1…⌘9 reach t
   *Test*, *Lint*, *Format* and *Deploy* scripts (when set) are in ▾ too, each in a tab named as it (run again, the
   last one's tab goes; Deploy asks first); Enter in its ended tab runs it again (a deploy's: only Run ▾ › Deploy, which asks). ⌘K has *Run the test script*…
   ▾ also lists your actions (Settings → *Actions*, and the project's), worked out as it opens:
-  - *Agent actions*: a prompt for an agent (Claude Code, Codex, Antigravity, Grok, OpenCode, or *Any agent*), listed while the workspace runs that agent. It goes to
+  - *Agent actions*: a prompt for an agent (Claude Code, Codex, Antigravity, Grok, OpenCode, Pi, or *Any agent*), listed while the workspace runs that agent. It goes to
     the focused tab if it's that agent, else its first tab, now or (while it works) when its turn ends.
   - *Shell actions*: a command (an action whose target is *Shell*), run in the focused shell if it's at its prompt,
     else the workspace's first shell at its prompt, else a new one.
@@ -2763,7 +2763,7 @@ title large at the top and small in the glass head once you scroll.
   hotkeys, *Pick an element*, a fixed key like ⌘C, or ⌃ alone: the terminal's). The menu bar and Help show the keys
   you set; the old ones do nothing.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
-- *Agents & profiles* › *Versions*: each agent CLI on this Mac (Claude Code, Codex, Antigravity, Grok, OpenCode, Cursor) with
+- *Agents & profiles* › *Versions*: each agent CLI on this Mac (Claude Code, Codex, Antigravity, Grok, OpenCode, Pi, Cursor) with
   its version, the newest out and how it was installed (npm, Homebrew or its own installer). *Update* runs its own
   update in a terminal tab you can watch (*Show*), and the row says how it went; a failed one shows its exit code and
   *Retry*. Tick several for *Update selected*. Tabs already running keep their version until restarted. An npm, bun or
@@ -2773,7 +2773,7 @@ title large at the top and small in the glass head once you scroll.
   says the delay doesn't apply. When an update
   is out, Settings on the rail says so in its tooltip, and has a dot with *A dot on Settings when an agent update is
   out* on (off by default).
-- *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Antigravity, Grok, OpenCode, or any command); a
+- *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Antigravity, Grok, OpenCode, Pi, or any command); a
   profile is how it starts, grouped under its agent: a model and an effort, and for Claude Code and Codex a
   permission mode, *Fast mode* and *Sandbox* (a workspace that picks its own wins), an account (Claude Code and Codex), flags
   (e.g. `--add-dir ../shared`; flags that set a permission mode keep theirs, and the mode picker is off) and
@@ -2791,14 +2791,14 @@ title large at the top and small in the glass head once you scroll.
   the hosts you allowed for the project; others are asked about) or *Off* (Codex: no network). Each agent has what its
   sandbox can do: *Off* isn't Claude Code's, *Listed hosts* isn't Codex's. When the sandbox refuses a host, its card in
   Needs you offers *Allow this domain in this project*; agents started from then on reach it. `laki preset set <name>
-  --net all|list|off` does the same. *Wrapper sandbox (macOS)*, for an agent with no sandbox of its own on (OpenCode;
+  --net all|list|off` does the same. *Wrapper sandbox (macOS)*, for an agent with no sandbox of its own on (OpenCode, Pi;
   Antigravity and Grok with theirs off; Claude Code or Codex with *Sandbox* off), starts it under macOS's
   `sandbox-exec`: it writes only in its worktree, git's folder, the temp folders, its storage folder and its own
   settings, and can't read `~/.ssh`, `~/.aws`, `~/.gnupg`, `gh`'s config, your keychains, other agents' settings or
   Laki's own data but what it works in. Its *Network*: *All* (as it is), or *Listed hosts*: it reaches only this Mac, and
   through Laki's proxy the same list as Claude Code's (the project's registries, GitHub, its model, what you allowed); a
   host off it gets the card's *Allow this domain in this project*, which works at once. A tool that ignores `HTTPS_PROXY`
-  reaches nothing. A new Antigravity, Grok or OpenCode profile has it on; a write it refuses shows on the tab's card
+  reaches nothing. A new Antigravity, Grok, OpenCode or Pi profile has it on; a write it refuses shows on the tab's card
   in Needs you with *Restart without the wrapper* (the profile keeps it). `laki preset set <name> --wrap` (`--no-wrap`)
   does the same. Apple marks `sandbox-exec` deprecated. *Sandbox* starts the agent in its own sandbox: its commands
   can write only in the worktree and what `git commit` writes in the repo's git folder (not its hooks or config, nor
@@ -2873,8 +2873,8 @@ title large at the top and small in the glass head once you scroll.
   opens them; set it to 0 in an env to see the URLs).
   *System prompt* (an agent's profile): your standing instructions for it (a "Reviewer" that never edits, a "Terse"
   one), added at each new tab's start on top of the project's memory, the same way as the note below (Claude Code's
-  `--append-system-prompt`, Codex's `developer_instructions`, Grok's `--rules`, OpenCode's instructions, Antigravity's
-  first message); `laki preset set <name> --system "…"` (`''` drops it).
+  `--append-system-prompt`, Codex's `developer_instructions`, Grok's `--rules`, OpenCode's instructions, Pi's
+  `--append-system-prompt` (a file of the tab's), Antigravity's first message); `laki preset set <name> --system "…"` (`''` drops it).
   *Tell it about Laki* (on by default; Claude Code and Codex): each start adds a short note to the agent's system
   prompt (`--append-system-prompt`, Codex's `developer_instructions`; a preset whose arguments set their own keeps
   those, and so does Codex with `developer_instructions` in its `config.toml`: no note then): it runs in Laki, and how to name its workspace (`laki rename . "…"`), attach a PR (`laki pr . <n>`), show you something to open (`laki show … --open <folder|file|url>`: a card
@@ -3103,7 +3103,7 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   or the last project you talked to; only at the very start, the word not kept. The pill says *Goes to Notes › Voice*
   or *Backlog · Shop* first; *Undo* takes the line or the item out again.
 - *Agent skill*: installs a skill for Claude Code, Codex, Antigravity, Grok or OpenCode in your home folder
-  (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/config/…` (Antigravity's), `~/.grok/…`, `~/.config/opencode/…`, or `$XDG_CONFIG_HOME/opencode/…` when you set it), so every session knows Laki: what it is, and how to drive it with its CLI (list
+  (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/config/…` (Antigravity's), `~/.grok/…`, `~/.config/opencode/…`, or `$XDG_CONFIG_HOME/opencode/…` when you set it), so every session knows Laki (Pi: Laki's tabs give it every skill by `--skill`, from Laki's data folder; `~/.pi` is never written): what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   *Extension creator* (`skills/laki-widget`, installed on its own) teaches them to make extensions: the files, the
   template language, JS extensions, actions, and checking one with `laki widget`. *Orchestrator*
@@ -3390,7 +3390,7 @@ a spot in the picture is where to tap. MCP's `laki_device` does the same.
 
 ### MCP
 
-`laki mcp` is an MCP server on stdio, for Claude Code, Codex, Antigravity, Grok, OpenCode or any MCP client. It lists its core
+`laki mcp` is an MCP server on stdio, for Claude Code, Codex, Antigravity, Grok, OpenCode or any MCP client (Pi has no MCP: its tabs get the laki CLI and Laki's skills). It lists its core
 tools (state, a new workspace, send, screen, wait, diff, ask, alert, progress, limits) and `laki_more`, which adds a group
 to the list (sessions, prs, schedule, widgets, specs, flows, memory, browser, settings): less of an agent's context goes
 to tools it won't use (an agent calls `laki_more` first for a tool it doesn't have yet); `laki mcp --all` (or `LAKI_MCP_ALL=1`) lists every one,

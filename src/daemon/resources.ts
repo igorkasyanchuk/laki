@@ -268,7 +268,7 @@ export async function resources(): Promise<Resources> {
   return { app, daemon: { ...(me ? use(me) : { pid: process.pid, rss: kb(mem.rss), cpu: 0, cmd: process.argv.join(' ') }), heap: kb(mem.heapUsed) }, tabs, others }
 }
 
-// An idle agent nobody looks at (claude, codex, grok, opencode, agy, an ACP one: resumable), quiet for settings.sleepAfter minutes, is put to sleep: its process ends
+// An idle agent nobody looks at (claude, codex, grok, opencode, pi, agy, an ACP one: resumable), quiet for settings.sleepAfter minutes, is put to sleep: its process ends
 // (it frees what it holds, and a long one grows), its screen stays, and a look (attach), a key or a message resumes
 // its chat (wake). Not one with a queue or a usage limit, without a chat to resume, on an SSH host, in a workspace
 // whose PR feedback goes to it (autoFix…), nor one with a port listening under it (a dev server it started).
@@ -278,11 +278,11 @@ export const isLive = (t: Tab) => asleep.has(t.id) || !!(sessions.get(t.id) && !
 // a chat its next start resumes (core's agentCmd): by its id, or agy as its workspace's only agy tab (-c: its folder's
 // latest) before it said its id
 const resumable = (t: Tab) =>
-  t.preset === 'gemini' ? !!t.resumeId || !state.tabs.some(x => x.id !== t.id && x.workspace === t.workspace && x.preset === 'gemini') : ['claude', 'codex', 'acp', 'grok', 'opencode'].includes(t.preset ?? '') && !!t.resumeId
+  t.preset === 'gemini' ? !!t.resumeId || !state.tabs.some(x => x.id !== t.id && x.workspace === t.workspace && x.preset === 'gemini') : ['claude', 'codex', 'acp', 'grok', 'opencode', 'pi'].includes(t.preset ?? '') && !!t.resumeId
 // why a tab can't sleep even when asked: a chat it can resume, here, idle with nothing waiting for it
 function cantSleep(t: Tab) {
   const r = rt.get(t.id)
-  if (!resumable(t)) return `${t.name} can't resume a chat: Claude Code, Codex, Grok, OpenCode, Antigravity and an ACP agent that loads its chats (Cursor) can, once they have one` // acp: resumeId only when it loads (acp.ts)
+  if (!resumable(t)) return `${t.name} can't resume a chat: Claude Code, Codex, Grok, OpenCode, Pi, Antigravity and an ACP agent that loads its chats (Cursor) can, once they have one` // acp: resumeId only when it loads (acp.ts)
   if (state.workspaces.find(w => w.id === t.workspace)?.host) return `${t.name} runs on an SSH host: its memory is there`
   if (r?.status !== 'idle' || r.limit || t.queue?.length) return `${t.name} is busy: it can sleep once its turn ends${r?.limit ? ' and its usage limit resets' : ''}`
 }

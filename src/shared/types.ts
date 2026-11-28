@@ -8,14 +8,14 @@ import type { FlowRun, FlowStats, FlowView } from './workflow.ts'
 import PRICE_TABLE from './prices.json' with { type: 'json' }
 
 // the coding agents Laki starts by name (a preset's agent; the command is the id), and what they're called
-export const AGENTS = ['claude', 'codex', 'gemini', 'grok', 'opencode'] as const
+export const AGENTS = ['claude', 'codex', 'gemini', 'grok', 'opencode', 'pi'] as const
 export type Agent = (typeof AGENTS)[number]
-export const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Antigravity', grok: 'Grok', opencode: 'OpenCode' } // gemini: Antigravity CLI (agy), Gemini CLI's successor; its id stays, so profiles and tabs keep it
+export const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Antigravity', grok: 'Grok', opencode: 'OpenCode', pi: 'Pi' } // gemini: Antigravity CLI (agy), Gemini CLI's successor; its id stays, so profiles and tabs keep it
 export const isAgent = (s?: string): s is Agent => (AGENTS as readonly string[]).includes(s ?? '')
 export const agentBin = (a: Agent) => (a === 'gemini' ? 'agy' : a) // its command: the id but for agy's
-// how hard an agent thinks, for those that take it (claude and agy --effort, codex model_reasoning_effort); models: names to
+// how hard an agent thinks, for those that take it (claude and agy --effort, codex model_reasoning_effort, pi --thinking); models: names to
 // suggest (any other goes too: a full name, provider/model for opencode)
-export const EFFORTS: Partial<Record<Agent, string[]>> = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'], gemini: ['low', 'medium', 'high', 'xhigh', 'max'] }
+export const EFFORTS: Partial<Record<Agent, string[]>> = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'], gemini: ['low', 'medium', 'high', 'xhigh', 'max'], pi: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] }
 // a model an agent says it has (accounts.ts agentModels): its id for --model, its name and words, its efforts
 export type AgentModel = { id: string; name: string; sub?: string; efforts?: string[]; def?: boolean }
 export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opus', 'sonnet', 'haiku'] }
@@ -660,7 +660,7 @@ export type Tab = {
   preset?: string // an Agent or custom: what the agent is (hooks, resume)
   profile?: string // the preset (Settings) it started from: its args and env
   cmd?: string // custom command
-  resumeId?: string // the agent's chat: claude session_id, codex thread-id, opencode session, agy's conversation (what it printed as it exited), grok's (Laki picks it)
+  resumeId?: string // the agent's chat: claude session_id, codex thread-id, opencode session, pi's session (its extension says it), agy's conversation (what it printed as it exited), grok's (Laki picks it)
   kept?: string // the chat (a resumeId) Laki kept a copy of as its workspace was archived (core's keepChats): <storage>/chats/<id>.jsonl
   forkOf?: string // claude session to fork on first start
   queue?: string[] // follow-ups for when the agent is idle
@@ -1470,8 +1470,8 @@ export type AgentServer = { name: string; scope: 'user' | 'project' | 'local' | 
 // how Laki's note (its own and the project's memory) reaches each agent at start (core.ts agentCmd): a flag of its own
 // (claude's --append-system-prompt, codex's developer_instructions, grok's --rules, opencode's config instructions), or,
 // with none (agy), in front of a new chat's first message
-export const MEMORY_HOW: Record<string, 'by flag' | 'in the first message'> = { claude: 'by flag', codex: 'by flag', grok: 'by flag', opencode: 'by flag', gemini: 'in the first message' }
-export type AgentContext = { agent: 'claude' | 'codex'; project?: string; path?: string; profile?: string; envAllow?: string[]; heldWhy?: Record<string, string> /* each held one's reason: its name, or its value's shape */; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[]; skills?: AgentSkill[] /* every agent's (sees.ts skillsAudit): what each loads, by size, for drift between them */ }
+export const MEMORY_HOW: Record<string, 'by flag' | 'in the first message'> = { claude: 'by flag', codex: 'by flag', grok: 'by flag', opencode: 'by flag', pi: 'by flag', gemini: 'in the first message' }
+export type AgentContext = { agent: 'claude' | 'codex' | 'pi'; project?: string; path?: string; profile?: string; envAllow?: string[]; heldWhy?: Record<string, string> /* each held one's reason: its name, or its value's shape */; held?: string[] /* hideSecrets on: the names kept from its profile's agent (shared/env.ts), never values */; rules: AgentRule[]; memory: { global: number; mine: number; learned: number; bytes: number }; servers: AgentServer[]; skills?: AgentSkill[] /* every agent's (sees.ts skillsAudit): what each loads, by size, for drift between them */ }
 // an agent's skill (its skills/<name>/SKILL.md in its folder, or a project's .claude/skills, .codex/skills): approxTokens
 // its size over 4; frontmatterBytes what every session reads of it (the rest loads when it's used)
 export type AgentSkill = { name: string; agent: string; path: string; at: string; scope: 'home' | 'project'; bytes: number; approxTokens: number; frontmatterBytes: number }
@@ -1709,7 +1709,7 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
 // a file's blame (the daemon's blame): its commits, and each line's (lines[n - 1]: line n's index into commits; -1: none)
 export type Blame = { commits: { sha: string; author: string; at: number; summary: string }[]; lines: number[] }
-export const API = 235
+export const API = 236
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
 
 // the agent browser's open, click or fill (main's browse): what it caused. nav: the page it moved to; errors: the

@@ -10,7 +10,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { type AgentContext, type AgentRule, type AgentServer, type AgentSkill, HOME_ACCOUNT, type Memory } from '../shared/types.ts'
 import { findProject, memoryNote, memoryOf, openPath, rt, state, heldFrom, heldWhyFrom, presets, settingsSet } from './core.ts'
 import { accountNamed, accountUsed, homeDir } from './accounts.ts'
-import { redact } from './share.ts'
+import { piDir, redact } from './share.ts'
 
 const MAX_READ = 1 << 20 // a rule file read for its @imports: its first MB
 const tilde = (p: string) => (p === homedir() || p.startsWith(`${homedir()}/`) ? `~${p.slice(homedir().length)}` : p)
@@ -94,6 +94,20 @@ function codexRules(path?: string): AgentRule[] {
   const dirs = chain(path)
   const root = dirs.findLastIndex(d => existsSync(join(d, '.git')))
   return [...out, ...dirs.slice(root >= 0 ? root : dirs.length - 1).flatMap(d => one(d, 'project'))]
+}
+
+// Pi: its agent folder's AGENTS.md (or CLAUDE.md), then one per folder from the filesystem's root down to where it runs,
+// the same name first (its README: "All matching files are concatenated")
+function piRules(path?: string): AgentRule[] {
+  const one = (d: string, scope: AgentRule['scope']): AgentRule[] => {
+    for (const n of ['AGENTS.md', 'CLAUDE.md']) {
+      const p = join(d, n)
+      const size = sizeOf(p)
+      if (size !== undefined) return [{ path: p, at: tilde(p), scope, size }]
+    }
+    return []
+  }
+  return [...one(piDir({ ...process.env, ...state.settings?.env }), 'user'), ...(path ? chain(path).flatMap(d => one(d, 'project')) : [])]
 }
 
 // env values and headers as their names only; a token-shaped string, a URL's password or a value after a --token,
@@ -245,13 +259,14 @@ export function skillsAudit(project?: string): AgentSkill[] {
   }
   for (const agent of ['claude', 'codex'] as const) scan(agent, join(configDir(agent), 'skills'), 'home')
   for (const [agent, rel] of Object.entries(SKILL_HOMES)) scan(agent, join(homedir(), rel, 'skills'), 'home')
+  scan('pi', join(piDir({ ...process.env, ...state.settings?.env }), 'skills'), 'home') // ~/.pi/agent/skills (its ~/.agents/skills: Codex's too, listed there)
   if (project) for (const agent of ['claude', 'codex']) scan(agent, join(project, `.${agent}`, 'skills'), 'project')
   return out
 }
 
 export function agentContext(p: { agent?: string; project?: string; profile?: string }): AgentContext {
   const agent = p.agent
-  if (agent !== 'claude' && agent !== 'codex') throw new Error('agent: claude or codex')
+  if (agent !== 'claude' && agent !== 'codex' && agent !== 'pi') throw new Error('agent: claude, codex or pi')
   const proj = p.project ? findProject(p.project) : undefined
   if (proj?.host) throw new Error(`${proj.name} is on ${proj.host}: what an agent sees there is read there`)
   const path = proj && !proj.kind ? proj.path : undefined // a project's folder (Terminals' and Browsers' are none)
@@ -263,9 +278,9 @@ export function agentContext(p: { agent?: string; project?: string; profile?: st
   return {
     agent,
     ...(proj && { project: proj.id, path: tilde(proj.path) }),
-    rules: agent === 'claude' ? claudeRules(path) : codexRules(path),
+    rules: agent === 'claude' ? claudeRules(path) : agent === 'pi' ? piRules(path) : codexRules(path),
     memory: { global: mem(state.settings?.memory, false), mine: mem(list, false), learned: mem(list, true), bytes: Buffer.byteLength(note) },
-    servers: [...mcpFor(mcpAll(state.settings?.mcp, proj?.config?.mcp), p.profile ?? agent).map(s => server(s.name, s, 'laki', proj?.config?.mcp?.some(o => o.name === s.name) ? "Laki: the project's settings" : "Laki: Settings' MCP servers")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))].map(s => (waiting.has(s.name) ? { ...s, signIn: true as const } : s)), // Laki's: passed by flags (shared/mcp.ts); waiting: mcpAuth.ts'
+    servers: agent === 'pi' ? [] /* Pi has no MCP */ : [...mcpFor(mcpAll(state.settings?.mcp, proj?.config?.mcp), p.profile ?? agent).map(s => server(s.name, s, 'laki', proj?.config?.mcp?.some(o => o.name === s.name) ? "Laki: the project's settings" : "Laki: Settings' MCP servers")), ...(agent === 'claude' ? claudeServers(path) : codexServers(path))].map(s => (waiting.has(s.name) ? { ...s, signIn: true as const } : s)), // Laki's: passed by flags (shared/mcp.ts); waiting: mcpAuth.ts'
     ...(prof => ({ ...(prof && { profile: prof, envAllow: presets().find(x => x.name === prof)?.envAllow ?? [] }), held: heldFrom(agent, prof), heldWhy: heldWhyFrom(agent, prof) }))(p.profile ?? presets().find(x => x.agent === agent)?.name),
     skills: skillsAudit(path),
   }

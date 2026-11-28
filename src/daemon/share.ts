@@ -3,6 +3,7 @@
 // prompts, its answers, its tool calls a line each; anything else (a shell, agy…): the terminal's text.
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { esc, imgsAsLinks, markdownHtml } from '../shared/markdown.ts'
 import { planFrom, type TabPlan } from '../shared/todos.ts'
@@ -12,7 +13,9 @@ import { SECRETS } from '../shared/secrets.ts'
 
 export type Said = { who: 'you' | 'agent' | 'tool' | 'screen' | 'new'; text: string; fail?: number; stopped?: true; at?: number; end?: number; cost?: number } // F6: at, end: its first and last line's time (the transcript's); cost: on a `you`, what the turn it started cost so far (claude's usage at API prices; none: a model with no price, codex) // fail: a run of tool calls', how many failed (claude's is_error: the Reader's Hide successful keeps that run); stopped: you stopped the turn there (Esc): a prompt of yours with it had no answer (the Reader's Edit and resend); new: the Reader's line where the tab's next chat (a /clear) begins (meters.ts chatRead)
 
-// claude's: <its config>/projects/<the folder's>/<session>.jsonl; codex's: <its home>/sessions/y/m/d/rollout-…-<thread>.jsonl
+// claude's: <its config>/projects/<the folder's>/<session>.jsonl; codex's: <its home>/sessions/y/m/d/rollout-…-<thread>.jsonl;
+// pi's: <its agent folder>/sessions/--<the folder's>--/<time>_<session>.jsonl (piDir: PI_CODING_AGENT_DIR, else ~/.pi/agent)
+export const piDir = (env: Record<string, string | undefined> = process.env) => (d => (d === '~' ? homedir() : d?.startsWith('~/') ? homedir() + d.slice(1) : d))(env.PI_CODING_AGENT_DIR) || join(homedir(), '.pi', 'agent')
 export function transcriptOf(agent: string, dir: string, id: string): string | undefined {
   if (!/^[\w-]+$/.test(id)) return // an id, never a path
   try {
@@ -21,6 +24,11 @@ export function transcriptOf(agent: string, dir: string, id: string): string | u
       const f = (readdirSync(join(dir, 'sessions'), { recursive: true }) as string[]).find(f => f.endsWith(`-${id}.jsonl`))
       return f && join(dir, 'sessions', f)
     }
+    if (agent === 'pi')
+      for (const d of readdirSync(join(dir, 'sessions'))) {
+        const f = (() => { try { return readdirSync(join(dir, 'sessions', d)).find(f => f.endsWith(`_${id}.jsonl`)) } catch { return undefined } })()
+        if (f) return join(dir, 'sessions', d, f)
+      }
   } catch {}
 }
 
@@ -285,6 +293,7 @@ export const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) 
 export const dayOf = (t: number) => (d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)(new Date(t))
 export const meterNew = (): Meter => ({ tokens: 0, by: {} })
 export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now(), owns?: Owns): Meter {
+  if (agent === 'pi') return piMeter(jsonl, m, now, owns)
   const add = (s: Spent, by = 1) => {
     m.tokens += by * partsTokens(s.p)
     partsAdd((m.by[s.model] ??= {}), s.p, by)
@@ -373,6 +382,38 @@ export function meterOf(agent: string, jsonl: string, m: Meter, now = Date.now()
       if (owns && !owns(answerKey(JSON.stringify(p)), at, m.model || 'unknown', p2)) continue // a fork's or spawned thread's copy of its parent's: its totals and limits as they were (its line's time is the copy's)
       add({ p: p2, day: at, model: m.model || 'unknown' })
     }
+  }
+  return m
+}
+
+// Pi's session file: each assistant message's usage (input, output, cacheRead, cacheWrite) as parts at Laki's prices by
+// its model, once by its entry's id and time (a /fork's or /clone's copy of it is the first chat's); the context its last
+// one filled (input and cache). ponytail: Pi's own cost (usage.cost) isn't read: Laki's table and your prices price it,
+// as claude's and codex's; its window comes from Laki's extension (meters.ts piCtx)
+function piMeter(jsonl: string, m: Meter, now: number, owns?: Owns): Meter {
+  for (const line of jsonl.split('\n')) {
+    if (!line.includes('"usage"') || !line.includes('"assistant"')) continue
+    type Usage = { input?: unknown; output?: unknown; cacheRead?: unknown; cacheWrite?: unknown }
+    let j: { type?: unknown; id?: unknown; timestamp?: unknown; message?: { role?: unknown; model?: unknown; usage?: Usage; timestamp?: unknown } }
+    try {
+      j = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const msg = j?.type === 'message' && j.message?.role === 'assistant' ? j.message : undefined
+    const u = msg?.usage
+    if (!msg || !u || typeof u !== 'object') continue
+    const model = String(msg.model || 'unknown')
+    const p = partsOf(model, { in: num(u.input), out: num(u.output), rd: num(u.cacheRead), w5: num(u.cacheWrite) })
+    if (!Object.keys(p).length) continue
+    const t = Date.parse(String(j.timestamp)) || num(msg.timestamp) || now
+    const day = dayOf(t)
+    if (owns && !owns(answerKey(`pi:${String(j.id)}:${t}`), day, model, p)) continue
+    m.tokens += partsTokens(p)
+    partsAdd((m.by[model] ??= {}), p)
+    partsAdd(((m.days ??= {})[day] ??= {})[model] ??= {}, p)
+    m.used = (num(u.input) ?? 0) + (num(u.cacheRead) ?? 0) + (num(u.cacheWrite) ?? 0)
+    m.model = model
   }
   return m
 }

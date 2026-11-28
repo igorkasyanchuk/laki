@@ -15,6 +15,7 @@ import { AGY, grokRoot, ocDb } from './agentUsage.ts'
 import { changed, log, state } from './core.ts'
 import { dir } from './dir.ts'
 import { daysWrite, ledger, USAGE_KEEP } from './meters.ts'
+import { piDir } from './share.ts'
 import type { FileState, ScanIn, ScanOut } from './usageScanWorker.ts'
 
 const scanPath = join(dir, 'usage-scan-v1.json')
@@ -63,7 +64,7 @@ export function usageScan(ask = false) {
   try {
     agyCwd = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(AGY(), 'cache', 'last_conversations.json'), 'utf8')) as Record<string, unknown>).flatMap(([cwd, id]) => (typeof id === 'string' ? [[id, cwd]] : [])))
   } catch {}
-  const input: ScanIn = { claude: roots('claude', 'projects'), codex: roots('codex', 'sessions'), grok: grokRoot(), agy, agyCwd, oc: ocDb(), files, since: Date.now() - USAGE_KEEP * 864e5 }
+  const input: ScanIn = { claude: roots('claude', 'projects'), codex: roots('codex', 'sessions'), pi: join(piDir({ ...process.env, ...state.settings?.env }), 'sessions'), grok: grokRoot(), agy, agyCwd, oc: ocDb(), files, since: Date.now() - USAGE_KEEP * 864e5 }
   const w = (worker = new Worker(file, { workerData: input, resourceLimits: { maxOldGenerationSizeMb: 512 } }))
   scanNow.running = true
   let saved = Date.now()

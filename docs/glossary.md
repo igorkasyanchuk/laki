@@ -18,7 +18,7 @@ out of Help and Settings.
 | **Extension** | a live page or button made of `widget.json` and its files; `laki ext` (= `laki widget`) | widget, plugin |
 | **Workflow** | a run of blocks (the Workflows page; `laki flow` is the CLI's short form) | Flow, Flows |
 | **Race** | one prompt to several agents, a worktree each (Compare); `--race` (= `--fan`) | fan, fan-out |
-| **Agent** | Claude Code, Codex, Antigravity, Grok, OpenCode | preset |
+| **Agent** | Claude Code, Codex, Antigravity, Grok, OpenCode, Pi | preset |
 | **Profile** | an agent with its args, env and model (Settings › Agents & profiles) | preset |
 | **Side panel** | the panel right of the panes (⌥⌘B): Info, Files, Changes, PR comments… | right panel, info panel |
 | **My Desk** | the page of extension tiles | the Desk |

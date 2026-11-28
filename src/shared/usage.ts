@@ -11,9 +11,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki limits [--agent claude] [--json]       how much of each agent's plan is used, and when it resets
   laki events [--json] [--ws <ref>]... [--type a,b] [--once] [--timeout <s>]   Laki's events as they happen, a line each (never starts Laki)
   laki project add <path|host:path> | ls | rm <id>   host:path: a folder over SSH (a ~/.ssh/config name or user@host)
-  laki new <project|.> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] (gemini: Antigravity CLI, agy) [--cmd c] [--prompt text] [--name n] [--local]
-            [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
-                                    opencode's: provider/model as \`opencode models\` lists it (an unknown one is refused)
+  laki new <project|.> [--base b] [--preset claude|codex|gemini|grok|opencode|pi|shell|none] (gemini: Antigravity CLI, agy) [--cmd c] [--prompt text] [--name n] [--local]
+            [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex), off…xhigh (pi: its thinking)]
+                                    opencode's: provider/model as \`opencode models\` lists it (an unknown one is refused); pi's: provider/id
             [--perm <mode>] [--fast]  its permission mode (auto, acceptEdits, plan, bypassPermissions: claude, codex) and fast mode;
                                     from an agent's tab, no --perm: the agent's own mode now (never one that never asks)
             [--sandbox|--no-sandbox]  the agent's own sandbox on or off over its profile's (claude, codex)

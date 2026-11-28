@@ -7,7 +7,8 @@
 // - Grok Build: its own, off by default (--sandbox workspace, GROK_SANDBOX, [sandbox] profile in ~/.grok/config.toml:
 //   Seatbelt on macOS); Laki doesn't turn it on (docs.x.ai/build/features/sandbox).
 // - OpenCode: none; permission rules only, its shell "runs with the host user's … authority" (opencode.ai/docs/permissions).
-// So the wrapper is for OpenCode, and Antigravity, Grok, Claude or Codex with their own off (one sandbox inside another:
+// - Pi: none, and no permission prompts (its README: "No permission popups"); every tool runs as you.
+// So the wrapper is for OpenCode and Pi, and Antigravity, Grok, Claude or Codex with their own off (one sandbox inside another:
 // sandbox-exec can't nest). Pure: the daemon (core.ts wrapCmd) realpaths every path first and passes them as -D
 // parameters: a path is never written into the profile's text
 import type { Agent } from './types.ts'
@@ -27,6 +28,7 @@ export const AGENT_WRITES: Record<Agent, string[]> = {
   gemini: ['.gemini'],
   grok: ['.grok'],
   opencode: ['.local/share/opencode', '.local/state/opencode', '.config/opencode', '.opencode'],
+  pi: ['.pi'], // its sessions, settings and sign-ins: ~/.pi/agent (PI_CODING_AGENT_DIR)
 }
 // what no wrapped agent reads: keys and tokens, the Keychains, every other agent's config
 export const SECRET_HOME = ['.ssh', '.aws', '.gnupg', '.config/gh', 'Library/Keychains']

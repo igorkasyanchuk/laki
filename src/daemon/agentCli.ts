@@ -19,6 +19,7 @@ export const CLIS: { id: string; name: string; cmd: string; npm?: string; self?:
   { id: 'gemini', name: AGENT_NAMES.gemini, cmd: 'agy', self: 'agy update' }, // Antigravity CLI: its install script's binary, not on npm (ponytail: no newest shown; agy update says)
   { id: 'grok', name: AGENT_NAMES.grok, cmd: 'grok' }, // ponytail: several CLIs carry the name: its package only from an npm install
   { id: 'opencode', name: AGENT_NAMES.opencode, cmd: 'opencode', npm: 'opencode-ai', self: 'opencode upgrade' },
+  { id: 'pi', name: AGENT_NAMES.pi, cmd: 'pi', npm: '@mariozechner/pi-coding-agent', self: 'pi update self' },
   { id: 'cursor', name: 'Cursor', cmd: 'cursor-agent', self: 'cursor-agent update' },
   { id: 'copilot', name: 'Copilot', cmd: 'copilot', npm: '@github/copilot', self: 'copilot update', ver: ['version'] }, // its docs name `copilot version`, not --version
 ]

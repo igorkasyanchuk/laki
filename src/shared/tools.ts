@@ -200,7 +200,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       {
         project: str('a project id, from laki_state'),
         prompt: str('what the agent should do, as for a new colleague: the goal, where to look, how to tell it is done'),
-        preset: str("claude (the default; a group's own agent when it has one), codex, gemini, grok, opencode, a preset of theirs, shell or none"),
+        preset: str("claude (the default; a group's own agent when it has one), codex, gemini, grok, opencode, pi, a preset of theirs, shell or none"),
         name: str('a short name for the workspace and its branch'),
         base: str('the branch to start from (default: the repo’s current one)'),
         local: { type: 'boolean', description: 'work in the project’s own folder instead of a new worktree' },
@@ -297,7 +297,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   {
     name: 'laki_new_tab',
     description: 'A new agent session (a tab) in a workspace that exists, in its folder, with a prompt: e.g. a codex review of what claude did there.',
-    inputSchema: obj({ ws: str('a workspace id'), preset: str("claude, codex, gemini, grok, opencode or a preset of theirs (default: the user's default agent)"), prompt: str('what it should do'), model: str("the agent's model (default: its own)"), name: str("the tab's name, 2-4 words of what it's for, e.g. codex review (default: the agent and the prompt's first words)"), ...PLACE }, ['ws', 'prompt']),
+    inputSchema: obj({ ws: str('a workspace id'), preset: str("claude, codex, gemini, grok, opencode, pi or a preset of theirs (default: the user's default agent)"), prompt: str('what it should do'), model: str("the agent's model (default: its own)"), name: str("the tab's name, 2-4 words of what it's for, e.g. codex review (default: the agent and the prompt's first words)"), ...PLACE }, ['ws', 'prompt']),
     run: async a => rpc('tabNew', { ws: a.ws, preset: a.preset || (await rpc<View>('state')).settings?.agent || 'claude', prompt: a.prompt, model: a.model, name: a.name || undefined, beside: a.beside || undefined, edge: a.edge, ...(from && { from }), agent: who ?? 'agent' }), // none: a shell; from an agent's: no command preset; every laki mcp caller is an agent (or Laki AI): its tab.new says so
   },
   {
@@ -411,7 +411,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
         project: str('a project id'),
         when: str('e.g. "weekdays at 9am", "every day at 2am except weekends", "every 2 hours from 9am to 6pm", "tomorrow at 7am"; several times with ";": "weekdays at 9am; fri at 4pm"'),
         prompt: str('what the agent should do each run; {{DD-MM-YY}}-style dates become the run’s'),
-        preset: str('claude (the default), codex, gemini, grok, opencode or a preset of theirs'),
+        preset: str('claude (the default), codex, gemini, grok, opencode, pi or a preset of theirs'),
         name: str('the task’s name, also each run’s workspace name; may hold {{DD-MM}}'),
         where: str('new (a new worktree each run), same (a worktree its first run makes, every run after there), local (the project folder, one session), local-new (the folder, a new session each run) or a workspace id'),
         fresh: { type: 'boolean', description: 'where same, local or a workspace id: each run starts a new agent tab there instead of telling the agent it has' },

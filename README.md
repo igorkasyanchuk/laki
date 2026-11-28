@@ -57,7 +57,7 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 | | Laki | Agents in terminal tabs (tmux, iTerm) |
 |---|---|---|
 | A git worktree per task | Made, set up and cleaned up for you | By hand (`git worktree add`) |
-| Any CLI agent | Claude Code, Codex, Antigravity, Grok, OpenCode, any command | Any |
+| Any CLI agent | Claude Code, Codex, Antigravity, Grok, OpenCode, Pi, any command | Any |
 | A second agent checks the work | Done check, as each turn ends | No |
 | Conflicts between parallel tasks | Collision radar, while they work | At merge |
 | What the agents cost | Every agent chat on this Mac, each answer once, at API prices; each plan's limits | Each agent's own `/usage` |

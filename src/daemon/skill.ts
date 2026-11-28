@@ -45,10 +45,10 @@ const MCP_FILE: Partial<Record<SkillAgent, string>> = { opencode: 'opencode.json
 
 // A2: the agents Laki tells at their start (core's agentCmd: --append-system-prompt, developer_instructions), so their
 // skill needn't load for Progress on tabs; the others' description still names $LAKI_PROGRESS
-const START_TOLD: SkillAgent[] = ['claude', 'codex']
+const START_TOLD: string[] = ['claude', 'codex', 'pi']
 
 // the files, as they'd be written now: the launcher holds this install's paths
-function files(at: string, k: SkillName, a: SkillAgent): Record<string, string> {
+function files(at: string, k: SkillName, a: SkillAgent | 'pi'): Record<string, string> {
   const cli = join(at, 'laki')
   const laki = `#!/bin/sh\n# the laki CLI, for agents (written by laki: Settings → Agent skill)\nexec /usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')} "$@"\n`
   if (k === 'laki-widget') return { laki, ...widgetSkill(cli, at) }
@@ -58,13 +58,13 @@ function files(at: string, k: SkillName, a: SkillAgent): Record<string, string> 
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Antigravity, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…), and show the user an important alert (a card on their screen over every app, with choices it waits for). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki${START_TOLD.includes(a) ? '' : ', and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work'}. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Antigravity, Grok, OpenCode, Pi) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…), and show the user an important alert (a card on their screen over every app, with choices it waits for). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki${START_TOLD.includes(a) ? '' : ', and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work'}. To make a Laki extension (a widget), use the laki-widget skill; to split work across several agents at once, the laki-orchestrate skill; to brainstorm with the user or write a spec, the laki-specs skill.
 ---
 
 # Laki
 
 Laki runs each task in a **workspace**: a git worktree on its own branch (\`laki/<id>\`), or the repo itself
-(\`--local\`), with tabs for agents (claude, codex, gemini: Antigravity CLI, grok, opencode), shells and a dev server. A **project** is a repo (or a
+(\`--local\`), with tabs for agents (claude, codex, gemini: Antigravity CLI, grok, opencode, pi), shells and a dev server. A **project** is a repo (or a
 folder) added to Laki; \`Terminals\` and \`Browsers\` (\`kind\` shells or browsers in \`ls --json\`) are the user's own terminals and web pages,
 not for new workspaces. The app shows all of it live; the CLI drives the same daemon.
 
@@ -595,6 +595,7 @@ export const skills = () => SKILLS.flatMap(k => (Object.keys(AGENTS) as SkillAge
 // as the daemon starts: an installed skill that's out of date (a Laki update changed it) is written again; never one
 // that isn't there, nor one whose launcher drives another data dir's daemon (another Laki, LAKI_HOME=…)
 export function refreshSkills() {
+  piSkills()
   const ours = q(`LAKI_HOME=${dir}`)
   const launcher = (at: string) => (existsSync(join(at, 'laki')) ? readFileSync(join(at, 'laki'), 'utf8') : '')
   for (const r of skills()) if (r.state === 'outdated' && launcher(r.path).includes(` ${ours} `)) skillSet({ agent: r.agent, on: true, skill: r.skill })
@@ -608,6 +609,24 @@ export function refreshSkills() {
       if (!readdirSync(old).length) rmdirSync(old)
     } catch (e) {
       log(`skills: ${old} not moved to agy's folder: ${(e as Error).message}`)
+    }
+  }
+}
+
+// Pi's: Laki's skills in its data folder (<data>/pi/skills/<name>), written as they change (as the daemon starts), each
+// given to a Pi tab by --skill (core's agentCmd). Never ~/.pi (flags only) nor ~/.agents/skills, which Pi reads but Codex
+// does too (two of each there). ponytail: a pi run outside Laki doesn't get them
+export function piSkills() {
+  for (const k of SKILLS) {
+    const at = join(dir, 'pi', 'skills', k)
+    const fs = files(at, k, 'pi')
+    if (Object.entries(fs).every(([f, t]) => existsSync(join(at, f)) && readFileSync(join(at, f), 'utf8') === t)) continue
+    try {
+      mkdirSync(at, { recursive: true, mode: 0o700 })
+      for (const [f, t] of Object.entries(fs)) writeFileSync(join(at, f), t)
+      chmodSync(join(at, 'laki'), 0o755)
+    } catch (e) {
+      log(`skills: ${at}: ${(e as Error).message}`)
     }
   }
 }

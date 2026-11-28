@@ -12,7 +12,7 @@ import { accountNamed, homeDir } from './accounts.ts'
 import { changed, chatFile, findWs, keptChat, keptOnly, openPath, presetOf, state } from './core.ts'
 import { type Spend, type SpendEntry, spendBreakdown, spendEntries } from '../shared/spend.ts'
 import { dir } from './dir.ts'
-import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, daysRows, isOld, type McpCall, type Meter, meterCost, meterNew, meterOf, num, type Owns, type Row, rowCost, rowTokens, partsMax, type Said, transcriptOf, type UseRec } from './share.ts'
+import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, daysRows, isOld, type McpCall, type Meter, meterCost, meterNew, meterOf, num, type Owns, type Row, rowCost, rowTokens, partsMax, piDir, type Said, transcriptOf, type UseRec } from './share.ts'
 export type { McpCall }
 import { claudeWindows } from './usage.ts'
 import { acpChat } from './acp.ts'
@@ -27,7 +27,7 @@ const SHARE_READ = 32 << 20 // a transcript's most read at once: a longer one st
 // (this chat's file found, or written anew)
 export function tailOf(tab: Tab, t: Tail, fresh: (was?: true) => void): string | undefined { // was: the file before was Laki's copy
   const agent = tab.preset
-  if ((agent !== 'claude' && agent !== 'codex') || !tab.resumeId || state.workspaces.find(w => w.id === tab.workspace)?.host) return
+  if ((agent !== 'claude' && agent !== 'codex' && agent !== 'pi') || !tab.resumeId || state.workspaces.find(w => w.id === tab.workspace)?.host) return
   // a chat's looked for again every 10 s at most (codex's: a walk of every session, here on the daemon's thread), every 2
   // minutes once it's been missing for one (a chat gone, another account's folder): a new chat's is written at its first
   // turn, whose end looks again at once (meterRead's look)
@@ -37,7 +37,7 @@ export function tailOf(tab: Tab, t: Tail, fresh: (was?: true) => void): string |
   if (t.file && !existsSync(t.file)) (t.file = undefined), (t.looked = 0) // gone (an agent deleted its old chat): looked for at once, Laki's copy if it kept one
   if ((!ours(t.file) || t.kept) && now - (t.looked ?? 0) > (now - t.since! < 60000 ? 10000 : 120000)) {
     t.looked = now
-    const c = chatFile(tab) // reading a copy: the agent's own may come back (a restore's)
+    const c = agent === 'pi' ? piChat(tab) : chatFile(tab) // reading a copy: the agent's own may come back (a restore's)
     if (c?.file !== t.file || !ours(t.file)) {
       const was = t.kept
       ;(t.file = c?.file), (t.kept = c?.kept), (t.pos = 0), fresh(was)
@@ -211,6 +211,10 @@ function todayFlush() {
   writeAtomic(todayPath, JSON.stringify(s))
 }
 // true: it read something new
+// a pi tab's session file: where its agent folder keeps it (the tab's env's PI_CODING_AGENT_DIR: Settings', its profile's)
+const piChat = (tab: Tab): { file: string; kept?: true } | undefined => (f => (f ? { file: f } : undefined))(transcriptOf('pi', piDir({ ...process.env, ...state.settings?.env, ...presetOf(tab)?.env }), tab.resumeId!))
+// a pi tab's context window, as Laki's extension said it at its last turn's end (core's hook: Pi's session file doesn't)
+export const piCtx = new Map<string, number>()
 export function meterRead(tab: Tab, look = false) { // look: a turn's end, its transcript looked for now
   const r: MeterRun = meters.get(tab.id) ?? { m: meterNew(), bg: bgDone(), subs: new Map(), keyFile: new Map() }
   meters.set(tab.id, r)
@@ -555,9 +559,10 @@ export function meterTick() {
   if (state.settings?.contextMeter === false && state.settings?.costs === false) return
   let any = false
   const archived = new Set(state.workspaces.filter(w => w.archived).map(w => w.id)) // nothing to read until it's back
-  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex') && !archived.has(t.workspace)) any = meterRead(t) || any
+  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex' || t.preset === 'pi') && !archived.has(t.workspace)) any = meterRead(t) || any
   for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'grok' || t.preset === 'gemini' || t.preset === 'opencode') && !archived.has(t.workspace)) any = otherRead(t) || any
   for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id)
+  for (const id of piCtx.keys()) if (!state.tabs.some(t => t.id === id)) piCtx.delete(id)
   agentDaysTidy(id => state.tabs.some(t => t.id === id)) // grok's and agy's, closed
   for (const id of lines.keys()) if (!state.tabs.some(t => t.id === id)) lines.delete(id)
   if (any) changed()
@@ -605,7 +610,7 @@ export function meterView(t: Tab): Pick<TabView, 'context' | 'usage' | 'plan' | 
   const pr = t.preset === 'claude' ? presetOf(t) : undefined
   const said = t.model || pr?.model || (/--model\b/.test(pr?.args ?? '') ? pr!.args : '') // a model the tab or its profile names wins over claude's settings
   // the window claude said (the chat's, kept once the line is old), else a guess
-  const max = s?.max ?? m?.max ?? (t.preset === 'claude' ? ((said ? /\[1m\]/i.test(said) : r?.big) || (m?.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
+  const max = s?.max ?? m?.max ?? (t.preset === 'pi' ? piCtx.get(t.id) : undefined) ?? (t.preset === 'claude' ? ((said ? /\[1m\]/i.test(said) : r?.big) || (m?.used ?? 0) > WINDOW ? 1e6 : WINDOW) : undefined)
   const live = s && Date.now() - s.mtime < STATUS_FRESH ? (s.used ?? (s.pct !== undefined && max ? Math.round((s.pct * max) / 100) : undefined)) : undefined
   const used = live ?? m?.used
   const bg = m && r!.bg

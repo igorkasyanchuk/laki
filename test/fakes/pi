@@ -1,0 +1,66 @@
+#!/usr/bin/env node
+// fake pi: records its args, loads the extensions -e names (their default factory, with a pi of its own: on(event,
+// handler)) and sends them a session's events as the real one does: session_start, then per prompt agent_start and
+// agent_end with its messages; each answer a line of its session file (<agent dir>/sessions/--<cwd>--/<time>_<id>.jsonl,
+// the real one's shape) with its usage. A prompt with "limit" fails (an API error), Esc ends a slow one (aborted)
+const fs = require('fs'), path = require('path'), { pathToFileURL } = require('url'), { randomUUID } = require('crypto')
+const args = process.argv.slice(2)
+const VALUED = new Set(['-e', '--extension', '--session', '--append-system-prompt', '--skill', '--model', '--thinking', '--provider', '--fork', '--session-dir', '--mode'])
+const flags = {}
+const messages = []
+for (let i = 0; i < args.length; i++) {
+  const a = args[i]
+  if (VALUED.has(a)) (flags[a] ??= []).push(args[++i])
+  else if (a.startsWith('-')) flags[a] = [true]
+  else messages.push(a)
+}
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'pi', tab: process.env.LAKI_TAB, args, messages }) + '\n')
+if (args[0] === '--version') process.stdout.write('0.73.1\n'), process.exit(0)
+const asked = flags['--session']?.[0]
+if (asked?.startsWith('gone-')) process.stdout.write(`Error: No session found matching '${asked}'\r\n`), process.exit(1)
+const id = asked ?? randomUUID()
+const agentDir = process.env.PI_CODING_AGENT_DIR || path.join(process.env.HOME, '.pi', 'agent')
+const sessions = path.join(agentDir, 'sessions', `--${process.cwd().replace(/^\//, '').replace(/\//g, '-')}--`)
+const old = fs.existsSync(sessions) ? fs.readdirSync(sessions).find(f => f.endsWith(`_${id}.jsonl`)) : undefined
+const file = path.join(sessions, old ?? `${new Date().toISOString().replace(/[:.]/g, '-')}_${id}.jsonl`)
+const line = o => (fs.mkdirSync(sessions, { recursive: true }), fs.appendFileSync(file, JSON.stringify(o) + '\n'))
+if (!old) line({ type: 'session', version: 3, id, timestamp: new Date().toISOString(), cwd: process.cwd() })
+const model = (flags['--model']?.[0] ?? 'claude-sonnet-4-5').replace(/^anthropic\//, '')
+;(async () => {
+  const handlers = {}
+  const pi = { on: (e, h) => (handlers[e] ??= []).push(h) }
+  for (const f of flags['-e'] ?? []) await (await import(pathToFileURL(f).href)).default(pi)
+  let used = 0
+  const ctx = { sessionManager: { getSessionId: () => id, getSessionFile: () => file }, getContextUsage: () => ({ tokens: used, contextWindow: 200000, percent: (used / 200000) * 100 }) }
+  const emit = (e, ev = {}) => (handlers[e] ?? []).forEach(h => h(ev, ctx))
+  process.stdout.write(`\x1b[?2004hfake pi ${args.join(' ')}\r\n`)
+  emit('session_start', { reason: asked ? 'resume' : 'startup' })
+  let busy
+  const turn = t => {
+    emit('agent_start')
+    process.stdout.write('Working... (esc to interrupt)\r\n')
+    const end = (stopReason, text, errorMessage) => {
+      busy = undefined
+      const usage = { input: 1000 + t.length, output: 50, cacheRead: 200, cacheWrite: 10, totalTokens: 1260 + t.length, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.01 } }
+      const message = { role: 'assistant', content: text ? [{ type: 'text', text }] : [], api: 'anthropic-messages', provider: 'anthropic', model, usage, stopReason, ...(errorMessage && { errorMessage }), timestamp: Date.now() }
+      if (stopReason !== 'aborted') (line({ type: 'message', id: randomUUID().slice(0, 8), parentId: null, timestamp: new Date().toISOString(), message }), (used = usage.input + usage.cacheRead + usage.cacheWrite))
+      if (text) process.stdout.write(`${text}\r\n`)
+      process.stdout.write('> ')
+      emit('agent_end', { messages: [{ role: 'user', content: t }, message] })
+    }
+    if (t.includes('limit')) return end('error', '', "You've hit your usage limit. Try again in 2 hours.")
+    busy = setTimeout(() => end('stop', `answer: ${t.trim()}`), t.startsWith('slow') ? 5000 : 300)
+  }
+  process.stdin.setRawMode(true) // before its banner: keys sent once it shows are read raw
+  if (messages.length) turn(messages.join('\n'))
+  else process.stdout.write('> ')
+  let typed = ''
+  process.stdin.on('data', d => {
+    for (const ch of d.toString().replace(/\x1b\[20[01]~/g, '')) {
+      if (ch === '\x1b' && busy) clearTimeout(busy), (busy = undefined), process.stdout.write('Operation aborted\r\n> '), emit('agent_end', { messages: [{ role: 'assistant', content: [], stopReason: 'aborted' }] })
+      else if (ch === '\r') { process.stdout.write('\r\n'); const t = typed; typed = ''; if (t === 'exit') process.exit(0); turn(t) }
+      else if (ch === '\x03') process.exit(130)
+      else if (ch !== '\x1b') { typed += ch; process.stdout.write(ch) }
+    }
+  })
+})()

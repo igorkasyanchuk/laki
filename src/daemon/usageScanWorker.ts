@@ -5,6 +5,7 @@
 // does nothing but export scan.
 // - Claude: <config>/projects/<folder>/<session>.jsonl and <session>/subagents/*.jsonl (the session's: its chat).
 // - Codex: <home>/sessions/**/rollout-*.jsonl, its chat the session_meta id, a spawned thread's its root parent's.
+// - Pi: <its agent folder>/sessions/--<folder>--/<time>_<session>.jsonl, its chat the session id (share.ts piDir).
 // - Grok: ~/.grok/sessions/<its folder, encoded>/<id>/usage.json, whole. Antigravity: each conversations/<id>.db, OpenCode:
 //   its opencode.db, only the rows past the last one counted (agentUsage.ts agyRead, ocRead).
 // Each file's { size, mtime, ctime, ino, pos } (usage-scan-v1.json): unchanged, skipped; the same inode and bigger, read on
@@ -22,7 +23,7 @@ import { meterNew, meterOf, type UseRec } from './share.ts'
 // rollout's session_meta (its thread, the one that spawned it); total, model: a codex rollout's running totals and model
 // at pos (its next token_count counts what grew since)
 export type FileState = { size: number; mtime: number; ctime: number; ino: number; pos: number; chat?: string; cwd?: string; id?: string; parent?: string; total?: Record<string, number>; model?: string }
-export type ScanIn = { claude: string[]; codex: string[]; grok?: string; agy?: string; agyCwd?: Record<string, string>; oc?: string; files: Record<string, FileState>; since: number; rate?: number }
+export type ScanIn = { claude: string[]; codex: string[]; pi?: string; grok?: string; agy?: string; agyCwd?: Record<string, string>; oc?: string; files: Record<string, FileState>; since: number; rate?: number }
 export type ScanOut = { recs: UseRec[]; files: Record<string, FileState | null> } // null: gone (not seen this scan)
 export const RATE = 32 << 20 // bytes a second, on average
 const BATCH = 4
@@ -45,7 +46,7 @@ export function budgetOf(rate = RATE): Budget {
   }
 }
 
-type Job = { file: string; agent: 'claude' | 'codex' | 'grok' | 'gemini' | 'opencode'; chat?: string; cwd?: string }
+type Job = { file: string; agent: 'claude' | 'codex' | 'pi' | 'grok' | 'gemini' | 'opencode'; chat?: string; cwd?: string }
 const ls = async (d: string) => readdir(d, { withFileTypes: true }).catch(() => [])
 const real = new Map<string, string>()
 // a folder resolved (/tmp: /private/tmp); one gone since, its nearest folder that's still there and the rest as said
@@ -97,6 +98,9 @@ async function jobs(i: ScanIn): Promise<Job[]> {
     await walk(join(root, 'sessions'), 0)
     out.splice(at, out.length - at, ...out.slice(at).sort((a, b) => (a.file < b.file ? -1 : 1))) // by name (its time): a thread before the ones it spawned
   }
+  if (i.pi)
+    for (const d of await ls(i.pi))
+      if (d.isDirectory()) for (const e of await ls(join(i.pi, d.name))) if (e.isFile() && /_[\w-]+\.jsonl$/.test(e.name)) out.push({ file: join(i.pi, d.name, e.name), agent: 'pi', chat: e.name.slice(e.name.lastIndexOf('_') + 1, -6) })
   if (i.grok)
     for (const d of await ls(i.grok)) {
       if (!d.isDirectory()) continue
@@ -120,7 +124,7 @@ async function statOf(j: Job) {
   return { size: s.size + (w?.size ?? 0), mtime: Math.max(s.mtimeMs, w?.mtimeMs ?? 0), ctime: Math.max(s.ctimeMs, w?.ctimeMs ?? 0), ino: s.ino }
 }
 
-// a claude or codex transcript from pos on, whole lines, through share.ts' meterOf (each answer's key and parts as the
+// a claude, codex or pi transcript from pos on, whole lines, through share.ts' meterOf (each answer's key and parts as the
 // tab's meter has them), its records onto out
 async function jsonl(j: Job, st: { size: number }, from: number, was: FileState | undefined, budget: Budget, out: UseRec[]): Promise<Partial<FileState>> {
   const fh = await open(j.file, 'r')
@@ -205,7 +209,7 @@ export async function scan(i: ScanIn, post: (o: ScanOut) => void | Promise<void>
         const mine: UseRec[] = []
         let got: Partial<FileState> | undefined
         try {
-          if (j.agent === 'claude' || j.agent === 'codex') got = await jsonl(j, st, from, on ? was : undefined, budget, mine)
+          if (j.agent === 'claude' || j.agent === 'codex' || j.agent === 'pi') got = await jsonl(j, st, from, on ? was : undefined, budget, mine)
           else if (j.agent === 'grok') {
             await budget.take(st.size)
             if (st.size < 8 << 20) mine.push(...grokParse(await readFile(j.file, 'utf8'), j.chat!, j.cwd))

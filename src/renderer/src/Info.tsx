@@ -543,8 +543,8 @@ export function InfoTab(p: {
   onUnrelate?: (url: string) => void // off the related list
   onDetach?: () => void // its PR, only linked, to related
   onLabel?: LabelApi // its PR's labels
-  sees?: ('claude' | 'codex')[] // F6: its agents' What it sees (their rules and MCP servers)
-  onSees?: (agent: 'claude' | 'codex') => void
+  sees?: ('claude' | 'codex' | 'pi')[] // F6: its agents' What it sees (their rules and MCP servers)
+  onSees?: (agent: 'claude' | 'codex' | 'pi') => void
   agentLog?: () => Promise<AgentDid[]> // What its agents did (agentLog), newest first
   spend?: () => Promise<SpendView> // Where it went (wsSpend): its tokens by source
   tabName?: (id: string) => string
