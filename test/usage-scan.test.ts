@@ -86,7 +86,7 @@ test('scan: a pi session counts each answer once by its entry, a /fork\'s copy o
   write(join(d, `2026-11-28T09-59-00-000Z_${id}.jsonl`), head(id) + msg('aaaa0001', 1000) + line({ type: 'message', id: 'u1', message: { role: 'user', content: 'usage of "assistant"' } }))
   write(join(d, `2026-11-28T10-30-00-000Z_${fork}.jsonl`), head(fork) + msg('aaaa0001', 1000) + msg('bbbb0002', 7))
   const outs: ScanOut[] = []
-  await scan({ claude: [], codex: [], pi: join(home, '.pi/agent/sessions'), files: {}, since: Date.now() - 90 * 864e5, rate: 1e12 }, o => void outs.push(o))
+  await scan({ claude: [], codex: [], pi: [join(home, '.pi/agent/sessions')], files: {}, since: Date.now() - 90 * 864e5, rate: 1e12 }, o => void outs.push(o))
   const recs = outs.flatMap(o => o.recs)
   assert.deepEqual(recs.map(r => [r.chat, r.p?.in, r.p?.rd]).sort(), [[id, 1000, 100], [fork, 1000, 100], [fork, 7, 100]].sort(), 'every answer read; the ledger keeps the copy for the first chat (the same key)')
   assert.equal(new Set(recs.filter(r => r.p?.in === 1000).map(r => r.key)).size, 1, 'one key for the answer and its copy')

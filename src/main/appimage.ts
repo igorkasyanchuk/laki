@@ -27,6 +27,8 @@ export function appImageOf(env: Record<string, string | undefined> = process.env
 }
 const partOf = (f: string) => join(dirname(f), `.${basename(f)}.download`)
 export const previousOf = (f: string) => `${f}.previous`
+// as Laki starts: a download a quit cut short (Restart to update's lives in memory only, so one left is unused)
+export const appImageTidy = (f: string) => rmSync(partOf(f), { force: true })
 // the kept one's version (<keptFile>: written as it's swapped out), while its file is there
 export function keptOf(f: string, keptFile: string): Kept | undefined {
   try {

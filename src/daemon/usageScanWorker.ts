@@ -23,7 +23,7 @@ import { meterNew, meterOf, type UseRec } from './share.ts'
 // rollout's session_meta (its thread, the one that spawned it); total, model: a codex rollout's running totals and model
 // at pos (its next token_count counts what grew since)
 export type FileState = { size: number; mtime: number; ctime: number; ino: number; pos: number; chat?: string; cwd?: string; id?: string; parent?: string; total?: Record<string, number>; model?: string }
-export type ScanIn = { claude: string[]; codex: string[]; pi?: string; grok?: string; agy?: string; agyCwd?: Record<string, string>; oc?: string; files: Record<string, FileState>; since: number; rate?: number }
+export type ScanIn = { claude: string[]; codex: string[]; pi?: string[]; grok?: string; agy?: string; agyCwd?: Record<string, string>; oc?: string; files: Record<string, FileState>; since: number; rate?: number }
 export type ScanOut = { recs: UseRec[]; files: Record<string, FileState | null> } // null: gone (not seen this scan)
 export const RATE = 32 << 20 // bytes a second, on average
 const BATCH = 4
@@ -98,9 +98,9 @@ async function jobs(i: ScanIn): Promise<Job[]> {
     await walk(join(root, 'sessions'), 0)
     out.splice(at, out.length - at, ...out.slice(at).sort((a, b) => (a.file < b.file ? -1 : 1))) // by name (its time): a thread before the ones it spawned
   }
-  if (i.pi)
-    for (const d of await ls(i.pi))
-      if (d.isDirectory()) for (const e of await ls(join(i.pi, d.name))) if (e.isFile() && /_[\w-]+\.jsonl$/.test(e.name)) out.push({ file: join(i.pi, d.name, e.name), agent: 'pi', chat: e.name.slice(e.name.lastIndexOf('_') + 1, -6) })
+  for (const root of i.pi ?? [])
+    for (const d of await ls(root))
+      if (d.isDirectory()) for (const e of await ls(join(root, d.name))) if (e.isFile() && /_[\w-]+\.jsonl$/.test(e.name)) out.push({ file: join(root, d.name, e.name), agent: 'pi', chat: e.name.slice(e.name.lastIndexOf('_') + 1, -6) })
   if (i.grok)
     for (const d of await ls(i.grok)) {
       if (!d.isDirectory()) continue

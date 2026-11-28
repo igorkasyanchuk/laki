@@ -8,7 +8,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { appImageBack, appImageGet, appImageOf, appImageSwap, keptOf, previousOf } from '../src/main/appimage.ts'
+import { appImageBack, appImageGet, appImageOf, appImageSwap, appImageTidy, keptOf, previousOf } from '../src/main/appimage.ts'
 import { STATE_V } from '../src/shared/update.ts'
 
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex')
@@ -74,4 +74,14 @@ test("appimage: only an AppImage on Linux it may write, in a folder it may write
   chmodSync(f, 0o644)
   chmodSync(d, 0o555)
   assert.equal(appImageOf({ APPIMAGE: f }, 'linux'), undefined, 'a folder it may not write')
+})
+
+test('appimage: a download a quit cut short goes as Laki starts; the AppImage and its kept one stay', () => {
+  const d = mkdtempSync(join(tmpdir(), 'laki-ai-'))
+  const f = join(d, 'Laki.AppImage')
+  for (const n of ['Laki.AppImage', 'Laki.AppImage.previous', '.Laki.AppImage.download']) writeFileSync(join(d, n), n)
+  appImageTidy(f)
+  assert.deepEqual(readdirSync(d).sort(), ['Laki.AppImage', 'Laki.AppImage.previous'])
+  appImageTidy(f) // none: nothing
+  rmSync(d, { recursive: true, force: true })
 })

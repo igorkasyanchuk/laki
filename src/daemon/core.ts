@@ -43,7 +43,7 @@ import { pictureIn } from './picture.ts'
 import { clientName } from './clients.ts'
 import * as agentCliMod from './agentCli.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, claudeVersion, effortsSaid, homeDir, loginCmd, modelNeedsView, modelRefused } from './accounts.ts'
-import { findSecrets, redact, transcriptOf } from './share.ts'
+import { findSecrets, piDir, redact, transcriptOf } from './share.ts'
 import { agentLogDrop } from './agentLog.ts'
 import { envJson, envRestore, envRetry, envScrub, envStash, envUnread } from './envKeys.ts'
 import { keysWhere, onKeys } from './keychain.ts'
@@ -2379,7 +2379,7 @@ function wrapCmd(tab: Tab, line: string, env: Record<string, string>): { cmd: st
     home: realOf(homedir()),
     gitDirs: gitWrites(ws.path, true).map(realOf), // the files git commit writes, never a worktree's whole git folder (its config.worktree: a program Laki's own git runs)
     tmp: [realOf('/tmp'), dirname(realOf(tmpdir()))],
-    write: [...(ws.storage ? [realOf(ws.storage)] : []), ...(tab.preset === 'claude' ? [realOf(statusDir)] : []), ...(account ? [realOf(account)] : [])],
+    write: [...(ws.storage ? [realOf(ws.storage)] : []), ...(tab.preset === 'claude' ? [realOf(statusDir)] : []), ...(account ? [realOf(account)] : []), ...(tab.preset === 'pi' && env.PI_CODING_AGENT_DIR ? [realOf(piDir(env))] : [])], // Pi's agent folder where its profile or Settings put it (~/.pi's: AGENT_WRITES)
     data: realOf(dir), // S6: the whole folder, never a list of its secrets (one added later: trusted clients' tokens)
     allowRead: [...wrapReads(), join(dir, 'mcp', `${tab.id}.json`), ...(account ? [account] : []), ...(p => (p ? [p.path] : []))(state.projects.find(p => p.id === ws.project))].map(realOf), // its project's checkout: a repo in the data folder (the sample) has its git config there; its own --mcp-config (mcpFile)
     net: presetOf(tab)?.net,

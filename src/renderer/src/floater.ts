@@ -785,8 +785,10 @@ function talkPage() {
   let closeLate = false // a conversation's end said first: the pill goes a moment later
   let lateT: ReturnType<typeof setTimeout> | undefined
   let mic = false // a conversation's: listening (or opening the mic), so its speech's end doesn't start another
+  let afterT: ReturnType<typeof setTimeout> | undefined
   const close = () => {
     convo = undefined
+    clearTimeout(afterT)
     if (!closeLate) return bridge?.talkClose()
     closeLate = false
     lateT = setTimeout(() => bridge?.talkClose(), 1800)
@@ -802,7 +804,7 @@ function talkPage() {
   let smokeRun = false
   const heardEl = box.querySelector<HTMLElement>('.t-heard')!
   const CONVO_HINT = 'Listening · the key, Esc or “stop” ends it'
-  const after = (ms: number) => setTimeout(() => (convo ? next() : close()), ms) // a conversation goes on; a single message's pill goes
+  const after = (ms: number) => (clearTimeout(afterT), (afterT = setTimeout(() => (convo ? next() : close()), ms))) // a conversation goes on; a single message's pill goes
   const listenNow = () => {
     if (mic || !convo) return
     mic = true
@@ -890,7 +892,7 @@ function talkPage() {
   const show = () => (toEl.textContent = `${convo ? `Conversation${convo.turns ? ` · ${convo.turns}` : ''} ` : ''}→ ${to ? talkName(list, to, cfg?.projects.find(p => p.id === toProject)?.name) : toProject ? `new task in ${cfg?.projects.find(p => p.id === toProject)?.name ?? toProject}` : 'new task'}`)
   const HINT = 'The key again or ⏎ sends · Tab: who gets it · Esc drops it'
   // Answer cards: the words went to the newest ask card; any key (Esc too) or the talk key stops its answer
-  const cardStop = () => (cardT ? (clearTimeout(cardT), (cardT = undefined), bridge?.talkCardStop?.(), say('Not answered'), setTimeout(close, 1000)) : close())
+  const cardStop = () => (cardT ? (clearTimeout(cardT), (cardT = undefined), bridge?.talkCardStop?.(), say('Not answered'), after(1000)) : convo ? endConvo() : close())
   document.addEventListener('keydown', e => {
     if (phase === 'card') return void (e.preventDefault(), cardStop())
     if (e.metaKey || e.ctrlKey) return
@@ -915,7 +917,7 @@ function talkPage() {
     if (e.key === 'Enter' && phase === 'rec') e.preventDefault(), stopRec?.(true)
     else if (e.key === 'Enter' && phase === 'route' && routed) e.preventDefault(), clearTimeout(routed.t), void send(routed.text) // now
   })
-  bridge?.onTalkKey(() => (convo && !(phase === 'answer' && asking) ? (routed && clearTimeout(routed.t), endConvo()) : phase === 'card' ? cardStop() : phase === 'speak' ? hush() : phase === 'answer' && asking ? (clearTimeout(asking.t), asking.go()) : phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
+  bridge?.onTalkKey(() => (phase === 'card' ? cardStop() : convo && !(phase === 'answer' && asking) ? (routed && clearTimeout(routed.t), endConvo()) : phase === 'speak' ? hush() : phase === 'answer' && asking ? (clearTimeout(asking.t), asking.go()) : phase === 'rec' ? stopRec?.(true) : phase === 'route' && routed ? (clearTimeout(routed.t), void send(routed.text)) : phase === 'sent' || phase === 'wait' ? close() : undefined))
   undo.onclick = async () => {
     undo.disabled = true
     const r = await bridge?.talkUndo()
@@ -967,6 +969,7 @@ function talkPage() {
     box.classList.add('rec')
     if (!over) say(convo ? CONVO_HINT : HINT)
     let ep: Ep = {}
+    let spoke: number | undefined // a conversation's: where this utterance's speech began (the silence before it isn't sent)
     const ctx = stream && new AudioContext()
     const an = ctx?.createAnalyser()
     if (an && ctx && stream) (an.fftSize = 512), ctx.createMediaStreamSource(stream).connect(an)
@@ -981,7 +984,11 @@ function talkPage() {
       const l = levelOf(buf)
       level.style.width = `${l * 100}%`
       if (l >= FLAT) loud = Date.now()
-      if (convo) return convoTick(ep = convoEp(ep, l))
+      if (convo) {
+        if (ep.from !== undefined) spoke = ep.from
+        ep = convoEp(ep, l)
+        return convoTick(ep)
+      }
       const q = phase === 'rec' && Date.now() - loud >= QUIET_MS
       if (q !== deaf) (deaf = q), say(q ? quietSay(device) : HINT, q)
     }, 60)
@@ -1003,7 +1010,7 @@ function talkPage() {
         level.style.width = '0'
         if (!send) return convo ? next() : close()
         if (Date.now() - at < VOICE_SHORT_MS && !convo) return void (say('Too short: say it, then press the key again', true), setTimeout(close, 1500))
-        void heard(smoke ? 'smoke test' : undefined, r && new Blob(chunks, { type: r.mimeType }))
+        void heard(smoke ? 'smoke test' : undefined, r && new Blob(chunks, { type: r.mimeType }), spoke === undefined ? 0 : Math.max(0, spoke - at - 400))
       }
       if (r && r.state !== 'inactive') (r.onstop = done), r.stop()
       else done()
@@ -1061,14 +1068,15 @@ function talkPage() {
       bridge?.talkListenStop(true)
     }
   }
-  async function heard(given?: string, audio?: Blob | null) {
+  async function heard(given?: string, audio?: Blob | null, skip = 0) { // skip: ms of the recording before its speech
     phase = 'writing'
     say('Writing it down…')
     let text = given ?? ''
     if (!given && audio) {
       try {
         const b = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(await audio.arrayBuffer())
-        const w = await bridge?.talkText(base64(wavOf(b.getChannelData(0), 16000)))
+        const pcm = b.getChannelData(0)
+        const w = await bridge?.talkText(base64(wavOf(pcm.subarray(Math.min(pcm.length, Math.floor((skip / 1000) * 16000))), 16000))) // billed by the second: not the wait before it
         if (w?.error) return void ((convo = undefined), say(w.error, true), setTimeout(close, 4000))
         text = w?.text?.trim() ?? ''
       } catch (e) {

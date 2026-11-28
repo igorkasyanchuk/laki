@@ -12,7 +12,7 @@ import { Worker } from 'node:worker_threads'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { accounts, homeDir } from './accounts.ts'
 import { AGY, grokRoot, ocDb } from './agentUsage.ts'
-import { changed, log, state } from './core.ts'
+import { changed, log, presets, state } from './core.ts'
 import { dir } from './dir.ts'
 import { daysWrite, ledger, USAGE_KEEP } from './meters.ts'
 import { piDir } from './share.ts'
@@ -64,7 +64,8 @@ export function usageScan(ask = false) {
   try {
     agyCwd = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(AGY(), 'cache', 'last_conversations.json'), 'utf8')) as Record<string, unknown>).flatMap(([cwd, id]) => (typeof id === 'string' ? [[id, cwd]] : [])))
   } catch {}
-  const input: ScanIn = { claude: roots('claude', 'projects'), codex: roots('codex', 'sessions'), pi: join(piDir({ ...process.env, ...state.settings?.env }), 'sessions'), grok: grokRoot(), agy, agyCwd, oc: ocDb(), files, since: Date.now() - USAGE_KEEP * 864e5 }
+  // pi: Settings' agent folder (PI_CODING_AGENT_DIR, else ~/.pi/agent) and each Pi profile's
+  const input: ScanIn = { claude: roots('claude', 'projects'), codex: roots('codex', 'sessions'), pi: [...new Set([undefined, ...presets().filter(p => p.agent === 'pi').map(p => p.env)].map(e => join(piDir({ ...process.env, ...state.settings?.env, ...e }), 'sessions')))], grok: grokRoot(), agy, agyCwd, oc: ocDb(), files, since: Date.now() - USAGE_KEEP * 864e5 }
   const w = (worker = new Worker(file, { workerData: input, resourceLimits: { maxOldGenerationSizeMb: 512 } }))
   scanNow.running = true
   let saved = Date.now()

@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { backOf, feedName, RELEASES, type Release, releaseOf, UPDATE_EVERY, type UpdateState, verdict } from '../shared/update.ts'
-import { appImageBack, appImageGet, appImageOf, appImageSwap, backWhy, keptOf } from './appimage.ts'
+import { appImageBack, appImageGet, appImageOf, appImageSwap, appImageTidy, backWhy, keptOf } from './appimage.ts'
 import { goBack, keepNow, keepWait, kept as keptBack, refused } from './back.ts'
 
 const linux = process.platform === 'linux'
@@ -43,6 +43,7 @@ export function updater(send: (s: UpdateState) => void) {
   const set = (next: Partial<UpdateState>) => send((s = { ...s, found: undefined, ...next }))
   const known = (linux ? Promise.resolve(!!appImage()) : signed()).then(install => void (s.install = install))
   let part: string | undefined // Linux: the checked download, until Restart to update
+  if (linux) (f => f && appImageTidy(f))(appImage())
   let soon: ReturnType<typeof setTimeout> | undefined // the launch's check
   let every: ReturnType<typeof setInterval> | undefined
   let autoOn: boolean | undefined
