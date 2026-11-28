@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Backdrop, Icon, IconButton, Page, act } from './ui'
 import { ago as agoOf } from './Info'
 
-import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type OwnPrice, type Today, type UsageWindow, usageOld } from '../../shared/types'
+import { AGENT_NAMES, AI_FROM, type AgentUsage, type AiCredits, type AiFrom, HOME_ACCOUNT, type OwnPrice, type QuotaSource, type Today, type UsageWindow, usageOld } from '../../shared/types'
 export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
@@ -14,6 +14,7 @@ export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', cod
 export const USAGE_HOSTS: Record<string, string> = { claude: 'api.anthropic.com', codex: 'chatgpt.com', grok: 'grok.com', gemini: 'agy' } // R4: who its usage endpoint asks (agy: its own /usage)
 // grok's and agy's Settings › Layout hints: no numbers of their own while off (Claude's and Codex's: Settings.tsx)
 export const USAGE_HINTS: Record<string, string> = {
+  claude: 'Asks Claude Code itself every 5 minutes (its own /usage numbers, the per-model weeks too): it reads its own sign-in, takes no turn and keeps no chat. Its status line wins while fresh. An older Claude Code that can’t say: Laki asks api.anthropic.com with your sign-in only if you say so (Ask api.anthropic.com under its row). Off: its status line only',
   grok: 'Reads your Grok sign-in (~/.grok) and asks grok.com directly, as Grok’s own CLI does: undocumented, may break. Off: no numbers',
   gemini: 'Runs agy’s own /usage every 5 minutes: it takes no turn and uses no quota (agy 1.1.11 or newer). Off: no numbers',
   codex: 'Runs codex app-server every 5 minutes and asks it: Codex reads its own sign-in, it takes no turn. An older Codex that can’t say: Laki asks chatgpt.com with your sign-in only if you say so (Ask chatgpt.com under its row). Off: what Codex reports as it works',
@@ -109,7 +110,8 @@ export function UsageButton({ load, credits, onUse, onDays, today, asks, onAsk }
 }
 
 // an agent's name, and its account's when it has more than one
-const nameOf = (r: AgentUsage, rows: AgentUsage[]) => [NAMES[r.agent] ?? r.agent, rows.filter(x => x.agent === r.agent).length > 1 && (r.account === HOME_ACCOUNT ? 'Default' : r.name)].filter(Boolean).join(' · ')
+const nameOf = (r: AgentUsage, rows: AgentUsage[]) => (r.agent === QUOTA ? (r.name ?? 'Quota source') : [NAMES[r.agent] ?? r.agent, rows.filter(x => x.agent === r.agent).length > 1 && (r.account === HOME_ACCOUNT ? 'Default' : r.name)].filter(Boolean).join(' · '))
+const QUOTA = 'quota' // a quota source's account (Settings › Usage): its own name, no default or Use
 
 // today's, its workspaces by name
 export type Spent = Omit<Today, 'ws'> & { ws: { name: string; gone?: boolean; tokens: number; cost: number }[] } // gone: removed since
@@ -204,8 +206,8 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
               <b>{nameOf(r, rows)}</b>
               {r.plan && <span className="muted">{r.plan[0].toUpperCase() + r.plan.slice(1)}</span>}
               <span className="grow" />
-              {mostRoom(rows, r.agent, now) === (r.account ?? HOME_ACCOUNT) && <span className="tag tag-open">most room</span>}
-              {rows.filter(x => x.agent === r.agent).length > 1 &&
+              {r.agent !== QUOTA && mostRoom(rows, r.agent, now) === (r.account ?? HOME_ACCOUNT) && <span className="tag tag-open">most room</span>}
+              {r.agent !== QUOTA && rows.filter(x => x.agent === r.agent).length > 1 &&
                 (r.default !== false ? (
                   <span className="tag" data-tip="New sessions start on it">default</span>
                 ) : (
@@ -225,6 +227,14 @@ function UsagePop({ anchor, rows, top, today, or, asks, onAsk, onUse, onDays, on
                     {' '}
                     <button type="button" className="link small" data-tip="Reads your Codex sign-in (auth.json) and asks chatgpt.com directly: undocumented, may break" onClick={() => onAsk('codex')}>
                       Ask chatgpt.com
+                    </button>
+                  </>
+                )}
+                {r.agent === 'claude' && r.error.startsWith('This Claude Code doesn’t say') && onAsk && asks?.claude !== true && (
+                  <>
+                    {' '}
+                    <button type="button" className="link small" data-tip="Reads your Claude Code sign-in (the Keychain) and asks api.anthropic.com directly: undocumented, may break" onClick={() => onAsk('claude')}>
+                      Ask api.anthropic.com
                     </button>
                   </>
                 )}
@@ -357,6 +367,44 @@ export function PriceForm({ model, models, onSave, onCancel }: { model?: string;
       )}
       {err && <span className="warn">{err}</span>}
     </form>
+  )
+}
+
+// Settings › Usage › Quota sources (settings.quotaSources): each with its URL and whether a token is kept; Add sends the
+// token to the daemon (the Keychain) and never keeps it here
+export function QuotaSources({ list, call }: { list: QuotaSource[]; call: <T>(method: string, p?: unknown) => Promise<T> }) {
+  const [rows, setRows] = useState(list)
+  const [v, setV] = useState({ name: '', url: '', token: '' })
+  const [err, setErr] = useState('')
+  const add = () =>
+    call<QuotaSource>('quotaSourceSet', v).then(
+      s => (setRows(r => [...r, s]), setV({ name: '', url: '', token: '' }), setErr('')),
+      e => setErr(String(e?.message ?? e)),
+    )
+  return (
+    <>
+      {rows.map(q => (
+        <div key={q.id} className="switch-row">
+          <span>{q.name}</span>
+          <span className="muted small mono grow">
+            {q.url}
+            {q.token ? ' · token kept' : ''}
+          </span>
+          <button type="button" className="link" onClick={() => call('quotaSourceRm', { id: q.id }).then(() => setRows(r => r.filter(x => x.id !== q.id)), e => setErr(String(e?.message ?? e)))}>
+            Drop
+          </button>
+        </div>
+      ))}
+      {rows.length < 8 && (
+        <form className="usage-price" onSubmit={e => (e.preventDefault(), add())}>
+          <input placeholder="Name" size={12} value={v.name} onChange={e => setV({ ...v, name: e.target.value })} />
+          <input className="mono" placeholder="https://… (its quota JSON)" size={28} value={v.url} onChange={e => setV({ ...v, url: e.target.value })} />
+          <input type="password" autoComplete="off" placeholder="Token (optional)" size={14} value={v.token} onChange={e => setV({ ...v, token: e.target.value })} />
+          <button type="submit">Add a quota source</button>
+          {err && <span className="warn">{err}</span>}
+        </form>
+      )}
+    </>
   )
 }
 

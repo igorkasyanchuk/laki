@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -154,7 +154,8 @@ test('usage: R4: by default no server is asked, signed in or not (codex says its
   writeFileSync(join(rig.home, 'keychain'), JSON.stringify({ claudeAiOauth: { accessToken: 'tok', expiresAt: Date.now() + 3_600_000 } }))
   mkdirSync(join(rig.home, '.codex'))
   writeFileSync(join(rig.home, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: 'codex-token', account_id: 'acc-1' } }))
-  assert.deepEqual((await rig.rpc('usage')).map((x: any) => [x.agent, x.source, x.windows.length]), [['claude', 'own', 0], ['codex', 'endpoint', 3]])
+  assert.deepEqual((await rig.rpc('usage')).map((x: any) => [x.agent, x.source, x.windows.length]), [['claude', 'endpoint', 0], ['codex', 'endpoint', 3]], 'each agent asked itself (this fake claude: an older one, no get_usage)')
+  assert.equal((await rig.rpc('usage'))[0].error, 'This Claude Code doesn’t say its limits: update it, or ask api.anthropic.com with your sign-in')
   assert.equal(hits, 0)
   assert.equal((await rig.rpc('state')).settings.usageNote, false, 'a new install: no note')
   await rig.stop()
@@ -397,4 +398,80 @@ test('usage: guard: turned away (401) with Claude and Codex asked for, no token 
   assert.deepEqual(urls.sort(), ['/api/oauth/usage', '/backend-api/wham/usage'], 'the usage endpoints, once each')
   assert.equal(urls.filter(x => /oauth\/token|\/token/.test(x)).length, 0, 'no token endpoint')
   files.forEach((f, i) => assert.ok(readFileSync(f).equals(before[i]), `${f}: as it was`))
+  // its own numbers (the default: Claude Code's get_usage, Codex's app server): no request at all, no sign-in read
+  urls.length = 0
+  writeFileSync(join(rig.home, 'claude-usage'), 'ok')
+  writeFileSync(join(rig.home, 'fake.log'), '')
+  await rig.rpc('settingsSet', { usage: {} })
+  await rig.rpc('usage', { now: Date.now() + 3_600_000 })
+  assert.deepEqual(urls, [], 'no request: no oauth or token URL')
+  assert.ok(!readFileSync(join(rig.home, 'fake.log'), 'utf8').split('\n').some(l => l.startsWith('security')), 'no Keychain item read')
+  files.forEach((f, i) => assert.ok(readFileSync(f).equals(before[i]), `${f}: as it was`))
+})
+
+// Claude Code's own plan limits: claude -p's initialize and get_usage (the fake's, as $HOME/claude-usage says), no token
+// of its read by Laki; the endpoint only when its switch is on and get_usage gave none
+test('usage: Claude Code’s get_usage: windows, plan, the per-model weeks and spend in one currency; none for another sign-in; an error keeps the last reading', async t => {
+  const rig = await fresh(t, { env: { LAKI_CLAUDE_USAGE_MS: '1500' } })
+  const mode = (m: string) => writeFileSync(join(rig.home, 'claude-usage'), m)
+  const claude = async (now: number) => (await rig.rpc('usage', { now })).find((x: any) => x.agent === 'claude')
+  let now = Date.now()
+  const later = () => (now += 6 * 60_000) // past its 5 minutes
+  mode('ok')
+  const a = await claude(now)
+  assert.deepEqual([a.source, a.plan, a.error, a.windows.map((w: any) => [w.label, w.used, w.note])], ['endpoint', 'max', undefined, [['5-hour', 15, undefined], ['Weekly', 36, undefined], ['Weekly · Fable', 8, undefined], ['Extra usage', 25, '12.50 of 50 USD/mo']]])
+  assert.ok(a.windows[0].resets > Date.now(), 'its reset, from the ISO time')
+  const asked = rig.fakeLog().filter((l: any) => l.bin === 'claude-usage')
+  assert.deepEqual([asked.length, asked[0].skip, asked[0].args.includes('--no-session-persistence'), asked[0].args.includes('{"disableAllHooks":true}')], [1, true, true, true])
+  assert.equal((await claude(now + 60_000)).windows.length, 4)
+  assert.equal(rig.fakeLog().filter((l: any) => l.bin === 'claude-usage').length, 1, 'kept 5 minutes')
+  mode('mismatch')
+  assert.deepEqual((await claude(later())).windows.map((w: any) => w.label), ['5-hour', 'Weekly', 'Weekly · Fable'], 'spend in two currencies: no Extra usage')
+  for (const m of ['none', 'bedrock']) {
+    mode(m)
+    assert.deepEqual([(await claude(later())).error, (await claude(now)).windows.length], ['No plan limits for this sign-in', 0], m)
+  }
+  mode('ok')
+  await claude(later())
+  for (const [m, why] of [['fail', 'Claude Code: Failed to fetch usage: 503'], ['slow', "claude didn't say its limits in 1.5 seconds"]]) {
+    mode(m)
+    const x = await claude(later())
+    assert.deepEqual([x.error, x.windows.length], [why, 4], `${m}: said, the last reading kept`)
+  }
+  mode('')
+  assert.equal((await claude(later())).error, 'This Claude Code doesn’t say its limits: update it, or ask api.anthropic.com with your sign-in')
+  assert.ok(!readFileSync(join(rig.home, 'fake.log'), 'utf8').split('\n').some(l => l.startsWith('security')), 'no Keychain item read')
+  await rig.rpc('settingsSet', { usage: { claude: false } })
+  const n = rig.fakeLog().filter((l: any) => l.bin === 'claude-usage').length
+  assert.equal((await claude(later())).source, 'own', 'off: its status line only')
+  assert.equal(rig.fakeLog().filter((l: any) => l.bin === 'claude-usage').length, n, 'not asked')
+})
+
+test('usage: a quota source in T3 Code’s format: each account a row, another version an error; its token sent, never kept in state.json', async t => {
+  const auth: string[] = []
+  const doc = { version: 1, accounts: [{ id: 'primary', label: 'My coding plan', providerInstanceId: 'work-codex', windows: [{ id: 'monthly', kind: 'monthly', label: 'Monthly budget', usedPercent: 35, resetsAt: '2026-12-01T00:00:00Z' }] }] }
+  const srv = createServer((q, r) => (auth.push(String(q.headers.authorization ?? '')), r.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(q.url === '/bad' ? { ...doc, version: 2 } : doc))))
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => srv.close())
+  const rig = await fresh(t)
+  const url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}`
+  const token = 'fake-quota-token-0042'
+  const s = await rig.rpc('quotaSourceSet', { name: 'Hub', url: `${url}/quota`, token })
+  await rig.rpc('quotaSourceSet', { name: 'Other', url: `${url}/bad` })
+  const rows = (await rig.rpc('usage')).filter((x: any) => x.agent === 'quota')
+  assert.deepEqual(rows.map((x: any) => [x.name, x.source, x.error, x.windows.map((w: any) => [w.label, w.used, w.resets])]), [
+    ['Hub · My coding plan', 'quota', undefined, [['Monthly budget', 35, Date.parse('2026-12-01T00:00:00Z')]]],
+    ['Other', 'quota', 'Not a quota document Laki reads: version 2, not 1', []],
+  ])
+  assert.deepEqual(auth.sort(), ['', `Bearer ${token}`].sort(), 'the token sent to its own source only')
+  const st = await rig.rpc('state')
+  assert.deepEqual(st.settings.quotaSources.map((x: any) => [x.name, !!x.token]), [['Hub', true], ['Other', false]])
+  await rig.stop()
+  for (const f of readdirSync(rig.data).filter(f => !f.startsWith('quota-'))) assert.ok(statSync(join(rig.data, f)).isDirectory() || !readFileSync(join(rig.data, f), 'utf8').includes(token), `not in ${f}`) // state.json, the logs: none (its own 0600 file only where there's no Keychain)
+  await rig.start()
+  await assert.rejects(rig.rpc('quotaSourceSet', { name: 'x', url: 'http://example.com/q' }), /https, or http on this Mac/)
+  await rig.rpc('settingsSet', { quotaSources: [{ id: 'q00000000', name: 'sneaky', url: 'https://example.com' }] })
+  assert.equal((await rig.rpc('state')).settings.quotaSources.length, 2, 'settingsSet leaves them as they are')
+  await rig.rpc('quotaSourceRm', { id: s.id })
+  assert.deepEqual((await rig.rpc('state')).settings.quotaSources.map((x: any) => x.name), ['Other'])
 })

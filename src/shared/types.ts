@@ -173,6 +173,7 @@ export const PRICE_OWN: Record<string, Partial<Price>> = {
 // prices.json; { as }: priced as another model is (one with no price of its own: a gateway's alias). The daemon's own
 // settings (core.ts sets yours.of); a kept day re-prices at once, its rows keeping parts
 export type OwnPrice = Rates | { as: string }
+export type QuotaSource = { id: string; name: string; url: string; token?: true } // token: one kept for it (the Keychain's quota-<id>)
 export const priceYours: { of?: () => Record<string, OwnPrice> | undefined } = {}
 // a price as Settings may keep it: rates 0 to 10,000 a million each, in and out given; or { as } another model
 export function ownPriceOk(model: string, v: unknown): OwnPrice {
@@ -843,6 +844,7 @@ export type Settings = {
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   tunnel?: NamedTunnel // permanent tunnels: your named tunnel and its domain (Settings › Tunnels)
+  quotaSources?: QuotaSource[] // Settings › Usage › Add a quota source (quotaSourceSet, never settingsSet): its token in the Keychain only
   prices?: Record<string, OwnPrice> // Settings › Usage › Model prices: yours, by model id, over Laki's (priceOf); { as }: another model's
   usageAll?: boolean // Settings › Usage › Count every agent chat on this Mac: the machine scan (daemon/usageScan.ts), on unless false; off: Laki's own tabs only
   usage?: Record<string, boolean> // R4: claude, codex: its usage endpoint asked too, with its own sign-in (true only; else claude's and codex's own numbers)
@@ -1299,7 +1301,7 @@ export type StudioChat = { id: string; title: string; at: number; busy: boolean 
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
 // an agent's limits; error: why there are none (signed out…); at: when they were read
 // account: whose (an Account's id or HOME_ACCOUNT), name to tell them apart, default: the one new sessions use
-export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; next?: number; account?: string; name?: string; default?: boolean; source?: 'own' | 'endpoint' } // source (R4): the agent's own numbers (its status line, its transcript) or its usage endpoint's // at: when its numbers were read; next: told to wait, asked again then (its numbers the last ones, from at)
+export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; next?: number; account?: string; name?: string; default?: boolean; source?: 'own' | 'endpoint' | 'quota' } // agent 'quota', source 'quota': a quota source's account (usage.ts quotaUsage), name its source's and its own // source (R4): the agent's own numbers (its status line, its transcript) or its usage endpoint's // at: when its numbers were read; next: told to wait, asked again then (its numbers the last ones, from at)
 // Usage's OpenRouter part (ai.ts aiCredits): the account's credits (total bought, used), the key's spend (today, this
 // week, this month, in dollars) and its own limit; low: under $1 or 10% left of either; error: neither was answered
 export type AiCredits = { at: number; credits?: { total: number; used: number }; key?: { day: number; week: number; month: number; limit?: number; left?: number }; low?: boolean; error?: string }

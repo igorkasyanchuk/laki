@@ -3271,7 +3271,7 @@ export function settingsSet(o: Settings, own = false) {
   const dirsWere = dirs(state.settings)
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
   if (o.prices) o = { ...o, prices: Object.fromEntries(Object.entries(o.prices).slice(0, 500).map(([m, v]) => [m.trim().slice(0, 200), ownPriceOk(m.trim(), v)]).filter(([m]) => m)) } // yours, checked
-  const { accounts: _, widgetDevAgent, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
+  const { accounts: _, widgetDevAgent, quotaSources: _q, ...rest } = o // Laki's own (accountAdd…, quotaSourceSet): folders it made, never one from an import; a quota source with its token's, only there
   o = own && widgetDevAgent ? { ...rest, widgetDevAgent } : rest
   const was = state.settings
   state.settings = { ...state.settings, ...o }

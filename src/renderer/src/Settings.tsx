@@ -9,7 +9,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { BASIC, FIND, findKey, freshOf, isBasic, SECTIONS, spotSection } from '../../shared/settingsMap'
 import { Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, type OwnPrice, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
+import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, type OwnPrice, type QuotaSource, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
 import { outLine, RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
@@ -26,7 +26,7 @@ import { Backdrop, BACKDROP, BACKDROPS, type BackdropKind } from './Backdrop'
 import { ask, askText, cardOpen, ScrollEdge, HOTKEY, QUICK_KEY, SHOT_KEY, TALK_KEY, TELL_KEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ProjectMark, Switch, usePageMark, usePageTitle, useToTop } from './ui'
 import { PICKER_KEY } from './Picker'
 import { ANSWER_KEYS, cmdClash, cmdMap, cmdOthers, COMMANDS, hotkeyClash, type KeyId, keyClash, keyMap, KEYS, keyShow } from '../../shared/keys'
-import { PriceForm, USAGE_AGENTS, USAGE_HINTS, USAGE_HOSTS } from './Usage'
+import { PriceForm, QuotaSources, USAGE_AGENTS, USAGE_HINTS, USAGE_HOSTS } from './Usage'
 import { Markdown } from './MarkdownView'
 import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
@@ -188,6 +188,7 @@ export type AppSettings = Paint & {
   timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   prices?: Record<string, OwnPrice> // Settings › Usage › Model prices: yours (priceOf)
+  quotaSources?: QuotaSource[] // Settings › Usage › Quota sources (quotaSourceSet: its token in the Keychain, never here)
   usageAll?: boolean // Settings › Usage: every agent chat on this Mac counted (the machine scan), on unless false
   usage?: Record<string, boolean> // R4: its usage endpoint asked too (true only); else Claude's and Codex's own numbers
   usageNote?: boolean // R4: Resources' one-time note
@@ -2645,8 +2646,8 @@ export function SettingsPage(p: {
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
-                  <Switch key={a} className="switch-row" on={a === 'gemini' || a === 'codex' ? s.usage?.[a] !== false : s.usage?.[a] === true} onChange={v => set({ usage: Object.fromEntries(Object.entries({ ...s.usage, [a]: v }).filter(([k, x]) => !(k === 'codex' && x === true && a === 'codex'))) })}>
-                    <Says title={a === 'codex' ? 'Ask Codex for its plan limits' : `Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={USAGE_HINTS[a] ?? `Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`} />
+                  <Switch key={a} className="switch-row" on={a === 'gemini' || a === 'codex' || a === 'claude' ? s.usage?.[a] !== false : s.usage?.[a] === true} onChange={v => set({ usage: Object.fromEntries(Object.entries({ ...s.usage, [a]: v }).filter(([k, x]) => !((k === 'codex' || k === 'claude') && x === true && a === k))) })}>
+                    <Says title={a === 'codex' || a === 'claude' ? `Ask ${name} for its plan limits` : `Ask ${USAGE_HOSTS[a]} for ${name}'s plan limits`} hint={USAGE_HINTS[a] ?? `Reads your ${name} sign-in and asks ${USAGE_HOSTS[a]} directly: undocumented, may break. Off: ${a === 'claude' ? "Claude Code's status line" : "what Codex reports as it works"} gives them`} />
                   </Switch>
                 ))}
                 <label className="switch-row">
@@ -2691,6 +2692,13 @@ export function SettingsPage(p: {
                   <PriceForm models={[]} onSave={async (m, p) => set({ prices: { ...s.prices, [m]: p } })} />
                 </div>
               </Group>
+              {p.call && (
+                <Group title="Quota sources" hint="Another provider's or hub's plan limits: a URL that answers in T3 Code's quota format (version 1: accounts, each with its windows' used percent), asked every 5 minutes, each account a row in Plan limits. Its token goes to the Keychain, nowhere else">
+                  <div className="setting-box">
+                    <QuotaSources list={s.quotaSources ?? []} call={p.call} />
+                  </div>
+                </Group>
+              )}
             </>
           )}
           {sec === 'extras' && (

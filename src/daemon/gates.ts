@@ -69,7 +69,7 @@ export const AGENT_NO: Record<string, string> = { artifactHosts: "read what a re
   bgOutput: "read a background task's output (laki screen reads what a tab shows)",
   wsBase: "change a workspace's base branch (what its diff and reviews compare with; the user does, from Changes)",
   tabAccount: "move a tab to another of the user's accounts (the user does, from the tab)",
-  accountRm: "remove one of the user's accounts (its sign-in goes with it)", hookAdd: 'add a webhook (what outsiders can start)', hookRm: 'remove a webhook',
+  accountRm: "remove one of the user's accounts (its sign-in goes with it)", quotaSourceSet: 'add or change a quota source (a URL Laki asks with a token of yours)', quotaSourceRm: 'remove a quota source', hookAdd: 'add a webhook (what outsiders can start)', hookRm: 'remove a webhook',
   hookSecret: "read a webhook's secret", hookExpose: 'put the webhook server on the internet',
   gateRestart: 'restart tabs to put them under a tool gate (the user does, from the extension or the tab)',
   tabUnbox: 'restart a tab outside its sandbox (the user does, from its card)',
@@ -122,7 +122,7 @@ export const REMOTE_NO = new Set(['safeOff', 'kcWrapper', 'kcWrapped', 'mcpImpor
   'skillOpen', 'wsRepair', 'events', 'clientLog', 'tabUnbox', 'projectNetAllow', 'ticketMint', 'clientAdd', 'clientRotate', 'clientRm', 'clientList',
   'clientAnswer', 'clientWho', 'diskTidy', 'proofShot', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'presence', 'remoteLog', 'diagnostics', 'agentContext',
   'agentContextOpen', 'remotePair', 'remoteDeviceRm', 'remoteDeviceSet', 'stateOwn', 'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'imageRead', 'remoteStart',
-  'cliInstall', 'cliRemove', 'shutdown', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave',
+  'cliInstall', 'cliRemove', 'shutdown', 'quotaSourceSet', 'quotaSourceRm', 'aiKey', 'aiEndpointKey', 'aiEndpointTest', 'skillSet', 'accountAdd', 'accountLogin', 'agentUpdate', 'presetSave',
   'hook', 'tunnelStart', 'scheduleSet', 'accountSet', 'accountRm', 'tabAccount', 'webhookTest', 'telegramSet', 'telegramPair', 'telegramTest', 'telegramLog', 'uiReset', 'projectClone', 'projectNew', 'device', 'aiShot', 'aiOpenApp',
   'widgetFileSave', 'widgetWrite', 'widgetNew', 'widgetFromTerm', 'widgetTerm', 'widgetRm', 'widgetRestore', 'widgetUndo', 'widgetRemix', 'widgetDev',
   'widgetMock', 'widgetCheck', ...TICKS])
@@ -165,7 +165,7 @@ export const AGENT_SETTINGS_OK = new Set('theme themeAuto updateDot projectBadge
 // the user's attention; keys and answers; secrets): Global memory, workflows' variables, the storage and worktree
 // folders, notifications among them
 export const AGENT_SETTINGS_NO = new Set('pushAtMac pushAfter pushIdle backupEvery backupDir backupOffered artifactHosts diskLow foldAfter gitTidy touchId termShell editor editors customCss editorCmd agent branchPrefix copyOnSelect editKeys fileClick notify needsList staleAfter ownAvatar avatars notifyOn edgeGlow dockBounce usageAt scheduleMaxMinutes scheduleAtOnce notifySound quietMinutes timerAlert timerSound presets hideSecrets hideSecretsAsked voiceNote secretHint sandboxNew \
-accounts accountUse mcpApps limitFallback templates actions env tunnelMails tunnel usage usageAll prices usageNote seenVersion labs specs workflows birdView calendar desk notes todoList cloud simulator emuWindow history planTemplates remoteMail remoteIdleOff remoteWhen remoteAwake remoteAuth remoteHost remoteTries remoteTsPin remoteFunnel remotePasskey remotePinFallback remoteIdle remoteHandoff remotePush \
+accounts accountUse mcpApps limitFallback templates actions env tunnelMails tunnel usage usageAll prices quotaSources usageNote seenVersion labs specs workflows birdView calendar desk notes todoList cloud simulator emuWindow history planTemplates remoteMail remoteIdleOff remoteWhen remoteAwake remoteAuth remoteHost remoteTries remoteTsPin remoteFunnel remotePasskey remotePinFallback remoteIdle remoteHandoff remotePush \
 remoteLevel remoteWrong remoteDeviceDays diffStat doneCheck readerTools sendKey nextStep livePlan radar fullReview aiEndpoint menuBarClick hoverFocus closeNoAsk storageDir keepStorage storageDays tmExclude spotlightExclude worktrees syncBase prPrompts prScan prQuiet bgRefresh keepAwake turnsKept turnChanges nextPrompt whenDone copyIgnored copyUntracked cloneDeps ptyHost ptyHostAsked spareWorktree \
 archivedDays prTries prBots browserBudget sleepAfter webhook inHooks continueOnError longTurn costWarn mcp archiveMerged archiveIdle archiveIdleKeepPR menuBar trayState floater floaterRecent floaterRecentHours floaterVoiceTo floaterMax floaterCards hideFloats floaterDone floaterAt islandOn floaterNew floaterMenu widgetDirs widgetDev widgetDevAgent imageDays artifactsIn memory memoryCompact workHours flowVars progress \
 keys cmdKeys pickerKey hotkeyOn hotkey shotAsk shotKey quickOn quickKey allowOn allowKey denyOn denyKey tellOn tellKey talkOn talkTo talkKey talkCards tgAi updateCheck recording background modelEfforts updateDelay devMode widgetAgent widgetLogs widgetHours ai voice achievements statusBridge loginAsked termClip'.split(' '))

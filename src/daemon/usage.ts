@@ -13,7 +13,8 @@ import { readFile } from 'node:fs/promises'
 import { homedir, tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { type AgentUsage, HOME_ACCOUNT, type UsageWindow } from '../shared/types.ts'
+import { type AgentUsage, HOME_ACCOUNT, type QuotaSource, type UsageWindow } from '../shared/types.ts'
+import { getFollow, localUrl } from './netAddr.ts'
 import { newer } from '../shared/update.ts'
 
 const run = promisify(execFile)
@@ -32,7 +33,7 @@ export const base = (real: string) => {
   return t && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(t) ? t : real
 }
 
-type Got = Omit<AgentUsage, 'agent' | 'at'> & { again?: boolean; busy?: number } // busy: told to slow down, its Retry-After (ms, 0: none)
+type Got = Omit<AgentUsage, 'agent' | 'at'> & { again?: boolean; busy?: number; ttl?: number } // busy: told to slow down, its Retry-After (ms, 0: none); ttl: kept this long (else the agent's)
 // whose limits: an agent's own sign-in (no dir) or an account's folder (accounts.ts)
 export type Who = { agent: string; account: string; name: string; dir?: string; default: boolean }
 const LOADERS: Record<string, (dir?: string, on?: Record<string, boolean>) => Promise<Got>> = { claude, codex, grok, gemini }
@@ -82,6 +83,16 @@ export function claudeWindows(u: any): UsageWindow[] {
   add('Weekly · Sonnet', u?.seven_day_sonnet?.utilization, when(u?.seven_day_sonnet?.resets_at))
   for (const l of Array.isArray(u?.limits) ? u.limits : [])
     if (l?.kind === 'weekly_scoped' && l.scope?.model?.display_name) add(`Weekly · ${l.scope.model.display_name}`, l.percent, when(l.resets_at))
+  for (const m of Array.isArray(u?.model_scoped) ? u.model_scoped : []) if (typeof m?.display_name === 'string' && m.display_name) add(`Weekly · ${m.display_name}`, m.utilization, when(m.resets_at)) // get_usage's per-model weeks
+  // get_usage's spend: only when its used and limit are in one currency at one scale (a ratio of minor units, T3 Code's rule)
+  const s = u?.spend
+  type Minor = { amount_minor: number; currency: string; exponent: number }
+  const minor = (v: unknown): Minor | undefined => (x => (typeof x.amount_minor === 'number' && typeof x.currency === 'string' && x.currency.trim() && Number.isInteger(x.exponent) && (x.exponent as number) >= 0 ? (x as Minor) : undefined))(obj(v))
+  const [su, sl] = [minor(s?.used), minor(s?.limit)]
+  if (s?.enabled === true && su && sl && su.currency.trim() === sl.currency.trim() && su.exponent === sl.exponent && sl.amount_minor > 0) {
+    const money = (v: { amount_minor: number; exponent: number }) => v.amount_minor / 10 ** v.exponent
+    add('Extra usage', (su.amount_minor / sl.amount_minor) * 100, undefined, `${money(su).toFixed(2)} of ${money(sl).toFixed(0)} ${su.currency.trim()}/mo`)
+  }
   const x = u?.extra_usage // cents
   if (x && x.is_enabled !== false && typeof x.used_credits === 'number' && x.monthly_limit > 0)
     add('Extra usage', (x.used_credits / x.monthly_limit) * 100, undefined, `$${(x.used_credits / 100).toFixed(2)} of $${(x.monthly_limit / 100).toFixed(0)}/mo`)
@@ -113,7 +124,48 @@ export async function claudeCred(d?: string): Promise<ClaudeCred | undefined> {
   return best
 }
 
-async function claude(d?: string): Promise<Got> {
+// Claude Code's own: claude -p's control requests, initialize then get_usage (as T3 Code and emdash ask it), with the
+// account's folder: claude reads its own sign-in, Laki none of it; no prompt, nothing billed, no session kept, its hooks
+// off; skip_behaviors, or it first reads 7 days of transcripts. rate_limits: the endpoint's shape (claudeWindows), its
+// model_scoped weeks and spend too; subscription_type its plan. rate_limits_available false, or a sign-in that isn't
+// Anthropic's own (initialize's account.apiProvider): none. An error or no answer in CLAUDE_MS: said, the last good
+// reading kept (ask). ponytail: get_usage is marked experimental by Claude Code ("the response shape may change"): read
+// defensively, its shape as claude 2.1.332 said it (2026-11-28); a change reads as no windows (the endpoint then, if on)
+const CLAUDE_MS = Number(process.env.LAKI_CLAUDE_USAGE_MS) || 20_000 // the env: tests'
+const OLDER_CLAUDE = 'This Claude Code doesn’t say its limits: update it, or ask api.anthropic.com with your sign-in'
+async function claudeOwn(d?: string): Promise<Got> {
+  const env = { ...process.env, ...(d && { CLAUDE_CONFIG_DIR: d }) }
+  const req = (id: string, request: object) => ({ type: 'control_request', request_id: id, request })
+  let init: Obj | undefined
+  let r: Obj
+  try {
+    r = await asked('claude', ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--settings', '{"disableAllHooks":true}'], env, [req('laki-init', { subtype: 'initialize' }), req('laki-usage', { subtype: 'get_usage', skip_behaviors: true })], (m: unknown) => {
+      const x = obj(obj(m).response)
+      if (obj(m).type !== 'control_response') return
+      if (x.request_id === 'laki-init') init = x
+      else if (x.request_id === 'laki-usage') return x
+    }, 'its limits', CLAUDE_MS)
+  } catch (e) {
+    const x = e as { code?: string }
+    return { windows: [], error: x.code === 'ENOENT' ? 'Claude Code isn’t installed' : failed(e), again: true }
+  }
+  if (r.subtype !== 'success') {
+    const why = String(r.error ?? 'an error')
+    return UNKNOWN.test(why) || /subtype/i.test(why) ? { windows: [], error: OLDER_CLAUDE } : { windows: [], error: `Claude Code: ${why.slice(0, 160)}`, again: true }
+  }
+  const u = obj(r.response)
+  const provider = str(obj(obj(init?.response).account).apiProvider)
+  const plan = str(u.subscription_type)
+  if ((provider && provider !== 'firstParty') || u.rate_limits_available === false) return { plan, windows: [], error: 'No plan limits for this sign-in' }
+  const windows = claudeWindows(u.rate_limits)
+  return { plan, windows, error: windows.length ? undefined : 'This plan shows no limits', ttl: USAGE_TTL }
+}
+// on.claude: unset, Claude Code's own (get_usage); true, the endpoint too when that gave no windows; false: neither
+async function claude(d?: string, on: Record<string, boolean> = {}): Promise<Got> {
+  const own = await claudeOwn(d)
+  return own.windows.length || on.claude !== true ? own : claudeEndpoint(d)
+}
+async function claudeEndpoint(d?: string): Promise<Got> {
   const c = await claudeCred(d)
   if (!c) return { windows: [], error: d ? 'Not signed in: Settings › Agents & profiles, Sign in' : 'Not signed in to a Claude plan: run claude, then /login', again: true }
   const plan = c.subscriptionType || undefined
@@ -397,6 +449,83 @@ async function gemini(): Promise<Got> {
   return { windows: r.windows, error: r.windows.length ? undefined : 'This plan shows no limits' }
 }
 
+// ---------- quota sources (settings.quotaSources, Settings › Usage › Add a quota source), for every other provider's or hub's limits
+// in T3 Code's HTTP quota format (its docs/user/usage.md): { version: 1, accounts: [{ id, label, windows: [{ id, kind:
+// session|weekly|monthly|other, label, usedPercent, resetsAt? }] }] }, GET every 5 minutes with its token as a Bearer (the
+// Keychain's, quota-<id>: never state.json, a log or the view), through netAddr's getFollow (https, a public address,
+// each redirect checked again; a URL on this Mac, a local hub, asked directly). Each account a row (agent and source
+// 'quota'); another version or shape: one row with the error. At most QUOTA_MAX sources, accounts and windows each.
+// No reader of Laki's own takes another app's token (Copilot, Cursor, z.ai…): a quota source covers them
+export const QUOTA_MAX = 8
+const KIND: Record<string, string> = { session: 'Session', weekly: 'Weekly', monthly: 'Monthly', other: 'Limit' }
+export function quotaRead(doc: unknown): { accounts: { id: string; label: string; windows: UsageWindow[] }[] } | { error: string } {
+  const d = obj(doc)
+  const bad = (why: string) => ({ error: `Not a quota document Laki reads: ${why}` })
+  if (d.version !== 1) return bad(`version ${JSON.stringify(d.version ?? null)}, not 1`)
+  if (!Array.isArray(d.accounts)) return bad('no accounts')
+  const accounts: { id: string; label: string; windows: UsageWindow[] }[] = []
+  for (const a of d.accounts.slice(0, QUOTA_MAX).map(obj)) {
+    const id = str(a.id)
+    if (!id || !Array.isArray(a.windows)) return bad('an account with no id or windows')
+    const windows: UsageWindow[] = []
+    for (const w of a.windows.slice(0, QUOTA_MAX).map(obj)) {
+      const used = num(w.usedPercent)
+      if (used === undefined || !Object.hasOwn(KIND, String(w.kind))) return bad('a window with no usedPercent or kind')
+      windows.push({ label: (str(w.label)?.trim() || KIND[String(w.kind)]).slice(0, 40), used: pct(Math.min(100, used)), resets: when(w.resetsAt) })
+    }
+    accounts.push({ id: id.slice(0, 80), label: (str(a.label)?.trim() || id).slice(0, 80), windows })
+  }
+  return { accounts }
+}
+async function quotaGet(s: QuotaSource, token: string): Promise<AgentUsage[]> {
+  const row = (r: Partial<AgentUsage>): AgentUsage => ({ agent: 'quota', source: 'quota', windows: [], at: Date.now(), account: s.id, name: s.name, ...r })
+  try {
+    const signal = AbortSignal.timeout(10_000)
+    const headers: Record<string, string> = { Accept: 'application/json', ...(token && { Authorization: `Bearer ${token}` }) }
+    let status: number
+    let body: AsyncIterable<Uint8Array> | Iterable<Uint8Array>
+    if (localUrl(s.url)) {
+      const r = await fetch(s.url, { signal, headers, redirect: 'error' })
+      ;[status, body] = [r.status, r.body ?? []]
+    } else {
+      const r = await getFollow(s.url, signal, headers)
+      ;[status, body] = [r.statusCode ?? 0, r]
+    }
+    if (status === 401 || status === 403) return [row({ error: 'Turned away: check its token (Settings › Usage)' })]
+    if (status < 200 || status > 299) return [row({ error: `HTTP ${status}` })]
+    const parts: Buffer[] = []
+    let size = 0
+    for await (const b of body) {
+      if ((size += b.length) > 1 << 20) throw new Error('more than 1 MB')
+      parts.push(Buffer.from(b))
+    }
+    let doc: unknown
+    try {
+      doc = JSON.parse(Buffer.concat(parts).toString('utf8'))
+    } catch {
+      return [row({ error: 'Not JSON' })]
+    }
+    const r = quotaRead(doc)
+    if ('error' in r) return [row({ error: r.error })]
+    return r.accounts.map(a => row({ account: `${s.id}:${a.id}`, name: `${s.name} · ${a.label}`, windows: a.windows, ...(!a.windows.length && { error: 'No limits said' }) }))
+  } catch (e) {
+    return [row({ error: failed(e) })]
+  }
+}
+const quotaKept = new Map<string, { at: number; url: string; p: Promise<AgentUsage[]> }>()
+export const quotaForget = (id: string) => quotaKept.delete(id) // its URL or token changed: asked again
+export function quotaUsage(sources: QuotaSource[] | undefined, token: (id: string) => string, now = Date.now()): Promise<AgentUsage[]> {
+  return Promise.all(
+    (sources ?? []).slice(0, QUOTA_MAX).map(s => {
+      const c = quotaKept.get(s.id)
+      if (c && c.url === s.url && now - c.at < USAGE_TTL) return c.p
+      const p = quotaGet(s, token(s.id))
+      quotaKept.set(s.id, { at: now, url: s.url, p })
+      return p
+    }),
+  ).then(x => x.flat())
+}
+
 // ---------- each agent's answer, kept for its TTL (AGAIN or BACK_OFF when it says so); callers asking meanwhile share
 // one request; last: its last answer with numbers, shown while the server says to wait
 
@@ -415,7 +544,7 @@ const SAYS: Record<string, string> = {
   codex: 'No numbers yet: they come with what Codex reports as a tab works',
   grok: 'Laki asks grok.com for these only when you say so: Settings › Layout › Ask grok.com',
 }
-const OWN_CMD: Record<string, true> = { gemini: true, codex: true } // asked unless off: the agent's own command, no token of its read
+const OWN_CMD: Record<string, true> = { gemini: true, codex: true, claude: true } // asked unless off: the agent's own command, no token of its read
 const asksOf = (on: Record<string, boolean>, agent: string) => (OWN_CMD[agent] ? on[agent] !== false : on[agent] === true)
 export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now(), own?: (w: Who, now: number, any?: boolean) => { windows: UsageWindow[]; at: number } | undefined): Promise<AgentUsage[]> {
   return Promise.all(
@@ -443,8 +572,12 @@ function ask(w: Who, key: string, now: number, on: Record<string, boolean>): Pro
   if (c?.p && now - c.at < c.ttl) return c.p
   const entry: Entry = { at: now, ttl: TTL[w.agent] ?? USAGE_TTL }
   entry.p = LOADERS[w.agent](w.dir, on).then(
-    ({ again, busy, ...r }) => {
+    ({ again, busy, ttl, ...r }) => {
+      if (ttl) entry.ttl = ttl
       if (again) entry.ttl = AGAIN
+      // failed on the way (an error, no answer): said, with the last good reading kept
+      const had = last.get(key)
+      if (again && r.error && !r.windows.length && had) return { ...had, error: r.error }
       if (busy !== undefined) {
         entry.slows = (c?.slows ?? 0) + 1
         entry.ttl = Math.max(busy, BACK_OFF[Math.min(entry.slows, BACK_OFF.length) - 1])

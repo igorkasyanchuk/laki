@@ -9,11 +9,13 @@ import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync, writeFileSync } 
 import { readJson } from '../shared/conn.ts'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Preset, type Tab } from '../shared/types.ts'
+import { type Account, ACCOUNT_AGENTS, type AgentModel, type AccountAgent, type AccountView, AGENT_NAMES, HOME_ACCOUNT, isAccountAgent, type Preset, type QuotaSource, type Tab } from '../shared/types.ts'
+import { keyRead, keyWrite } from './keychain.ts'
+import { localUrl } from './netAddr.ts'
 import { changed, presetNamed, q, save, state } from './core.ts'
 import { dir } from './dir.ts'
 import { isLive } from './resources.ts'
-import { asked, claudeCred, keychainService, othersWho, type Who } from './usage.ts'
+import { asked, claudeCred, keychainService, othersWho, QUOTA_MAX, quotaForget, type Who } from './usage.ts'
 import { older, tooOld } from './limits.ts'
 import { ACP_VERSION, acpModels } from './acp.ts'
 
@@ -255,3 +257,46 @@ export function modelRefused(model: string | undefined, text: string): string | 
 // (its version not looked at yet since the daemon started: asked now, so a claude updated meanwhile drops the warning)
 export const modelNeedsView = () => (state.modelNeeds && Object.keys(state.modelNeeds).length ? (!has.at && void claudeHas(), Object.fromEntries(Object.entries(state.modelNeeds).filter(([m]) => needsNewer(m)))) : undefined)
 export const claudeVersion = () => has.v
+
+// Settings › Usage › Add a quota source (usage.ts quotaUsage): its name, URL (https; http only on this Mac, a local hub)
+// and token, kept by keychain.ts as quota-<id> (the Keychain, else a 0600 file), never in state.json, a log or the view
+// (settings.quotaSources' token: true, one kept); token '' removes it, none keeps it. The user's only (gates.ts)
+const quotaKey = (id: string) => [`quota-${id}`, join(dir, `quota-${id}.key`)] as const
+export const quotaToken = (id: string) => (/^q[0-9a-f]{8}$/.test(id) ? keyRead(...quotaKey(id)) : '')
+export function quotaSourceSet(p: { id?: unknown; name?: unknown; url?: unknown; token?: unknown }): QuotaSource {
+  const list = state.settings?.quotaSources ?? []
+  const was = p.id === undefined ? undefined : list.find(s => s.id === p.id)
+  if (p.id !== undefined && !was) throw new Error('no such quota source')
+  if (!was && list.length >= QUOTA_MAX) throw new Error(`${QUOTA_MAX} quota sources at most`)
+  const name = String(p.name ?? was?.name ?? '').trim().slice(0, 60)
+  if (!name) throw new Error("a quota source's name")
+  const raw = String(p.url ?? was?.url ?? '').trim()
+  if (!URL.canParse(raw)) throw new Error('its URL, as https://host/path')
+  const u = new URL(raw)
+  if (u.username || u.password) throw new Error('no user or password in its URL: the token has a field of its own')
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && localUrl(raw))) throw new Error('its URL: https, or http on this Mac only')
+  const id = was?.id ?? `q${randomBytes(4).toString('hex')}`
+  let token = !!was?.token
+  if (typeof p.token === 'string') {
+    const t = p.token.trim()
+    if (t.length > 4096 || /[\r\n]/.test(t)) throw new Error('its token: one line')
+    keyWrite(...quotaKey(id), t)
+    token = !!t
+  }
+  const s: QuotaSource = { id, name, url: u.href, ...(token && { token: true as const }) }
+  state.settings = { ...state.settings, quotaSources: was ? list.map(x => (x.id === id ? s : x)) : [...list, s] }
+  quotaForget(id)
+  save()
+  changed()
+  return s
+}
+export function quotaSourceRm(p: { id?: unknown }) {
+  const list = state.settings?.quotaSources ?? []
+  const s = list.find(x => x.id === p.id)
+  if (!s) throw new Error('no such quota source')
+  keyWrite(...quotaKey(s.id), '')
+  state.settings = { ...state.settings, quotaSources: list.filter(x => x !== s) }
+  quotaForget(s.id)
+  save()
+  changed()
+}

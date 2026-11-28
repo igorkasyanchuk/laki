@@ -665,8 +665,39 @@ Laki AI's OpenRouter credits (ai.ts `aiCredits`, `Usage.tsx` `creditsPart`; low:
 shown when the other is refused; `creditsLow`: under $1 or 10% left of the credits or of the key's own limit.
 
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`). R4: the endpoints below are undocumented and asked only when
-`settings.usage[agent] === true` (Settings › Layout › *Ask … for plan limits*, off by default); Codex's own app server and
-agy's own /usage unless it's false (`OWN_CMD`). Otherwise each
+`settings.usage[agent] === true` (Settings › Layout › *Ask … for plan limits*, off by default); Claude Code's own
+`get_usage`, Codex's own app server and agy's own /usage unless it's false (`OWN_CMD`: no token of theirs read).
+
+Claude Code's own (`claudeOwn`, as T3 Code and emdash ask it): `claude -p --input-format stream-json --output-format
+stream-json --verbose --no-session-persistence --settings '{"disableAllHooks":true}'` with the account's folder as
+`CLAUDE_CONFIG_DIR` (`asked`, as accounts.ts' model list), two control requests: `initialize`, then `{ subtype:
+'get_usage', skip_behaviors: true }` (without it claude first reads 7 days of transcripts); no prompt, nothing billed,
+no session kept; killed at its answer or 20 s (`CLAUDE_MS`, `LAKI_CLAUDE_USAGE_MS`: tests'). Its `rate_limits` has the
+endpoint's shape (`claudeWindows`: `five_hour`, `seven_day`, `utilization` 0 to 100, `resets_at` ISO; `extra_usage` in
+cents), each `model_scoped` entry *Weekly · <display_name>*, `spend` as *Extra usage* only when its `used` and `limit`
+are in one currency at one exponent (a ratio of minor units, T3 Code's rule); `subscription_type` the plan.
+`rate_limits_available` false, or `initialize`'s `account.apiProvider` other than `firstParty`: *No plan limits for this
+sign-in*. An error or no answer: said, the last good reading kept (`ask`: a failure on the way, `again`). An older claude
+that doesn't know the subtype: *This Claude Code doesn't say its limits* (the popup's *Ask api.anthropic.com* sets
+`usage.claude` true). Asked at most every 5 minutes per account (`ttl`). The endpoint (below) only when `usage.claude`
+is true and get_usage gave no windows; the status line still wins while fresh. ponytail: get_usage is marked
+experimental by Claude Code ("the response shape may change"): read defensively, its shape as claude 2.1.332 said it
+(2026-11-28). The fake: `test/fakes/claude`'s stream-json (`FAKE_CLAUDE_USAGE` or `$HOME/claude-usage`: unset an older
+claude, `ok`, `mismatch`, `none`, `bedrock`, `fail`, `slow`; each ask in FAKE_LOG as `claude-usage`).
+
+Quota sources (`quotaUsage`; Settings › Usage › Quota sources, `quotaSourceSet` / `quotaSourceRm` in accounts.ts, the
+user's only: gates.ts, never `settingsSet`, which leaves `quotaSources` as they are): a name, a URL (https; http only on
+this Mac, a local hub) and an optional token, kept by keychain.ts as `quota-<id>` (the Keychain, else a 0600 file:
+never state.json, a log or the view; `settings.quotaSources`' `token: true` says one's kept). GET every 5 minutes (a
+change of URL or token: at once) through netAddr.ts `getFollow` (https, a public address, each redirect checked again;
+this Mac's directly), `Authorization: Bearer` with the token, 1 MB read at most. T3 Code's HTTP quota format (its
+`docs/user/usage.md`): `{ version: 1, accounts: [{ id, label, windows: [{ id, kind: session|weekly|monthly|other, label,
+usedPercent, resetsAt? }] }] }` (`quotaRead`): each account a row (agent and source `quota`, its name `<source> ·
+<label>`) in the Plan limits popover; another version or shape: the source's row with the error. At most 8 sources, 8
+accounts a source and 8 windows an account (`QUOTA_MAX`). No reader of Laki's own takes another app's token (Copilot,
+Cursor, z.ai…): a quota source covers them.
+
+ Otherwise each
 account's numbers are what the agent reports itself (meters.ts' `statusLimits(w, now, true)`: Claude's status line
 `rate_limits`, Codex's transcripts' `token_count` `rate_limits` (share.ts' `meterOf` keeps the newest as `Meter.limits`,
 `codexRateWindows`), chosen window by window across the account's tabs (an idle claude rewrites its status line with the

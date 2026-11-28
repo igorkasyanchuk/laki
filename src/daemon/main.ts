@@ -62,8 +62,8 @@ import * as ticks from './ticks.ts'
 import { hookAdd, hookExpose, hookList, hookRm, hookSecret, hookStop, inboundStart } from './inbound.ts'
 import { ticketTick } from './tickets.ts'
 import { agentCommands, refreshSkills, skills, skillSet } from './skill.ts'
-import { accountAdd, accountRm, accountSet, accountViews, agentModels, usageWho } from './accounts.ts'
-import { usage } from './usage.ts'
+import { accountAdd, accountRm, accountSet, accountViews, agentModels, quotaSourceRm, quotaSourceSet, quotaToken, usageWho } from './accounts.ts'
+import { quotaUsage, usage } from './usage.ts'
 import { chatWithApps, mcpAppCall, mcpPage } from './mcpApps.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRestore, noteRm, noteSave, noteTrashTidy, noteUpload, todoListGet, todoListSave } from './notes.ts'
@@ -758,7 +758,9 @@ const api = {
   sim: p => sim(p), // the side panel's Simulator: iOS Simulators and Android (adb) devices
   cloudflared: (o: { ws?: string }) => remoteMod.cloudflared(o),
   aiCredits: () => aiCredits(), // Usage's OpenRouter part: credits left, the key's spend
-  usage: (p?: { now?: number }) => usage(core.state.settings?.usage, usageWho(), p?.now, metersMod.statusLimits), // claude's status line's, while fresh
+  usage: (p?: { now?: number }) => Promise.all([usage(core.state.settings?.usage, usageWho(), p?.now, metersMod.statusLimits), quotaUsage(core.state.settings?.quotaSources, quotaToken, p?.now)]).then(([a, b]) => [...a, ...b]), // claude's status line's, while fresh; a quota source's accounts after
+  quotaSourceSet: (p: In<typeof quotaSourceSet>) => quotaSourceSet(p), // Settings › Usage › Add a quota source: its token to the Keychain
+  quotaSourceRm: (p: In<typeof quotaSourceRm>) => quotaSourceRm(p),
   // laki limits, laki_limits: usage's own cache and back-off (no request the status bar's ring wouldn't make), only the
   // agents the managed policy allows. Recording mode: no account names, unless the caller's workspace isn't a private one
   limits: async (p?: { agent?: unknown; from?: { ws?: unknown; tab?: unknown } }) => {
@@ -1047,7 +1049,7 @@ const FROM = new Set(['kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggest
   'clientAnswer', 'events', 'agentLog', 'agentCalls', 'ticketMint', 'diskUsage', 'diskTidy', 'chatSearch', 'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp',
   'safeOff', 'reviewMark', 'reviewNotesGet', 'reviewNotesSet', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'screenLock', 'presence', 'remoteLog', 'diagnostics',
   'agentContext', 'agentContextOpen', 'stateOwn', 'aiState', 'aiNew', 'aiStop', 'aiChats', 'aiOpen', 'aiChatRm', 'aiUnqueue', 'aiContinue', 'studioChatRm',
-  'voiceText', 'projectClone', 'projectNew', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'tabAccount', 'imageRead', 'tabReopen',
+  'voiceText', 'projectClone', 'projectNew', 'wsUpdate', 'stopAll', 'dndSet', 'longStop', 'limits', 'tabDraft', 'tabMode', 'accountRm', 'quotaSourceSet', 'quotaSourceRm', 'tabAccount', 'imageRead', 'tabReopen',
   'hookAdd', 'hookRm', 'hookSecret', 'hookExpose', 'alertShow', 'noticeShow', 'alertAnswer', 'flowFirst', 'flowHold', 'wsSet', 'prompts', 'sideAsk', 'chatList',
   'chatImport', 'turnUndo', 'turnRewind', 'turnFork', 'tabHandover', 'secretAsk', 'secretGive', 'show', 'linkRm', 'tabSet', 'presetSave', 'wsArchive', 'prAct',
   'prDraft', 'ship', 'shipDraft', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'scheduleRelease', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun',
@@ -1595,7 +1597,7 @@ chatRead chatSearch bgOutput flowList flowGet flowHistory prompts chatList hookL
   wsSet: p => Object.keys(p ?? {}).find(k => !WS_SET.has(k)) ?? '',
   alertAnswer: p => (alertMacOnly(p) ? 'raise or remove a spend cap' : ''), // cap.ts' choices that raise it: the Mac's
 }
-const ANSWER_NO = new Set(['safeOff', 'kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
+const ANSWER_NO = new Set(['quotaSourceSet', 'quotaSourceRm', 'safeOff', 'kcWrapper', 'kcWrapped', 'mcpImport', 'suggest', 'suggestAnswer', 'scheduleCopy', 'promptQuestions', 'promptImprove', 'secretForget', 'gitTidy', 'gitTidyTick', 'goalSet', 'goalClear', 'flowExport', 'flowImport', 'flowImportSave',
   'flowWaitEnd', 'dataBackup', 'dataRestore', 'signIn', 'mcpSignIn', 'keptOpen', 'keptRm', 'uninstall', 'skillOpen', 'wsRepair', 'tabBell', 'remoteKeep', 'clientLog',
   'tabUnbox', 'projectNetAllow', 'clientAdd', 'clientRotate', 'clientRm', 'clientList', 'clientAnswer', 'clientWho', 'events', 'ticketMint', 'diskTidy',
   'mergeQueueStart', 'mergeQueueStop', 'aiShot', 'aiOpenApp', 'aiHelp', 'archivedKeep', 'termAnswer', 'termList', 'termRevoke', 'diagnostics', 'agentContext',

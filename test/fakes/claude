@@ -21,9 +21,33 @@ if (args[0] === 'auth' && args[1] === 'login') {
 // -p --output-format json (an extension's AI source, aiOnce): one result; "fail…" fails, "words…" has no json block,
 // "slow…" waits (a Stop ends it); "slackread…": a tool it may not use unasked, asked through --permission-prompt-tool
 // (an extension's laki_ask server), what the user said in its data
-// -p --input-format stream-json (agentModels): its initialize answer's models, a gateway's custom one among them
+// -p --input-format stream-json (agentModels, usage.ts' plan limits): its control requests answered a line at a time:
+// initialize with its models (a gateway's custom one among them) and its account, get_usage as FAKE_CLAUDE_USAGE says
+// (or $HOME/claude-usage's; unset: an older claude that doesn't know it; ok, mismatch: spend in two currencies, none: no limits for this sign-in,
+// bedrock: another provider's sign-in, fail: an error, slow: no answer); each ask in FAKE_LOG as bin 'claude-usage'
 if (args[0] === '-p' && args[args.indexOf('--input-format') + 1] === 'stream-json' && !args.includes('--mcp-config')) {
-  return process.stdin.once('data', () => process.stdout.write(JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: 'laki', response: { models: [{ value: 'default', displayName: 'Default' }, { value: 'opus', displayName: 'Opus', description: 'everyday', supportedEffortLevels: ['low', 'high'] }, { value: 'gw/custom-1', displayName: 'Custom 1' }], hooksOff: args.includes('{"disableAllHooks":true}') } } }) + '\n'))
+  const say = (id, response, error) => process.stdout.write(JSON.stringify({ type: 'control_response', response: error ? { subtype: 'error', request_id: id, error } : { subtype: 'success', request_id: id, response } }) + '\n')
+  const mode = process.env.FAKE_CLAUDE_USAGE ?? (() => { try { return fs.readFileSync(`${process.env.HOME}/claude-usage`, 'utf8').trim() } catch { return '' } })() // the env, else $HOME/claude-usage (a test switching it)
+  const at = h => new Date(Date.now() + h * 3600e3).toISOString()
+  const limits = { five_hour: { utilization: 15, resets_at: at(2) }, seven_day: { utilization: 36, resets_at: at(50) }, seven_day_opus: null, extra_usage: { is_enabled: false, monthly_limit: null, used_credits: null }, model_scoped: [{ display_name: 'Fable', utilization: 8, resets_at: at(50) }], spend: { enabled: true, used: { amount_minor: 1250, currency: 'USD', exponent: 2 }, limit: { amount_minor: 5000, currency: mode === 'mismatch' ? 'EUR' : 'USD', exponent: 2 } } }
+  let buf = ''
+  process.stdin.on('data', d => {
+    buf += d
+    for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
+      const m = JSON.parse(buf.slice(0, i))
+      buf = buf.slice(i + 1)
+      const sub = m.request?.subtype
+      if (sub === 'initialize') say(m.request_id, { models: [{ value: 'default', displayName: 'Default' }, { value: 'opus', displayName: 'Opus', description: 'everyday', supportedEffortLevels: ['low', 'high'] }, { value: 'gw/custom-1', displayName: 'Custom 1' }], hooksOff: args.includes('{"disableAllHooks":true}'), account: { subscriptionType: 'Claude Max', apiProvider: mode === 'bedrock' ? 'bedrock' : 'firstParty' } })
+      else if (sub === 'get_usage') {
+        fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude-usage', args, skip: m.request.skip_behaviors, dir: process.env.CLAUDE_CONFIG_DIR ?? '' }) + '\n')
+        if (mode === 'slow') continue
+        if (!mode) say(m.request_id, undefined, 'Unsupported control request subtype: get_usage')
+        else if (mode === 'fail') say(m.request_id, undefined, 'Failed to fetch usage: 503')
+        else say(m.request_id, { subscription_type: 'max', rate_limits_available: mode !== 'none', rate_limits: mode === 'none' ? null : limits })
+      }
+    }
+  })
+  return
 }
 if (args[0] === '-p' && args[args.indexOf('--output-format') + 1] === 'json') {
   const prompt = args[args.length - 1]
