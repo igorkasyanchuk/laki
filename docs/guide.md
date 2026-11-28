@@ -261,22 +261,28 @@ xattr -dr com.apple.quarantine /Applications/Laki.app
 
 ### Linux, and Windows through WSL
 
-`npm run pack:linux` builds the Linux app in Docker, `dist/linux/Laki-<version>-arm64.AppImage` (`ARCH=x64 npm run
-pack:linux`: `…-x86_64.AppImage`), then runs the tests and a smoke test against it. To run it on Ubuntu 24.04, or on
-Windows in WSL 2 (its Ubuntu; WSLg shows the window):
+Each release has an AppImage for x64 (`Laki-<version>-x86_64.AppImage`) and arm64 (`…-arm64.AppImage`), for Ubuntu
+22.04 or later, Debian 12 and Fedora 40 ([install.md](install.md#linux)); `npm run pack:linux` builds one in Docker
+(`ARCH=x64` for x64), then runs the tests and a smoke test against it. To run it on Ubuntu 24.04, or on Windows in
+WSL 2 (its Ubuntu; WSLg shows the window):
 
 ```bash
-sudo apt install libnss3 libasound2t64 fuse3 wslu xdg-utils   # wslu: WSL only, links open in Windows' browser
-chmod +x Laki-*.AppImage && ./Laki-*.AppImage
+sudo apt install libnss3 libasound2t64 xdg-utils wslu   # wslu: WSL only, links open in Windows' browser
+mkdir -p ~/Applications && mv Laki-*.AppImage ~/Applications/Laki.AppImage
+chmod +x ~/Applications/Laki.AppImage && ~/Applications/Laki.AppImage
 ```
 
 In WSL, add `export BROWSER=wslview` to `~/.bashrc` for those links. Everything runs in Linux there: install your agents
 and `gh` in WSL and sign in there, and keep projects in its own folders (`~/…`, not `/mnt/c`: git is slow across that
-boundary). On a desktop Ubuntu 24.04+, if it stops on the SUID sandbox helper (AppArmor), start it with `--no-sandbox`.
+boundary). On Ubuntu 23.10 and later the AppImage starts Laki without Chromium's sandbox (AppArmor allows the user
+namespaces it needs only to programs with a profile), and Settings › Updates says so; one AppArmor profile for your
+AppImage's path turns it on: [install.md](install.md#chromiums-sandbox-on-ubuntu-2310-and-later).
 The AppImage's starter is static: no libfuse2 or zlib1g-dev to install (a plain Ubuntu 24.04 arm64 runs it), and with
 no FUSE at all `--appimage-extract-and-run` runs it.
-Laki doesn't update itself on Linux: when a newer one is out, Settings › Updates says so, and *Download* opens its
-release page; replace the AppImage with the new one (your data stays).
+In a folder you own, it updates itself (Settings › Updates): the release's AppImage is downloaded beside it, checked
+against the release's `SHA256SUMS.txt`, and put in under the same name on *Restart to update*, the one before kept as
+`<name>.previous` for *Go back*. In a folder you can't write, *Download* opens the release page and you replace it
+(your data stays).
 
 On a server with no screen, `./Laki-*.AppImage --headless --tailscale` runs Laki for a browser instead of a window:
 [headless.md](headless.md).
@@ -3632,9 +3638,9 @@ sidebar for (youtube-nocookie.com).
 Laki checks for a new version at launch and every 4 hours (Settings › General › *Updates*, where *Check for updates*
 turns it off; the app menu's *Check for Updates…* asks now). A new version shows in the status bar (*Update to x.y*,
 a click opens Settings › Updates) until you update, and says so once in a toast; nothing downloads until you click. In Settings › General › *Updates*: its notes, then *Update to x.y* (a downloaded,
-signed Mac app: it downloads, then *Restart to update*; your agents keep running) or *Download* (Linux, a build of
-your own: the release's page). Pre-releases are never offered. *Update delay* (none, 1, 3, 7, 14 or 30 days) offers a
-release only once it's that old; meanwhile Settings says when it will be, and *Skip the delay once* lets that one in now. *Skip this version* passes on the release offered (the next one is offered as usual; *Offer it again* undoes it), and *Earlier versions* opens the releases page if you need to go back one. On a Mac, *Go back to <version>* does it in one click: the version before the last update, kept when that update downloaded (with 1 GB free) and checked (its signature, the same developer). Laki restarts as it and skips the newer one; if your data is in a newer format than it reads, Settings says so before you click.
+signed Mac app, or an AppImage in a folder you own: it downloads, then *Restart to update*; your agents keep
+running) or *Download* (an AppImage you can't write, a build of your own: the release's page). Pre-releases are never offered. *Update delay* (none, 1, 3, 7, 14 or 30 days) offers a
+release only once it's that old; meanwhile Settings says when it will be, and *Skip the delay once* lets that one in now. *Skip this version* passes on the release offered (the next one is offered as usual; *Offer it again* undoes it), and *Earlier versions* opens the releases page if you need to go back one. On a Mac, *Go back to <version>* does it in one click: the version before the last update, kept when that update downloaded (with 1 GB free) and checked (its signature, the same developer); on Linux, the AppImage before it, kept beside yours. Laki restarts as it and skips the newer one; if your data is in a newer format than it reads, Settings says so before you click.
 *Update when idle* (beside *Update to x.y* and *Restart to update*) waits until no agent works or asks you, then
 downloads if it must, restarts Laki on the new version, and, once every agent is idle, restarts its daemon too (tabs
 resume); *Cancel* stops it. An agent can ask for it (`laki update --when-idle`, MCP's `laki_update_when_idle`): its own

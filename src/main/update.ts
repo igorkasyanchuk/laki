@@ -39,7 +39,7 @@ export const signed = (): Promise<boolean> =>
     : new Promise(r => execFile('/usr/bin/codesign', ['-dv', '--verbose=2', bundle()], (_e, _out, err) => r(/Authority=Developer ID Application:/.test(String(err)))))
 
 export function updater(send: (s: UpdateState) => void) {
-  let s: UpdateState = { version: app.getVersion(), status: 'idle', install: false }
+  let s: UpdateState = { version: app.getVersion(), status: 'idle', install: false, ...(linux && app.commandLine.hasSwitch('no-sandbox') && { sandboxOff: true }) }
   const set = (next: Partial<UpdateState>) => send((s = { ...s, found: undefined, ...next }))
   const known = (linux ? Promise.resolve(!!appImage()) : signed()).then(install => void (s.install = install))
   let part: string | undefined // Linux: the checked download, until Restart to update

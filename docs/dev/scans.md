@@ -616,7 +616,7 @@ date. Only Settings' auto checks (`updateCheck`, on unless false: App's `updateA
 after the first, then `UPDATE_EVERY`, 4 hours) announce a version, once (`found`, userData's `update.json` `told`: App's
 toast, *See what's new*); App's `upd` (the state as it opens, then each change) keeps `.sb-update` in the status bar
 while `latest` is there (*Update to x.y*, *Downloading…*, *Restart to update*: Settings › Updates). Nothing downloads until `download` (Settings' *Update to x.y*), only with `install`
-(packaged, macOS, `codesign -dv` says Developer ID) and the feed: Electron's `autoUpdater` (Squirrel.Mac, `serverType:
+(packaged, macOS, `codesign -dv` says Developer ID; on Linux an AppImage it may replace) and the feed: Electron's `autoUpdater` (Squirrel.Mac, `serverType:
 'json'`, that version's feed, `feedOf`: its zip), `ready` on `update-downloaded`, then `install` is `quitAndInstall`
 (main sets `quitting` on autoUpdater's `before-quit-for-update`: the window's close would only hide it). A check has
 30 s (`AbortSignal.timeout`) and sets `checking` before any await, so a second one meanwhile returns its state; `auto`
@@ -628,7 +628,21 @@ Updates…* is `laki://settings/general?spot=Updates` (links.ts' settings `spot`
 Developer ID one (its `Laki.app/Contents/MacOS/Laki` through `codesign -dv`: Squirrel.Mac turns an ad-hoc one down). The
 app's Info.plist has `ElectronSquirrelPreventDowngrades` (`build.mac.extendInfo`): Squirrel.Mac refuses a downloaded app
 older than the one running, whatever the release's tag says (an older signed build tagged as new). Settings ›
-General's `UpdatesField`. ponytail: no Linux self-update (no new dependency), no channels, no daemon restart.
+General's `UpdatesField`. ponytail: no channels, no daemon restart.
+On Linux (`src/main/appimage.ts`, no electron in it: `test/appimage.test.ts` runs it on node with a local server):
+`install` is `appImageOf` (packaged, `$APPIMAGE` an absolute file it can write, in a folder it can write); the feed is
+`releaseOf`'s Linux one (`appImageName` for this arch, x64 as x86_64, and `SHA256SUMS.txt` both in the release).
+`download` is `appImageGet`: the sums first (`sumOf`), the AppImage streamed to `.<name>.download` beside it (0600,
+`wx`, hashed as it comes, net.fetch with a 30-minute timeout), refused and removed on a mismatch, then given the running
+one's mode; `ready` keeps its path in memory (`appImageTidy` removes one a quit left, as the updater starts). `install`
+is `appImageSwap` (the running file to `<name>.previous`, the download to its name, put back if that fails;
+`previous-appimage.json` in userData: `{ version, stateV }`), then `app.relaunch({ execPath: <the AppImage> })` and
+`app.quit()`. `lookBack` offers `back` at once (`keptOf`: the record and its file; `backWhy`: an older version only),
+and `update-back` is `appImageBack` (the two swapped through `<name>.swap`, the record now this version's), update.json's
+`pass`, relaunch. `sandboxOff`: started with `--no-sandbox` (the AppImage's AppRun adds it when `unshare -Ur true`
+fails: Ubuntu 23.10+'s AppArmor user namespace rule), Settings' line links `SANDBOX_DOCS` (install.md's profile).
+ponytail: the trust limit is TLS plus a checksum from the same release, no signature (docs/trust.md).
+`scripts/linux-matrix.sh` runs the built AppImages on Ubuntu 24.04 and 22.04, Debian 12 and Fedora 40 in Docker.
 
 Go back (#G1, `src/main/back.ts`; pure parts in `src/shared/update.ts`: `keepWhy`, `backRefused`, `backOf`, in
 `test/update.test.ts`): on `update-downloaded`, `keepNow` copies the running bundle with `ditto` to

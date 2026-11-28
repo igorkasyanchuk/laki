@@ -157,6 +157,8 @@ time and AI money per run (`budget: 60 min, $5`).
   tailnet's devices only (a PIN too if you like), or with Funnel and a PIN for the internet. Its link opens once, in one tab;
   copy the link and the PIN apart, or *Copy all* for both in one message. End to end: what the phone and the Mac say is
   sealed between them, so the tunnel's provider can't read or log it.
+- **Linux**: an AppImage for x64 and arm64 (Ubuntu, Debian, Fedora) that updates itself in place, checked against the
+  release's checksums, with Go back; on Ubuntu 23.10 and later, one AppArmor profile keeps Chromium's sandbox on.
 - **Headless**: on a server with no screen, `./Laki.AppImage --headless --tailscale`, and Laki in your browser
   ([headless.md](headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you

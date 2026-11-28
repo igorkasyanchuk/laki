@@ -6,7 +6,7 @@ use Laki in a browser, from your laptop or phone, through **remote access**.
 
 ## Run it
 
-On Linux, the AppImage (`npm run pack:linux` builds it: [the guide's Linux part](guide.md#linux-and-windows-through-wsl)):
+On Linux, the release's AppImage ([install.md](install.md#linux); `npm run pack:linux` builds one):
 
 ```bash
 chmod +x Laki-*-x86_64.AppImage

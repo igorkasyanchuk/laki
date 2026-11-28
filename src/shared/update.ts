@@ -13,12 +13,15 @@ export type UpdateState = {
   latest?: Release // the newest release, once a check found one newer
   checked?: number // the last check that answered (ms)
   error?: string
-  install: boolean // this copy replaces itself: a Mac, packaged, Developer ID signed; else Download is the release page
+  install: boolean // this copy replaces itself: a Mac, packaged, Developer ID signed, or an AppImage it may write (main/appimage.ts); else Download is the release page
   found?: boolean // this state's check found a version not told about before (the app's toast)
   held?: { version: string; until: number } // a newer release Settings' Update delay holds back until then (ms)
   passed?: string // R7: the newest release is one you chose to skip (Skip this version): not offered until a newer one is out
   back?: Back // #G1: Settings' Go back to <version>: the version before an update, kept and verified
+  sandboxOff?: boolean // Linux: started with --no-sandbox (the AppImage's starter adds it where user namespaces are off: Ubuntu 23.10 and up), SANDBOX_DOCS says how to turn it on
 }
+// docs/install.md's AppArmor profile for the AppImage (Settings › Updates links it while Chromium's sandbox is off)
+export const SANDBOX_DOCS = 'https://github.com/igorkasyanchuk/laki/blob/main/docs/install.md#chromiums-sandbox-on-ubuntu-2310-and-later'
 
 // #G1: Go back. Before an update installs, main (src/main/back.ts) copies the running bundle to
 // userData/previous.noindex/Laki.app (ditto, one kept; out of Spotlight) with previous.json: its version and the state.json schema it knows. Go

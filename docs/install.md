@@ -15,7 +15,7 @@ brew upgrade --cask laki                        # a new version (or Settings ›
 What it needs:
 
 - git;
-- the agents you use, on the PATH your login shell gives: `claude`, `codex`, `agy` (Antigravity: `curl -fsSL https://antigravity.google/cli/install.sh | bash`), `grok`, `opencode`;
+- the agents you use, on the PATH your login shell gives: `claude`, `codex`, `agy` (Antigravity: `curl -fsSL https://antigravity.google/cli/install.sh | bash`), `grok`, `opencode`, `pi`;
 - optional: `gh`, signed in (`gh auth login`), for pull requests, checks and reviews; `cloudflared` or Tailscale for
   Expose to the world and remote access.
 
@@ -54,12 +54,53 @@ npm link                          # optional: the laki CLI
 `npm run pack:x64` builds the Intel app on an Apple silicon Mac. Working on Laki: [CONTRIBUTING.md](../CONTRIBUTING.md)
 (build, test, the demo world, the rules) and [AGENTS.md](../AGENTS.md) (how the code works).
 
-## Linux and Windows (WSL 2), a preview
+## Linux
 
-`npm run pack:linux` builds `dist/linux/Laki-<version>-<arch>.AppImage` in Docker and tests it there (`ARCH=x64` for
-Intel/AMD). [The guide](guide.md#linux-and-windows-through-wsl) says how to run it; on a server with no screen,
-[headless](headless.md).
-It doesn't update itself: Settings › General › Updates says when a newer one is out, and you replace the AppImage.
+An AppImage for x64 and arm64: Ubuntu 22.04 or later, Debian 12, Fedora 40 (each run in Docker before a release),
+with a desktop. Download `Laki-<version>-x86_64.AppImage` (or `-arm64`) from
+[the latest release](https://github.com/igorkasyanchuk/laki-releases/releases/latest), keep it in a folder you own,
+and start it:
+
+```bash
+mkdir -p ~/Applications && mv ~/Downloads/Laki-*.AppImage ~/Applications/Laki.AppImage
+chmod +x ~/Applications/Laki.AppImage && ~/Applications/Laki.AppImage
+```
+
+No libfuse2 to install: its starter is static (with no FUSE at all, `--appimage-extract-and-run`). On Ubuntu 24.04,
+`sudo apt install libnss3 libasound2t64 xdg-utils` if they're missing. It updates itself (Settings › General ›
+Updates): *Update to x.y* downloads the release's AppImage beside yours, checks it against the release's
+`SHA256SUMS.txt`, and *Restart to update* puts it in under the same name, the one before kept as
+`Laki.AppImage.previous` for *Go back*. In a folder you can't write (`/opt`), *Download* opens the release page and you
+replace it. [The guide](guide.md#linux-and-windows-through-wsl) has the rest; on a server with no screen,
+[headless](headless.md). `npm run pack:linux` builds it yourself in Docker (`ARCH=x64` for Intel/AMD).
+
+### Chromium's sandbox on Ubuntu 23.10 and later
+
+Ubuntu 23.10 and later let only programs with an AppArmor profile make the user namespaces Chromium's sandbox needs.
+Without one, the AppImage starts Laki with `--no-sandbox`: it works, but its pages run without that sandbox, and
+Settings › General › Updates says so. One profile for your AppImage's path turns it on (once: an update keeps the
+path and the name):
+
+```bash
+f=$(readlink -f ~/Applications/Laki.AppImage)   # where yours is
+sudo tee /etc/apparmor.d/laki > /dev/null <<EOF
+abi <abi/4.0>,
+include <tunables/global>
+
+profile laki "$f" flags=(default_allow) {
+  userns,
+}
+EOF
+sudo apparmor_parser -r /etc/apparmor.d/laki
+```
+
+Then start Laki again; Settings no longer says the sandbox is off. The profile lets that one file (and what it starts)
+make user namespaces, nothing else; it trusts whatever is at that path, so keep it in a folder only you write. To take
+it away: `sudo apparmor_parser -R /etc/apparmor.d/laki && sudo rm /etc/apparmor.d/laki`.
+
+## Windows (WSL 2), a preview
+
+The Linux AppImage in WSL 2's Ubuntu, WSLg showing the window: [the guide](guide.md#linux-and-windows-through-wsl).
 
 ## If something's off
 

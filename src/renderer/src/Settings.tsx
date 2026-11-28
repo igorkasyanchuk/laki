@@ -12,7 +12,7 @@ import { type CSSProperties, Fragment, type ReactNode, useEffect, useMemo, useRe
 import { BACKUP_DIR, type CostWarn, COST_WARN, type TgAi, LABS, ACCOUNT_AGENTS, FOLD_AFTER, type SecretKept, STORAGE_DAYS, type UninstallRow, type AccountAgent, type HookSeen, type AccountView, type AchievementsKept, type Agent, AGENT_NAMES, AGENTS, type AgentUsage, aiOn, type Design, type NamedTunnel, type AiSettings, COMPACT_DAYS, EFFORTS, FAST, SANDBOX, SANDBOX_NO, sandboxOff, NET_OK, NET_NO, type Net, type FixWhat, flowsOn, HOME_ACCOUNT, isAccountAgent, type Memory, MEMORY_MAX, MODELS, type NotifyKind, type OwnPrice, type QuotaSource, permInArgs, PERMS, PR_BOTS, PR_PROMPTS, PR_QUIET, PR_SCAN, PR_TRIES, type Preset, type PRMarks, type ProjectLook, REMOTE_TRIES, type SideLook, type SideStyle, SLEEP_AFTER, specsOn, type TelegramView, type VoiceSettings, VOICE_MODEL, type Webhook, type WhenDone } from '../../shared/types'
 import { COPILOT, CURSOR, isCopilot, isCursor } from '../../shared/install'
 import { hhmm } from '../../shared/tray'
-import { outLine, RELEASES_URL, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
+import { outLine, RELEASES_URL, SANDBOX_DOCS, STATE_V, UPDATE_DELAYS, type UpdateState } from '../../shared/update'
 import { ago } from '../../shared/widget'
 import { exportable, importable, type RunAction, STALE_AFTER, type Template, USAGE_AT } from './text'
 import { bridge, openExternal } from './api'
@@ -704,7 +704,7 @@ function GoBack({ back, now }: { back: NonNullable<UpdateState['back']>; now: st
   }
   return (
     <div className="row cli-row">
-      <Says title={`Laki ${back.version} is kept`} hint={`The version before this update, checked: same developer, signature intact.${data}`} />
+      <Says title={`Laki ${back.version} is kept`} hint={`${/Linux/.test(navigator.userAgent) ? 'The AppImage before this update, kept beside this one.' : 'The version before this update, checked: same developer, signature intact.'}${data}`} />
       <span className="grow" />
       <button type="button" onClick={() => void go()}>
         Go back to {back.version}
@@ -790,6 +790,15 @@ function UpdatesField({ on, onOn, delay, onDelay, idle, onIdle }: { on: boolean;
         </div>
       )}
       {u.back && bridge?.updateBack && <GoBack back={u.back} now={u.version} />}
+      {u.sandboxOff && (
+        <p className="muted small">
+          Chromium's sandbox is off: this Linux doesn't let Laki use it (Ubuntu 23.10 and later restrict it).{' '}
+          <a href={SANDBOX_DOCS} onClick={e => (e.preventDefault(), openExternal(SANDBOX_DOCS))}>
+            Turn it on ↗
+          </a>{' '}
+          with one AppArmor profile, once.
+        </p>
+      )}
       <p className="muted small update-back">
         A release went wrong for you?{' '}
         <a href={RELEASES_URL} onClick={e => (e.preventDefault(), openExternal(RELEASES_URL))}>

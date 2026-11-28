@@ -62,7 +62,7 @@ limit. Remote access opens the same inbox on your phone, over Cloudflare or Tail
 | Conflicts between parallel tasks | Collision radar, while they work | At merge |
 | What the agents cost | Every agent chat on this Mac, each answer once, at API prices; each plan's limits | Each agent's own `/usage` |
 | Account needed | None | None |
-| Platforms | macOS 13+ on Apple silicon; Intel, Linux and Windows (WSL 2): build it yourself | Any |
+| Platforms | macOS 13+ on Apple silicon; Linux (x64, arm64); Intel Macs and Windows (WSL 2): build it yourself | Any |
 
 Everything else (themes, extensions, workflows, scheduled prompts, the CLI and its MCP server, trusted clients for apps
 outside Laki): [docs/features.md](docs/features.md).
@@ -76,7 +76,11 @@ macOS 13 or later on Apple silicon. Download the dmg from [the latest release](h
 brew install --cask igorkasyanchuk/laki/laki    # then: brew upgrade --cask laki
 ```
 
-You need git and the agents you use on your PATH; `gh` (signed in) for pull requests. Building it yourself, Linux and
+Linux (Ubuntu 22.04+, Debian 12, Fedora 40; x64 or arm64): the AppImage from the same release, which updates itself
+([docs/install.md](docs/install.md#linux); Ubuntu 23.10+ keeps Chromium's sandbox with
+[one AppArmor profile](docs/install.md#chromiums-sandbox-on-ubuntu-2310-and-later)).
+
+You need git and the agents you use on your PATH; `gh` (signed in) for pull requests. Building it yourself and
 Windows (WSL 2): [docs/install.md](docs/install.md).
 
 ## Use

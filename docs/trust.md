@@ -37,7 +37,7 @@ Counting every agent chat on this Mac (Settings › Usage) reads their files her
 | Host | What is sent | When | How to turn it off |
 |---|---|---|---|
 | `api.github.com` | A request for the latest release of `igorkasyanchuk/laki-releases`: your IP address and Laki's user agent, nothing else | At launch, then every 4 hours | Settings › General › Updates |
-| `github.com` (and the release asset it redirects to) | The update's download: what any download sends | Only when you install an update (a signed Mac: Squirrel downloads it) | Don't install it; Updates off |
+| `github.com` (and the release asset it redirects to) | The update's download: what any download sends | Only when you install an update (a signed Mac: Squirrel downloads it; an AppImage: Laki downloads it and the release's `SHA256SUMS.txt`) | Don't install it; Updates off |
 | `avatars.githubusercontent.com` | A GitHub login in the URL, to draw a PR author's picture | When a PR panel or a widget shows one | Settings › Appearance › GitHub pictures |
 | GitHub, through your `gh` | What `gh` sends, as you: PRs, checks, reviews, issues, codespaces of the repos you add | While a workspace has a branch on GitHub (the PR scans), and as you act | Don't sign `gh` in, or use projects without a GitHub remote |
 | Your git remotes, through `git` | `git fetch` and `git push`, as you | New worktrees fetch their base; Ship pushes | Projects without a remote |
@@ -125,6 +125,11 @@ So no program can run its own JavaScript inside Laki's signed binary to borrow t
 helper binary of its own in the bundle, with its own bundle id and none of those grants
 ([SECURITY.md › Known limits](../SECURITY.md#known-limits)). A build from source
 (`npm run pack`) is ad-hoc signed and not notarized: macOS asks you to allow it once.
+
+On Linux the AppImage isn't signed. An update Laki installs itself is checked against the same release's
+`SHA256SUMS.txt` before it goes in: a download cut short or changed on the way is refused, but both come from one
+GitHub release over TLS, so whoever could publish a release there could publish both. A signature of Laki's own is
+the step after. To check one by hand: `sha256sum -c --ignore-missing SHA256SUMS.txt` beside it.
 
 ## Who maintains Laki
 
