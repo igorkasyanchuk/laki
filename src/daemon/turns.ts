@@ -17,7 +17,7 @@ import { widgetEvent } from './widgets.ts'
 import { dir } from './dir.ts'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { diff, g, inside, treeOf, turnDir } from './files.ts'
-import { chatRead } from './meters.ts'
+import { chatRead, usageWs } from './meters.ts'
 import { aiOnce, hasKey } from './ai.ts'
 import { accountEnv, accountFor, accountNamed, homeDir } from './accounts.ts'
 import { transcriptOf } from './share.ts'
@@ -542,6 +542,7 @@ export async function sideAsk(p: { tab: string; text: string }) {
       const j = JSON.parse(out)
       if (j.is_error) throw new Error(j.result || j.subtype || 'claude failed')
       s.session = j.session_id ?? s.session
+      usageWs(s.session, tab.workspace, 'claude') // its fork's own answers: the tab's workspace's, not outside Laki
       text = String(j.result ?? '').trim()
     } else {
       if (!aiOn(state.settings) || ((state.settings?.ai?.backend ?? 'openrouter') === 'openrouter' && !hasKey())) throw new Error("a side chat about this agent uses Laki AI's model: turn Laki AI on (Settings › AI)")

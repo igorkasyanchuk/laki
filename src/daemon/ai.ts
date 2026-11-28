@@ -30,7 +30,7 @@ import { planGet, planOfChat } from './plans.ts'
 import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetLogs, widgetsView, widgetWhat } from './widgets.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 import { IMPROVE_MAX, IMPROVE_SYSTEM, improvedOf, treeOf } from '../shared/improve.ts'
-import { chatRead } from './meters.ts'
+import { chatRead, usageSkip } from './meters.ts'
 import { redact } from './share.ts'
 import { explainWhat } from '../shared/ask.ts'
 
@@ -922,7 +922,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const cfg = userCfg && backend === 'claude' ? secretFile(JSON.stringify({ mcpServers: { laki_ask: mcpWith({ LAKI_PERM_EXT: o.perm! }) } }), 'json') : undefined
   const args =
     backend === 'claude'
-      ? ['-p', '--output-format', 'json', ...(userCfg ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '', '--strict-mcp-config']), ...(cfg ? ['--mcp-config', cfg, '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
+      ? ['-p', '--output-format', 'json', '--no-session-persistence', ...(userCfg ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '', '--strict-mcp-config']), ...(cfg ? ['--mcp-config', cfg, '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
       : ['exec', '--json', '--skip-git-repo-check', ...(userCfg ? [] : ['--ignore-user-config', ...CODEX_TOOLS.flatMap(f => ['-c', `features.${f}=false`])]), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
   mkdirSync(home, { recursive: true })
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)), ...(!userCfg && backend === 'claude' && { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' }) } // claude.ai's connectors: --strict-mcp-config keeps them out too, this for an older claude
@@ -948,6 +948,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
         call.in = (j.usage?.input_tokens ?? 0) + (j.usage?.cache_read_input_tokens ?? 0) + (j.usage?.cache_creation_input_tokens ?? 0)
         call.out = j.usage?.output_tokens ?? 0
       }
+      if (j.type === 'thread.started') usageSkip(j.thread_id) // its rollout: the call log counts it, not the machine scan
       if (j.type === 'item.completed' && j.item?.type === 'agent_message') text = j.item.text ?? ''
       if (j.type === 'turn.completed') (call.in += j.usage?.input_tokens ?? 0), (call.out += j.usage?.output_tokens ?? 0)
     }
@@ -1262,7 +1263,7 @@ async function claude(o: Opts) {
   let failed = ''
   try {
     await cli<ClaudeLine>(o, 'claude', args, j => {
-      if (j.session_id) resume[sk] = j.session_id
+      if (j.session_id) (resume[sk] = j.session_id), usageSkip(j.session_id) // resumed: its transcript kept, the call log counts it
       if (j.type === 'system' && j.model) r.model = j.model
       if (j.type === 'assistant')
         for (const b of j.message?.content ?? []) {
@@ -1318,7 +1319,7 @@ async function codex(o: Opts) {
   let failed = ''
   try {
     await cli<CodexLine>(o, 'codex', args, j => {
-      if (j.type === 'thread.started' && j.thread_id) resume[sk] = j.thread_id
+      if (j.type === 'thread.started' && j.thread_id) (resume[sk] = j.thread_id), usageSkip(j.thread_id)
       const it = j.item
       if (j.type === 'item.started' && it?.type === 'mcp_tool_call') (r.calls++, say(o.t, 'tool', `${it.tool} ${JSON.stringify(it.arguments ?? {})}`))
       if (j.type === 'item.completed' && it?.type === 'agent_message') r.text = it.text ?? ''

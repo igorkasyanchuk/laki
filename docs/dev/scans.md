@@ -753,7 +753,8 @@ sidechain's; `<synthetic>` skipped); the window `WINDOW` (200K), 1M for a `[1m]`
 `model`, the preset's args; none named: claude's own settings, `claudeBig`: the workspace's `.claude/settings.local.json`,
 `settings.json`, then the account's folder's) or once `used` is past it. Codex: `turn_context`'s model, the last `token_count`'s
 `last_token_usage.total_tokens` of `model_context_window`, its `total_token_usage` growing (`total`: a smaller one is
-counted anew). Tokens as parts by model (`Meter.by`, `days`; `types.ts` `Parts`: `in` (input not from the cache), `out`, `w5` and `w1`
+counted anew); claude's answer is a line per block, the largest of each part across its lines counts (a subagent's
+output grows as it streams: T3 Code's rule, `partsMax`), once. Tokens as parts by model (`Meter.by`, `days`; `types.ts` `Parts`: `in` (input not from the cache), `out`, `w5` and `w1`
 (cache writes kept 5 minutes and an hour: claude's `cache_creation.ephemeral_1h_input_tokens`, the rest 5 minutes; no
 split said, all), `rd` (reads); `L` past the model's long line, `F` fast mode: `partsOf`, share.ts `usageParts`), priced as
 they're read (`meterCost`: the priced cost, the tokens of each model with no price). Prices: `shared/prices.json`
@@ -762,12 +763,26 @@ they're read (`meterCost`: the priced cost, the tokens of each model with no pri
 fast mode's 2x on Opus 5.5, Opus 5, Opus 4.8, Fable 5.2 and Mythos 5.2); by the exact model id, never a family guess: a
 model with no row is unpriced. `costOf`: a 1-hour write 2x input and a 5-minute one 1.25x unless the row says; a
 request whose whole input (cache too) is past the row's `long.above` (Haiku 5.5's 100K, Sonnet 4/4.5's 200K, gpt-5.4,
-5.5 and 5.6's 272K) at those rates, every token of it; fast (claude's `usage.speed` `fast`) times every rate. Copied
-answers count once: each claude answer's key (`answerKey`: message id and request id, sha-256, 11 characters), each
-codex `token_count`'s (its payload: totals and limits, copied as they were; a copy's line time and session are the
-copy's) is owned by the first chat to report it (meters.ts `ownsOf`: `owners`, kept as each chat's `keys` by day in
-usage-days.json, gone with the day) and, in a tab, by the first file of it (`keyFile`: a spawned codex thread's copy of
-its parent's turns); a forked or resumed chat's copied lines add nothing, its context still its own. `meterView`: `TabView.context` `{ used, max }`, `usage`
+5.5 and 5.6's 272K) at those rates, every token of it; fast (claude's `usage.speed` `fast`) times every rate.
+
+The ledger (meters.ts `ledger`): `<data>/usage-days.json` is the only one, by chat (its session id: claude's transcript
+name, codex's `session_meta` id, OpenCode's, agy's and Grok's own; a tab's `resumeId` is that same id for each). Each
+answer an agent's API call was billed for counts once: its key (`answerKey`: claude's message id and request id, else
+the line's uuid; codex's `token_count` payload, totals and limits, copied as they were; Grok's turn end and model, agy's
+conversation and step row, OpenCode's message id: agentUsage.ts; sha-256, 11 characters) is owned by the first chat to
+report it (`owners`, kept as each chat's `keys` by day, gone with the day) and its parts are added to that chat's day
+and model as it's claimed (`rowAdd`); a forked or resumed chat's copied lines add nothing there, its context still its
+own. A tab's file also by its first file (`keyFile`: a spawned codex thread's copy of its parent's turns). Every reader
+goes through it: a tab's live read (`ownsOf` in meterOf, `otherRead`'s records) and the machine scan (below); a reader
+only reads and hands records (share.ts `UseRec`: chat, key, day, model, parts or `own`, cwd). `grow`: an answer claimed in
+the last 10 minutes (`GROW_MS`) and its parts so far, kept in the file: a later line of it adds what grew (over a
+restart too); ponytail: one whose lines are further apart counts its earlier ones. `pre` (`LEDGER_V` 2): what 0.68.0
+kept that no key backs (rows from before parts, Grok's, agy's and OpenCode's totals), moved aside as the file loads and
+shown as it is until the chat is read again (its first record): the recount replaces it outright; a chat whose
+transcript is gone keeps it, and a deleted transcript never loses its rows or keys. `skip`: chats Laki's own runs made
+(`usageSkip`: Laki AI's claude -p and codex exec chats, their session or thread id; aiOnce's claude runs
+`--no-session-persistence`, never resumed): its call log counts them. `usageWs`: a side chat's fork (turns.ts) is its
+tab's workspace's. `meterView`: `TabView.context` `{ used, max }`, `usage`
 `{ tokens, cost? }`, `skills` (B7: share.ts `skillsIn`, the lines that name `Skill`, `SKILL.md` or *Base directory for
 this skill*: claude's Skill calls (`input.skill`), the message that loads one (its folder; a `/skill` typed has only
 that), a Read of a SKILL.md; codex's shell calls that read one; the main chat's, by name in the order loaded, 50 at
@@ -775,15 +790,14 @@ most). The status bar's `.sb-ctx` is a button: its menu lists them, a pick calls
 folder said, else the workspace's `.claude/skills/<name>` or `.codex/skills/<name>`, else the agent's own; its SKILL.md
 in the editor; the user's only). share.ts `toolLine` names a Skill call's skill (the Reader's `.rd-skill` chip). Today's (`dayOf`, by each line's `timestamp`, this Mac's day: the day's parts)
 per chat in `<data>/usage-today.json` (`spent`: `day`, `chats` by resume id with its workspace, its name then, `tokens` and
-`models` (each a `Row`; one kept before parts under `''` until the parts outgrow it),
-`nameOf`: none for a private one, so a removed one is still named, `gone` in StatusBar's Today; a chat's the more of
-what was kept and what's read now, so a restart's reading anew counts once and a closed tab's stays), the view's `today`
+`models` (each a `Row`, the ledger's of today: `todayFlush` copies a chat's as the ledger moves it; one kept before parts
+under `''` until the chat's read again), `nameOf`: none for a private one, so a removed one is still named, `gone` in
+StatusBar's Today), the view's `today`
 (`todayView`: tokens, cost, the 5 workspaces that used most, `unpriced`: the models with no price and their tokens, the
-popup's *no price for <model>* lines). The Usage page's days: `<data>/usage-days.json` (`kept`: by chat its workspace,
-agent, `days` (day, model: a `Row`) and `keys`), written 2 s after a read (`daysLater`, once for a tick's tabs; `daysWrite`
+popup's *no price for <model>* lines). The Usage page's days: the ledger (`kept`: by chat its workspace,
+agent, `days` (day, model: a `Row`), `keys`, `pre`), written 2 s after a read (`daysLater`, once for a tick's tabs; `daysWrite`
 as the daemon stops), 90 days kept. A `Row` (share.ts): `{ p }` parts, priced now; `{ tokens, cost, own }` an agent's own
 count (Grok's and OpenCode's price; agy's no cost: no price); `{ tokens, cost }` one kept before parts (old: its cost then).
-`rowMerge`: part by part the more of kept and read (a restart reads each chat anew), an old row until parts reach it.
 `usageDays` (`daysRows`): a row per day, agent, model and workspace with `priced` (false: no price), `old`, `read` and
 `input` (the cache's share: Usage.tsx *From cache*). `test/meter.test.ts`: the prices, a 1-hour write, fast mode, long
 prompts, the fixtures' models all priced (`test/fixtures/transcripts`), a re-price of a kept day (`PRICE_OWN` changed), a
@@ -802,16 +816,16 @@ lower cap only (`capRaises`, main.ts' `agentNo`), never a project's or profile's
 one (`WS_SET`, `NEW_KEYS`). A workflow's budget holds in its runs too: whichever ends first stops it. A closed
 tab's cost stays in the sum and the cost warning's: `Workspace.spentClosed`, added in core.ts `closeTab` (the daemon's,
 no call sets it), its `ClosedTab.spent` taken off again when ⇧⌘T resumes its chat (its meter counts it then); an
-unpriced chat's tokens leave it. ponytail: a host's tabs aren't metered. `test/meter.test.ts`, `test/agent-gates.test.ts`. Grok's, Antigravity's and OpenCode's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) add
-their days and today's under their own chat ids: Grok's `~/.grok/sessions/<folder>/<id>/usage.json` (each turn's
+unpriced chat's tokens leave it. ponytail: a host's tabs aren't metered. `test/meter.test.ts`, `test/agent-gates.test.ts`. Grok's, Antigravity's and OpenCode's tabs (`agentUsage.ts`, from `meterTick`'s `otherRead`: this Mac's, read only) hand
+the ledger their records under their own chat ids (`agentDays`, a record per turn, step or message, its key its own): Grok's `~/.grok/sessions/<folder>/<id>/usage.json` (each turn's
 `endedAt`, per model `totalTokens` and `costUsdTicks`, 1e-10 USD, its own price; the folder `encodeURIComponent` of the
 worktree, else any holding the id), agy's `~/.gemini/antigravity-cli/conversations/<id>.db` (its id, else
 `cache/last_conversations.json`'s for the worktree; cloned to a temp folder with its WAL (`COPYFILE_FICLONE`: on APFS no
 bytes copied, elsewhere node's copy), read with node's own sqlite, at most every 30 s per tab and only the `steps` rows
-past the last one with usage that tab counted (`agyRead`'s `last`, kept in `seen` with its days: `agyNext` adds them; a
+past the last one with usage that tab counted (`agyRead`'s `last`, kept in `seen`; a
 row with no usage yet, a step under way, is read again; the table's rowid going below it is another conversation: read
 whole); a DB and its WAL past 32 MB (`AGY_BIG`) are read in a worker (`agyWorker.ts`, its own build entry: 512 MB heap,
-ended at 20 s; the tab's days as they were until it answers), past 256 MB not at all: `steps`' metadata, field 1 its time, field 9 its usage, 2+3+4+5 input, output, cache writes
+ended at 20 s; its records as it answers), past 256 MB not at all: `steps`' metadata, field 1 its time, field 9 its usage, 2+3+4+5 input, output, cache writes
 and reads; `gen_metadata`'s 1.3 → 1.19 the model's name; tokens only). OpenCode's: its own `opencode.db` (the `data`
 folder `opencode debug paths` names, `ocDb`: asked once, again every 10 minutes while it hasn't said; else
 `XDG_DATA_HOME` or `~/.local/share`, then `opencode`; `OPENCODE_DB` when set; else the newest `opencode-<channel>.db`),

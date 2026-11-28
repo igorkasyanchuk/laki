@@ -7,12 +7,12 @@ import { dirname, join, relative, sep } from 'node:path'
 import { createInterface } from 'node:readline'
 import { readJson, writeAtomic } from '../shared/conn.ts'
 import { planDone } from '../shared/todos.ts'
-import { type ChatHit, type Goal, HOME_ACCOUNT, priceOf, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
+import { type ChatHit, type Goal, HOME_ACCOUNT, type Parts, partsAdd, priceOf, type Tab, type TabView, type Today, type UsageWindow, type Workspace } from '../shared/types.ts'
 import { accountNamed, homeDir } from './accounts.ts'
 import { changed, chatFile, findWs, keptChat, keptOnly, openPath, presetOf, state } from './core.ts'
 import { type Spend, type SpendEntry, spendBreakdown, spendEntries } from '../shared/spend.ts'
 import { dir } from './dir.ts'
-import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, daysRows, isOld, type McpCall, type Meter, meterCost, meterNew, meterOf, num, type Owns, type Row, rowCost, rowMerge, rowsOf, rowTokens, type Said, transcriptOf } from './share.ts'
+import { type BgRead, bgOf, type BgTask, type ByModel, chatOf, dayOf, daysRows, isOld, type McpCall, type Meter, meterCost, meterNew, meterOf, num, type Owns, type Row, rowCost, rowTokens, partsMax, type Said, transcriptOf, type UseRec } from './share.ts'
 export type { McpCall }
 import { claudeWindows } from './usage.ts'
 import { acpChat } from './acp.ts'
@@ -179,8 +179,8 @@ type Sum = Pick<Meter, 'tokens' | 'by' | 'days'>
 type MeterRun = Tail & { m: Meter; big?: boolean; bg: BgRead; subs: Map<string, Sub>; sum?: Sum; keyFile: Map<string, string>; kids?: { at: number; files: string[] } } // big: claude's own settings run it on a 1M window
 const meters = new Map<string, MeterRun>()
 const todayPath = join(dir, 'usage-today.json')
-// name: its workspace's as it was, so one removed since is still named in Today; models: today's rows (the old one
-// under '': a chat kept before parts, its tokens and cost)
+// name: its workspace's as it was, so one removed since is still named in Today; models: today's rows, the ledger's (the
+// old one under '': a chat kept before parts, its tokens and cost, until the chat's read again)
 type TodayChat = { ws: string; name?: string; tokens: number; models: Record<string, Row> }
 let spent: { day: string; chats: Record<string, TodayChat> } | undefined
 // (none for a private one, or one of a private project: Recording mode hides them, never named here)
@@ -192,15 +192,19 @@ function spentNow() {
   for (const c of Object.values(spent.chats)) if (!c.models || typeof c.models !== 'object') c.models = { '': { tokens: num(c.tokens) ?? 0, cost: num((c as { cost?: unknown }).cost) ?? 0 } }
   return spent
 }
-function keepToday(id: string, ws: string, models: Record<string, Row>) {
+// today's of the chats the ledger moved (todo), from it: their rows of today as it has them, their workspace's name
+const todo = new Set<string>()
+function todayFlush() {
+  if (!todo.size) return
   const s = spentNow()
-  const c = (s.chats[id] ??= { ws, tokens: 0, models: {} })
-  let moved = false
-  for (const [model, row] of Object.entries(models)) (r => r && ((c.models[model] = r), (moved = true)))(rowMerge(c.models[model], row))
-  const old = c.models['']
-  if (old && Object.entries(c.models).reduce((n, [k, r]) => n + (k ? rowTokens(r) : 0), 0) >= rowTokens(old)) delete c.models[''], (moved = true)
-  if (!moved) return
-  ;(c.ws = ws), (c.name = nameOf(ws)), (c.tokens = Object.values(c.models).reduce((n, r) => n + rowTokens(r), 0))
+  const day = s.day
+  for (const id of todo) {
+    const c = keptNow().chats[id]
+    const models = { ...c?.pre?.[day], ...c?.days[day] }
+    if (!c || !Object.keys(models).length) continue
+    s.chats[id] = { ws: c.ws, name: nameOf(c.ws) ?? s.chats[id]?.name, tokens: Object.values(models).reduce((n, r) => n + rowTokens(r), 0), models }
+  }
+  todo.clear()
   writeAtomic(todayPath, JSON.stringify(s))
 }
 // true: it read something new
@@ -227,10 +231,7 @@ export function meterRead(tab: Tab, look = false) { // look: a turn's end, its t
     if (t) meterOf(tab.preset!, t, sub.m, now, ownsOf(tab, r, f)), (read = true)
   }
   if (!read) return moved
-  r.sum = r.subs.size ? meterSum([r.m, ...[...r.subs.values()].map(x => x.m)]) : r.m
-  const today = r.sum.days?.[dayOf(now)]
-  if (today) keepToday(tab.resumeId!, tab.workspace, rowsOf(today))
-  keepDays(tab, Object.fromEntries(Object.entries(r.sum.days ?? {}).map(([d, by]) => [d, rowsOf(by)])))
+  r.sum = r.subs.size ? meterSum([r.m, ...[...r.subs.values()].map(x => x.m)]) : r.m // the ledger has each answer as it was read (ownsOf)
   return true
 }
 function meterSum(ms: Meter[]): Sum {
@@ -373,49 +374,109 @@ export function chatCostBefore(tab: Tab, since: number): number | undefined {
   return cost
 }
 
-// each day's by agent and model, the Usage page's: <data>/usage-days.json by chat, its days USAGE_KEEP back. A chat's
-// day and model: the more of what was kept and what's read now (a restart reads each chat anew), as today's is
+// ---------- the ledger: <data>/usage-days.json, the only one (the Usage page's days, Today's), by chat (its session id),
+// USAGE_KEEP days back. Each answer an agent's API call was billed for counts once: its key (share.ts answerKey; Grok's,
+// agy's and OpenCode's: agentUsage.ts) is owned by the first chat to report it, kept with its day (keys, gone with it),
+// and its parts added to that chat's day and model as it's claimed. Every reader goes through ledger(): a Laki tab's
+// live read (meterRead's ownsOf, otherRead) and the machine scan (usageScan.ts). A copy of an answer in a forked or
+// resumed chat counts nowhere else. grow: an answer claimed in the last GROW_MS and its parts so far: a later line of it
+// (a subagent's output grows as it streams) adds what grew, the larger of each part, over a restart too. pre: what was
+// kept before every row had keys (0.68.0's rows from before parts, Grok's, agy's and OpenCode's totals), shown as it is
+// until the chat's read again (its first record): the recount replaces it outright; a chat whose transcript is gone keeps
+// it. skip: chats Laki's own runs made (Laki AI's call log counts them: usageSkip)
 export const USAGE_KEEP = 90
+const LEDGER_V = 2
+const GROW_MS = 10 * 60_000 // ponytail: an answer whose lines are further apart than this counts its earlier ones only
 const daysPath = join(dir, 'usage-days.json')
-// keys: the answers a chat owns (share.ts answerKey's, 11 characters each, run together) by their day, gone with it
-type KeptChat = { ws: string; agent: string; days: Record<string, Record<string, Row>>; keys?: Record<string, string> }
-type Kept = { chats: Record<string, KeptChat> }
+type Days = Record<string, Record<string, Row>> // by day, then model
+// ws: its workspace ('' run outside Laki: dir, the folder it ran in, its newest line's)
+type KeptChat = { ws: string; agent: string; days: Days; keys?: Record<string, string>; pre?: Days; dir?: string; made?: number } // made: usageWs's, kept empty until the scan finds it
+type Kept = { v?: number; chats: Record<string, KeptChat>; grow?: Record<string, [chat: string, at: number, day: string, model: string, p: Parts]>; skip?: Record<string, number> }
 let kept: Kept | undefined
 let owners: Map<string, string> | undefined // an answer's key: the chat that owns it
 let daysT: ReturnType<typeof setTimeout> | undefined
-const keptNow = () => (kept ??= (k => (k && typeof k.chats === 'object' ? k : { chats: {} }))(readJson<Kept>(daysPath)))
+function keptNow() {
+  if (kept) return kept
+  const k = readJson<Kept>(daysPath)
+  kept = k && typeof k.chats === 'object' ? k : { v: LEDGER_V, chats: {} }
+  if (kept.v !== LEDGER_V) { // 0.68.0's: its rows no key backs (all but parts) are pre
+    for (const c of Object.values(kept.chats))
+      for (const [d, models] of Object.entries(c.days ?? {})) {
+        for (const [m, r] of Object.entries(models)) if (!('p' in r)) (((c.pre ??= {})[d] ??= {})[m] = r), delete models[m]
+        if (!Object.keys(models).length) delete c.days[d]
+      }
+    kept.v = LEDGER_V
+  }
+  return kept
+}
 function ownersNow() {
   if (owners) return owners
   owners = new Map()
   for (const [id, c] of Object.entries(keptNow().chats)) for (const s of Object.values(c.keys ?? {})) for (let i = 0; i + 11 <= s.length; i += 11) owners.set(s.slice(i, i + 11), id)
   return owners
 }
-// a tab's file's answers: one counts if no other chat reported it first (a forked or resumed chat's copied lines are
-// the first one's) and no other file of this tab counted it (a codex thread's copy of its parent's turns); a claim is
-// kept with its day
-const ownsOf = (tab: Tab, r: MeterRun, file: string): Owns => (key, day) => {
+// one answer into the ledger: false when another chat owns it (or Laki's own run made the chat). ws: a Laki tab's
+// workspace (the chat's rows move there: an outside chat resumed in a tab); none: the scan's (the chat's folder kept
+// while no tab claimed it)
+export function ledger(r: UseRec, ws?: string): boolean {
+  const k = keptNow()
+  if (k.skip?.[r.chat]) return false
+  const c = (k.chats[r.chat] ??= { ws: ws ?? '', agent: r.agent, days: {} })
+  if (ws !== undefined && c.ws !== ws) (c.ws = ws), delete c.dir, todo.add(r.chat), daysLater()
+  else if (ws === undefined && !c.ws && r.cwd && c.dir !== r.cwd) (c.dir = r.cwd), daysLater()
+  if (c.pre) delete c.pre, todo.add(r.chat), daysLater() // read again: the recount replaces what was kept before keys
   const o = ownersNow()
-  const by = o.get(key)
-  if (by !== undefined && by !== tab.resumeId) return false
+  const by = o.get(r.key)
+  if (by !== undefined && by !== r.chat) return false
+  if (by === undefined) {
+    o.set(r.key, r.chat)
+    ;(c.keys ??= {})[r.day] = (c.keys[r.day] ?? '') + r.key
+    rowAdd(r.chat, c, r.day, r.model, r)
+    if (r.p) (k.grow ??= {})[r.key] = [r.chat, Date.now(), r.day, r.model, r.p]
+    return true
+  }
+  const g = k.grow?.[r.key]
+  if (!g || !r.p) return true
+  const d: Parts = {}
+  for (const [x, v] of Object.entries(r.p)) if (v > (g[4][x] ?? 0)) d[x] = v - (g[4][x] ?? 0)
+  if (Object.keys(d).length) rowAdd(r.chat, c, g[2], g[3], { p: d }), (g[4] = partsMax(g[4], r.p))
+  return true
+}
+function rowAdd(id: string, c: KeptChat, day: string, model: string, r: Pick<UseRec, 'p' | 'own'>) {
+  const d = (c.days[day] ??= {})
+  const was = d[model]
+  if (r.p) d[model] = { p: partsAdd(was && 'p' in was ? { ...was.p } : {}, r.p) }
+  else if (r.own) {
+    const w = was && !('p' in was) ? was : undefined
+    const cost = r.own.cost === undefined && w?.cost === undefined ? undefined : (w?.cost ?? 0) + (r.own.cost ?? 0)
+    d[model] = { tokens: (w?.tokens ?? 0) + r.own.tokens, ...(cost !== undefined && { cost }), own: true }
+  }
+  if (day === dayOf(Date.now())) todo.add(id)
+  daysLater()
+}
+// Laki's own runs' chats (Laki AI's, a side chat's fork): never counted here, its call log has them
+export function usageSkip(id: string | undefined) {
+  if (!id) return
+  ;(keptNow().skip ??= {})[id] = Date.now()
+  daysLater()
+}
+// a chat Laki ran outside a tab (a side chat's fork): its workspace's, wherever the scan finds it
+export function usageWs(id: string | undefined, ws: string, agent: string) {
+  if (!id) return
+  const c = (keptNow().chats[id] ??= { ws, agent, days: {}, made: Date.now() })
+  if (c.ws !== ws) (c.ws = ws), delete c.dir, todo.add(id)
+  daysLater()
+}
+// a tab's file's answers: one counts if no other chat reported it first (a forked or resumed chat's copied lines are
+// the first one's) and no other file of this tab counted it (a codex thread's copy of its parent's turns)
+const ownsOf = (tab: Tab, r: MeterRun, file: string): Owns => (key, day, model, p) => {
   const was = r.keyFile.get(key)
   if (was !== undefined && was !== file) return false
+  if (!ledger({ chat: tab.resumeId!, agent: tab.preset!, key, day, model, p }, tab.workspace)) return false
   r.keyFile.set(key, file)
-  if (by === undefined) {
-    o.set(key, tab.resumeId!)
-    const c = (keptNow().chats[tab.resumeId!] ??= { ws: tab.workspace, agent: tab.preset!, days: {} })
-    ;(c.keys ??= {})[day] = (c.keys[day] ?? '') + key
-    daysLater()
-  }
   return true
 }
 const timeOf = (day: string) => (([y, m, d]) => new Date(y, m - 1, d).getTime())(day.split('-').map(Number))
-function keepDays(tab: Tab, days: Record<string, Record<string, Row>>) {
-  if (!tab.resumeId) return
-  const c = (keptNow().chats[tab.resumeId] ??= { ws: tab.workspace, agent: tab.preset!, days: {} })
-  let moved = false
-  for (const [day, models] of Object.entries(days)) for (const [model, row] of Object.entries(models)) (r => r && (((c.days[day] ??= {})[model] = r), (moved = true)))(rowMerge(c.days[day]?.[model], row))
-  if (moved) daysLater()
-}
 // written a moment later, once for every tab a tick read (and as the daemon stops: main.ts' shutdown)
 function daysLater() {
   if (daysT) return
@@ -425,15 +486,20 @@ function daysLater() {
 export function daysWrite() {
   clearTimeout(daysT)
   daysT = undefined
+  todayFlush()
   const k = kept
   if (!k) return
   const from = Date.now() - USAGE_KEEP * 864e5
   let gone = false
   for (const [id, x] of Object.entries(k.chats)) {
     for (const d of Object.keys(x.days)) if (timeOf(d) < from) delete x.days[d]
+    for (const d of Object.keys(x.pre ?? {})) if (timeOf(d) < from) delete x.pre![d]
+    if (x.pre && !Object.keys(x.pre).length) delete x.pre
     for (const d of Object.keys(x.keys ?? {})) if (timeOf(d) < from) delete x.keys![d], (gone = true)
-    if (!Object.keys(x.days).length) delete k.chats[id], (gone = true)
+    if (!Object.keys(x.days).length && !x.pre && !((x.made ?? 0) > from)) delete k.chats[id], (gone = true)
   }
+  for (const [key, g] of Object.entries(k.grow ?? {})) if (Date.now() - g[1] > GROW_MS) delete k.grow![key]
+  for (const [id, at] of Object.entries(k.skip ?? {})) if (at < from) delete k.skip![id]
   if (gone) owners = undefined // read again from what's kept
   writeAtomic(daysPath, JSON.stringify(k))
 }
@@ -441,7 +507,8 @@ export function daysWrite() {
 // and its workspace's id (ws: the Usage page's Where it went names it, or says it's gone), priced by today's table
 // (costOf). priced: false, tokens with no price (none for its model; agy's); old: some kept before parts, at their cost
 // then; read and input: its cache reads of all its input (the cache's share), parts' only
-export const usageDays = () => ({ keep: USAGE_KEEP, rows: daysRows(keptNow().chats) })
+export const usageDays = () => ({ keep: USAGE_KEEP, rows: daysRows(Object.fromEntries(Object.entries(keptNow().chats).map(([id, c]) => [id, c.pre ? { ...c, days: daysJoin(c.days, c.pre) } : c]))) })
+const daysJoin = (a: Days, b: Days): Days => Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].map(d => [d, { ...b[d], ...a[d] }]))
 // ponytail: claude's API retries (meterOf's retry: the Reader's line, the tab's Retrying…) come with this read too; both
 // meters off, none show
 export function meterTick() {
@@ -449,25 +516,21 @@ export function meterTick() {
   let any = false
   const archived = new Set(state.workspaces.filter(w => w.archived).map(w => w.id)) // nothing to read until it's back
   for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex') && !archived.has(t.workspace)) any = meterRead(t) || any
-  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'grok' || t.preset === 'gemini' || t.preset === 'opencode') && !archived.has(t.workspace)) otherRead(t)
+  for (const t of state.tabs) if (t.kind === 'agent' && (t.preset === 'grok' || t.preset === 'gemini' || t.preset === 'opencode') && !archived.has(t.workspace)) any = otherRead(t) || any
   for (const id of meters.keys()) if (!state.tabs.some(t => t.id === id)) meters.delete(id)
   agentDaysTidy(id => state.tabs.some(t => t.id === id)) // grok's and agy's, closed
   for (const id of lines.keys()) if (!state.tabs.some(t => t.id === id)) lines.delete(id)
   if (any) changed()
 }
-// Grok's, Antigravity's and OpenCode's chats (agentUsage.ts): their days for the Usage page, today's for Today (Grok's
-// and OpenCode's at their own price, agy's tokens only). This Mac's only
+// Grok's, Antigravity's and OpenCode's chats (agentUsage.ts): each answer into the ledger, under the tab's workspace
+// (Grok's and OpenCode's at their own price, agy's tokens only). This Mac's only
 function otherRead(t: Tab) {
   const ws = state.workspaces.find(w => w.id === t.workspace)
-  if (!ws || ws.host) return
-  const r = agentDays(t, ws.path)
-  if (!r) return
-  const { id, days } = r
-  const priced = t.preset !== 'gemini' // agy's: tokens only
-  const rows = (by: Record<string, { tokens: number; cost: number }>) => Object.fromEntries(Object.entries(by).map(([m, v]): [string, Row] => [m, { tokens: v.tokens, ...(priced && { cost: v.cost }), own: true }]))
-  keepDays({ ...t, resumeId: id }, Object.fromEntries(Object.entries(days).map(([d, by]) => [d, rows(by)])))
-  const today = days[dayOf(Date.now())]
-  if (today) keepToday(id, t.workspace, rows(today))
+  if (!ws || ws.host) return false
+  return agentDays(t, ws.path, recs => {
+    for (const x of recs) ledger(x, t.workspace)
+    changed()
+  })
 }
 const WINDOW = 200e3 // claude's context unless its model says [1m] (its transcript doesn't say)
 // claude's own settings, as it reads them (the workspace's local, then its project's, then yours: its account's folder):
@@ -593,6 +656,7 @@ export function statusTidy() {
 
 // today's, the workspaces that used most first (5); unpriced: the models with no price, their tokens
 export function todayView(): Today | undefined {
+  todayFlush()
   const chats = Object.values(spentNow().chats)
   if (!chats.length) return
   const ws = new Map<string, { ws: string; name?: string; tokens: number; cost: number }>()

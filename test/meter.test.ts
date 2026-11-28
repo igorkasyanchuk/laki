@@ -216,7 +216,7 @@ test('prices: every model the test fixtures’ transcripts name has a price', ()
 })
 
 test('usage days: kept as token parts and priced as read (a new price re-prices a kept day); old rows keep their cost; no price says so', async t => {
-  const { daysRows, rowMerge } = await import('../src/daemon/share.ts')
+  const { daysRows, partsMax } = await import('../src/daemon/share.ts')
   const day = '2026-11-20'
   const chats = {
     c1: { ws: 'w', agent: 'claude', days: { [day]: { 'claude-opus-5-5': { p: { in: 1e6, w1: 1e6 } }, 'claude-next-9': { p: { in: 1000, rd: 3000 } } } } },
@@ -232,11 +232,7 @@ test('usage days: kept as token parts and priced as read (a new price re-prices 
   t.after(() => (PRICE_OWN['claude-opus-5-5'] = was))
   PRICE_OWN['claude-opus-5-5'] = { in: 40 }
   assert.equal(row('claude-opus-5-5').cost, 40 + 8 + 1.5, 'the same kept day at the new price; the old row at its own')
-  assert.deepEqual(rowMerge({ p: { in: 5, out: 9 } }, { p: { in: 7, out: 2 } }), { p: { in: 7, out: 9 } }, 'the more of each part')
-  assert.equal(rowMerge({ p: { in: 7 } }, { p: { in: 7 } }), undefined)
-  assert.deepEqual(rowMerge({ tokens: 10, cost: 1 }, { p: { in: 10 } }), { p: { in: 10 } }, 'an old row: its parts once they reach it')
-  assert.equal(rowMerge({ tokens: 10, cost: 1 }, { p: { in: 9 } }), undefined)
-  assert.deepEqual(rowMerge({ tokens: 10, own: true }, { tokens: 12, cost: 0.2, own: true }), { tokens: 12, cost: 0.2, own: true })
+  assert.deepEqual(partsMax({ in: 5, out: 9 }, { in: 7, out: 2, rd: 1 }), { in: 7, out: 9, rd: 1 }, 'the more of each part')
 })
 
 const FX = join(import.meta.dirname, 'fixtures/transcripts')
@@ -312,6 +308,35 @@ test('meter: a forked chat’s copied answers count once, to the chat that repor
   assert.equal((await rig.rpc('state')).today.tokens, 41830 + 150)
 })
 
+test('ledger: an answer’s lines count the largest of each part, over a restart too; 0.68.0’s rows no key backs are replaced as the chat is read again, kept where it isn’t', async t => {
+  const rig = await fresh(t, { env: { LAKI_METER_MS: '200' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await until(async () => (x => x?.resumeId && x)(await rig.tab(ws.id)), 'its chat')
+  const dir = join(rig.home, '.claude/projects/-tmp-repo')
+  mkdirSync(join(dir, 'grow-1/subagents'), { recursive: true })
+  const ans = (id: string, model: string, i: number, o: number, more = {}) => line({ type: 'assistant', timestamp: new Date().toISOString(), requestId: `r_${id}`, message: { id, model, usage: { input_tokens: i, output_tokens: o } }, ...more })
+  writeFileSync(join(dir, 'grow-1.jsonl'), ans('msg_m', 'claude-opus-5-5', 100, 10))
+  const sub = join(dir, 'grow-1/subagents/agent-g.jsonl')
+  writeFileSync(sub, ans('msg_g', 'claude-haiku-5-5', 7, 2, { isSidechain: true }) + ans('msg_g', 'claude-haiku-5-5', 5, 40, { isSidechain: true })) // its output as it streams; a later line's input no bigger
+  await rig.rpc('hook', { tab: tab.id, state: 'start', payload: { session_id: 'grow-1' } })
+  const total = async () => (await rig.rpc('usageDays')).rows.reduce((n: number, r: any) => n + r.tokens, 0)
+  await until(async () => (await total()) === 110 + 7 + 40, 'the largest of each part')
+  await rig.stop()
+  appendFileSync(sub, ans('msg_g', 'claude-haiku-5-5', 7, 300, { isSidechain: true })) // its last line, written as the daemon was down
+  // the ledger as 0.68.0 left it: no version, a row from before parts for this chat and one for a chat whose transcript is gone
+  const f = join(rig.data, 'usage-days.json')
+  const k = JSON.parse(readFileSync(f, 'utf8'))
+  delete k.v
+  const y = dayOf(Date.now() - 864e5)
+  k.chats['grow-1'].days[y] = { 'claude-opus-5-5': { tokens: 999, cost: 2 } }
+  k.chats['gone-1'] = { ws: ws.id, agent: 'claude', days: { [y]: { 'claude-opus-5-5': { tokens: 500, cost: 1 } } } }
+  writeFileSync(f, JSON.stringify(k))
+  await rig.start()
+  await until(async () => (await total()) === 110 + 7 + 300 + 500, 'what grew once; grow-1’s old row recounted (it has none that day), gone-1’s kept')
+  assert.equal((await rig.rpc('state')).today.tokens, 110 + 7 + 300)
+})
+
 // a protobuf message: [field, varint or bytes]…
 const pb = (...fs: [number, number | Uint8Array][]) => {
   const vi = (n: number) => { const b: number[] = []; do { const x = n % 128; n = Math.floor(n / 128); b.push(n ? x | 128 : x) } while (n); return b }
@@ -357,7 +382,7 @@ test("meter: Grok's and Antigravity's chats by day and model for the Usage page 
 // Antigravity's DB read again: only the steps past the last one with usage (a step under way is read again), added to
 // the days kept; a DB whose rows went back (another conversation) starts over; the temp folder goes even when it throws
 test('agyRead: only the new steps; a smaller DB starts over; no temp folder left', async t => {
-  const { agyNext, agyRead, agyRows } = await import('../src/daemon/agentUsage.ts')
+  const { agyRead, agyRows } = await import('../src/daemon/agentUsage.ts')
   const { DatabaseSync } = await import('node:sqlite')
   const dir = mkdtempSync(join(tmpdir(), 'laki-agy-test-'))
   const was = process.env.TMPDIR
@@ -372,27 +397,25 @@ test('agyRead: only the new steps; a smaller DB starts over; no temp folder left
     for (const n of steps) db.prepare('INSERT INTO steps VALUES (0, ?)').run(step(n))
     db.close()
   }
-  const total = (d: Record<string, Record<string, { tokens: number }>>) => Object.values(d).flatMap(Object.values).reduce((n, m) => n + m.tokens, 0)
+  const total = (r: { recs: { own?: { tokens: number } }[] }) => r.recs.reduce((n, x) => n + (x.own?.tokens ?? 0), 0)
   const f = join(dir, 'conv.db')
   make(f, 100, 200)
   let n = agyRows.n
   const r1 = agyRead(f)!
-  assert.deepEqual([total(r1.days), r1.last, r1.again, agyRows.n - n], [300, 2, false, 2])
-  let kept = agyNext(undefined, r1)
+  assert.deepEqual([total(r1), r1.last, r1.again, agyRows.n - n], [300, 2, false, 2])
+  assert.deepEqual([new Set(r1.recs.map(x => x.key)).size, r1.recs[0].chat], [2, 'conv'], 'a key a step, the conversation its chat')
   make(f, 50, undefined) // one more step, and one under way (no usage yet)
   n = agyRows.n
   const r2 = agyRead(f, r1.last)!
-  assert.deepEqual([total(r2.days), r2.last, agyRows.n - n], [50, 3, 2], 'the two new rows only')
-  kept = agyNext(kept, r2)
-  assert.equal(total(kept), 350)
+  assert.deepEqual([total(r2), r2.last, agyRows.n - n], [50, 3, 2], 'the two new rows only')
   n = agyRows.n
   assert.equal(agyRead(f, r2.last)!.last, 3)
   assert.equal(agyRows.n - n, 1, 'the step under way read again')
-  // replaced by a smaller one (another conversation): read whole, the kept days dropped
+  // replaced by a smaller one (another conversation): read whole
   rmSync(f)
   make(f, 70)
   const r3 = agyRead(f, 3)!
-  assert.deepEqual([r3.again, total(agyNext(kept, r3))], [true, 70])
+  assert.deepEqual([r3.again, total(r3)], [true, 70])
   // not a DB: nothing, and its temp folder gone
   writeFileSync(join(dir, 'bad.db'), 'not sqlite')
   assert.equal(agyRead(join(dir, 'bad.db')), undefined)
@@ -429,8 +452,8 @@ test('ocRead: a session and its subagents’ messages, OpenCode’s own cost; on
   ocSaid(db, 'm4', 'ses_subsub', 'z-ai/glm-5.1', [100, 10, 0, 0, 0], 0.001)
   ocSaid(db, 'm5', 'ses_main', 'z-ai/glm-5.1', [700, 77, 0, 0, 0], 0.002, false) // still answering
   const by = (r: any) => {
-    const m: Record<string, { tokens: number; cost: number }> = {} // a model's days summed: m6, two hours back, is yesterday's before 2 am
-    for (const d of Object.values(r.days) as any[]) for (const [k, v] of Object.entries(d) as any) m[k] = { tokens: (m[k]?.tokens ?? 0) + v.tokens, cost: (m[k]?.cost ?? 0) + v.cost }
+    const m: Record<string, { tokens: number; cost: number }> = {} // a model's records summed: m6, two hours back, is yesterday's before 2 am
+    for (const x of r.recs) m[x.model] = { tokens: (m[x.model]?.tokens ?? 0) + x.own.tokens, cost: (m[x.model]?.cost ?? 0) + x.own.cost }
     return Object.entries(m).map(([k, v]) => [k, v.tokens, Math.round(v.cost * 1e6) / 1e6]).sort()
   }
   let n = ocRows.n
@@ -448,6 +471,9 @@ test('ocRead: a session and its subagents’ messages, OpenCode’s own cost; on
   assert.deepEqual([by(r3), r3.last], [[['z-ai/glm-5.1', 50, 0]], 8])
   db.close()
   assert.equal(ocRead(join(dir, 'none.db'), 'ses_main'), undefined)
+  // every session (the machine scan's): each under the one it hangs from, in that one's folder
+  const all = ocRead(f, undefined)!
+  assert.deepEqual([...new Set(all.recs.map(x => `${x.chat} ${x.cwd}`))].sort(), ['ses_main /tmp', 'ses_other /tmp'])
 })
 
 test("meter: OpenCode's sessions from its own database, for the Usage page and Today, at OpenCode's own price", async t => {
